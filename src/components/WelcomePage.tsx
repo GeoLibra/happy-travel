@@ -11,11 +11,44 @@ interface WelcomeProps {
 
 const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   const [mounted, setMounted] = useState(false);
+  const [isPressing, setIsPressing] = useState(false);
+  const [progress, setProgress] = useState(0);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isPressing) {
+      if (audioRef.current && progress === 0) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.volume = 0.8;
+        audioRef.current.play().catch(() => {});
+      }
+      interval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 100) return 100;
+          return prev + 1;
+        });
+      }, 50); // 5s total duration
+    } else {
+      setProgress(0);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+    }
+    return () => clearInterval(interval);
+  }, [isPressing]);
+
+  useEffect(() => {
+    if (progress === 100) {
+      const timer = setTimeout(() => onEnter(), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [progress, onEnter]);
 
   if (!mounted) return null;
 
@@ -128,31 +161,26 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
           transition={{ duration: 0.8, delay: 1.2, ease: "backOut" }}
         >
           <button
-            onClick={onEnter}
-            onMouseEnter={() => {
-              if (audioRef.current) {
-                audioRef.current.currentTime = 0;
-                audioRef.current.volume = 0.8;
-                const playPromise = audioRef.current.play();
-                if (playPromise !== undefined) {
-                  playPromise.catch(() => {
-                    // Ignore autoplay errors quietly
-                  });
-                }
-              }
+            onPointerDown={(e) => {
+              e.preventDefault();
+              setIsPressing(true);
             }}
-            onMouseLeave={() => {
-               if (audioRef.current) {
-                   audioRef.current.pause();
-                   audioRef.current.currentTime = 0;
-               }
-            }}
-            className="group relative inline-flex items-center justify-center gap-3 px-10 py-4 bg-[#FFB800] text-[#001A30] font-black text-xl uppercase tracking-wider transform -skew-x-12 transition-all hover:bg-white hover:scale-105 hover:shadow-[0_0_30px_rgba(255,184,0,0.6)] active:scale-95 overflow-hidden"
+            onPointerUp={() => setIsPressing(false)}
+            onPointerLeave={() => setIsPressing(false)}
+            onContextMenu={(e) => e.preventDefault()}
+            className="group relative inline-flex items-center justify-center gap-3 px-10 py-4 bg-[#FFB800] text-[#001A30] font-black text-xl uppercase tracking-wider transform -skew-x-12 transition-all hover:bg-white hover:scale-105 hover:shadow-[0_0_30px_rgba(255,184,0,0.6)] active:scale-95 overflow-hidden select-none touch-none"
           >
-            <span className="relative z-10 flex items-center gap-2 skew-x-12">
-              <Zap size={20} className="fill-[#001A30]" />
-              <span className="block group-hover:hidden">启动引擎 ENGINE START</span>
-              <span className="hidden group-hover:block">唤醒狂欢 AWAKEN THE ROAR</span>
+            {/* Progress Bar Background */}
+            <div
+              className="absolute left-0 top-0 bottom-0 bg-[#E10600] z-0 transition-all duration-75 ease-linear pointer-events-none"
+              style={{ width: `${progress}%` }}
+            />
+
+            <span className={`relative z-10 flex items-center gap-2 skew-x-12 ${isPressing || progress > 0 ? 'text-white' : ''}`}>
+              <Zap size={20} className={isPressing || progress > 0 ? "fill-white" : "fill-[#001A30]"} />
+              <span className="block">
+                {isPressing ? `正在启动 ENGINE STARTING ${progress}%` : "长按启动按键 HOLD TO START"}
+              </span>
               <motion.span
                 animate={{ x: [0, 8, 0] }}
                 transition={{ repeat: Infinity, duration: 1 }}
@@ -160,7 +188,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
                 <ArrowRight size={24} strokeWidth={3} />
               </motion.span>
             </span>
-            <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-12 group-hover:animate-[shimmer_1s_infinite]" />
+            <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-12 group-hover:animate-[shimmer_1s_infinite] pointer-events-none" />
           </button>
           {/* Hidden Audio Element for better browser compatibility */}
           <audio ref={audioRef} src={f1EngineSound} preload="auto" />
