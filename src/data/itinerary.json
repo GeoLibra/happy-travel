@@ -1,0 +1,78 @@
+[
+  {
+    "date": "2026-03-13",
+    "locations": [
+      {
+        "id": "1-1",
+        "name": "上海国际赛车场",
+        "address": "嘉定区伊宁路2000号",
+        "type": "sports",
+        "coordinates": [121.223521, 31.340101],
+        "description": "F1中国大奖赛举办地"
+      },
+      {
+        "id": "1-2",
+        "name": "全季上海安亭地铁站酒店",
+        "address": "嘉定区安亭镇曹安公路5598号财富广场1楼",
+        "type": "hotel",
+        "coordinates": [121.161808,31.289831],
+        "description": "入住休息"
+      },
+      {
+        "id": "1-3",
+        "name": "上海体育场",
+        "address": "徐汇区天钥桥路666号",
+        "type": "sports",
+        "coordinates": [121.443309, 31.181485],
+        "description": "八万人体育场"
+      }
+    ]
+  },
+  {
+    "date": "2026-03-14",
+    "locations": [
+      {
+        "id": "2-1",
+        "name": "浦东美术馆 (非常毕加索)",
+        "address": "浦东新区滨江大道2777号",
+        "type": "museum",
+        "time": "10:00-22:00",
+        "coordinates": [121.496310, 31.238115],
+        "description": "非常毕加索展览"
+      },
+      {
+        "id": "2-2",
+        "name": "保利上海城市剧院 (谋杀启事)",
+        "address": "闵行区都市路4889号",
+        "type": "theatre",
+        "time": "14:30",
+        "coordinates": [121.389681, 31.105119],
+        "description": "阿加莎悬疑推理巨作《谋杀启事》"
+      },
+      {
+        "id": "2-3",
+        "name": "Manner Coffee(国客滨江店)",
+        "address": "虹口区东大名路500号",
+        "type": "cafe",
+        "coordinates": [121.497478, 31.247141],
+        "description": "滨江美景咖啡"
+      },
+      {
+        "id": "2-4",
+        "name": "天平小区",
+        "address": "徐汇区天平路",
+        "type": "hotel",
+        "coordinates": [121.438238, 31.198700],
+        "description": "社区位置"
+      },
+      {
+        "id": "2-5",
+        "name": "全季酒店(上海徐家汇店)",
+        "address": "徐汇区宜山路",
+        "type": "hotel",
+        "coordinates": [121.412027, 31.173611],
+        "description": "入住休息"
+      }
+    ]
+  }
+]

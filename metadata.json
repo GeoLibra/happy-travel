@@ -1,0 +1,5 @@
+{
+  "name": "上海周末行程助手",
+  "description": "一个交互式的上海两日游行程规划工具，支持地图展示、地点分类和响应式布局。",
+  "requestFramePermissions": ["geolocation"]
+}
