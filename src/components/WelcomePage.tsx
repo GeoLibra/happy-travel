@@ -15,30 +15,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
 
   useEffect(() => {
     setMounted(true);
-
-    // Global unlock for audio on first interaction
-    const unlockAudio = () => {
-      if (audioRef.current) {
-        audioRef.current.play().then(() => {
-           audioRef.current?.pause();
-           audioRef.current!.currentTime = 0;
-           // Remove listener once unlocked
-           window.removeEventListener('click', unlockAudio);
-           window.removeEventListener('touchstart', unlockAudio);
-           window.removeEventListener('keydown', unlockAudio);
-        }).catch(() => {});
-      }
-    };
-
-    window.addEventListener('click', unlockAudio);
-    window.addEventListener('touchstart', unlockAudio);
-    window.addEventListener('keydown', unlockAudio);
-
-    return () => {
-        window.removeEventListener('click', unlockAudio);
-        window.removeEventListener('touchstart', unlockAudio);
-        window.removeEventListener('keydown', unlockAudio);
-    };
   }, []);
 
   if (!mounted) return null;
