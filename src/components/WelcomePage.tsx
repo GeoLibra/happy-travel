@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Flag, ArrowRight, Zap } from 'lucide-react';
 
 import bgImage from '../img/IMG_9596.jpg';
+import f1EngineSound from '../audio/f1-engine.mp3';
 
 interface WelcomeProps {
   onEnter: () => void;
@@ -10,6 +11,7 @@ interface WelcomeProps {
 
 const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   const [mounted, setMounted] = useState(false);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -115,7 +117,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             欢迎开启上海狂欢周末
           </h2>
           <p className="text-[#A0AAB4] text-lg font-medium tracking-wide mt-2">
-            引擎轰鸣交织梦龙音浪，一场魔都竞速与摇滚狂欢的探索之旅。
+          引擎轰鸣碰撞摇滚风暴，一场魔都竞速与梦龙狂欢的探索之旅。
           </p>
         </motion.div>
 
@@ -128,52 +130,29 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
           <button
             onClick={onEnter}
             onMouseEnter={() => {
-              try {
-                // Synthetic F1 Engine Rev Sound using Web Audio API
-                const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-                if (!AudioContext) return;
-
-                const ctx = new AudioContext();
-
-                const duration = 1.0;
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                const filter = ctx.createBiquadFilter();
-
-                // F1 engine characteristic (high pitch sawtooth)
-                osc.type = 'sawtooth';
-
-                // Frequency envelope (revving up)
-                osc.frequency.setValueAtTime(150, ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + duration * 0.7);
-                osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + duration);
-
-                // Gain envelope (fade in and out)
-                gain.gain.setValueAtTime(0, ctx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + duration * 0.2);
-                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
-
-                // Filter to make it sound more like an exhaust
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(1000, ctx.currentTime);
-                filter.frequency.linearRampToValueAtTime(3000, ctx.currentTime + duration * 0.7);
-                filter.Q.value = 5;
-
-                osc.connect(filter);
-                filter.connect(gain);
-                gain.connect(ctx.destination);
-
-                osc.start(ctx.currentTime);
-                osc.stop(ctx.currentTime + duration);
-              } catch (e) {
-                console.error("Audio playback failed", e);
+              if (audioRef.current) {
+                audioRef.current.currentTime = 0;
+                audioRef.current.volume = 0.8;
+                const playPromise = audioRef.current.play();
+                if (playPromise !== undefined) {
+                  playPromise.catch(() => {
+                    // Ignore autoplay errors quietly
+                  });
+                }
               }
+            }}
+            onMouseLeave={() => {
+               if (audioRef.current) {
+                   audioRef.current.pause();
+                   audioRef.current.currentTime = 0;
+               }
             }}
             className="group relative inline-flex items-center justify-center gap-3 px-10 py-4 bg-[#FFB800] text-[#001A30] font-black text-xl uppercase tracking-wider transform -skew-x-12 transition-all hover:bg-white hover:scale-105 hover:shadow-[0_0_30px_rgba(255,184,0,0.6)] active:scale-95 overflow-hidden"
           >
             <span className="relative z-10 flex items-center gap-2 skew-x-12">
               <Zap size={20} className="fill-[#001A30]" />
-              启动引擎 ENGINE START
+              <span className="block group-hover:hidden">启动引擎 ENGINE START</span>
+              <span className="hidden group-hover:block">唤醒狂欢 AWAKEN THE ROAR</span>
               <motion.span
                 animate={{ x: [0, 8, 0] }}
                 transition={{ repeat: Infinity, duration: 1 }}
@@ -183,6 +162,8 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             </span>
             <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-12 group-hover:animate-[shimmer_1s_infinite]" />
           </button>
+          {/* Hidden Audio Element for better browser compatibility */}
+          <audio ref={audioRef} src={f1EngineSound} preload="auto" />
         </motion.div>
 
         <motion.p
