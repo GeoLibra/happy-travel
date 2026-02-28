@@ -4,7 +4,7 @@ export interface Location {
   id: string;
   name: string;
   address: string;
-  type: 'sports' | 'hotel' | 'museum' | 'theatre' | 'cafe';
+  type: 'sports' | 'hotel' | 'museum' | 'theatre' | 'cafe' | 'park';
   time?: string;
   description?: string;
   coordinates: [number, number]; // [lng, lat]
@@ -22,5 +22,6 @@ export const TYPE_COLORS = {
   hotel: '#f59e0b',  // orange
   museum: '#8b5cf6', // purple
   theatre: '#ef4444', // red
-  cafe: '#10b981'    // green
+  cafe: '#10b981',   // green
+  park: '#84cc16'    // lime
 };

@@ -16,6 +16,7 @@ import {
 import { ITINERARY_DATA, Location, TYPE_COLORS } from './constants';
 import MapComponent from './components/MapComponent';
 import { cn } from './lib/utils';
+import WelcomePage from './components/WelcomePage';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -24,11 +25,13 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
     case 'museum': return <Palette className={className} />;
     case 'theatre': return <Ticket className={className} />;
     case 'cafe': return <Coffee className={className} />;
+    case 'park': return <MapPin className={className} />; // Or another icon like Tree if available
     default: return <MapPin className={className} />;
   }
 };
 
 export default function App() {
+  const [showWelcome, setShowWelcome] = useState(true);
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
   const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>();
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list'); // For mobile toggle
@@ -69,8 +72,20 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 font-sans selection:bg-indigo-100">
-      {/* Header */}
+    <>
+      <AnimatePresence>
+        {showWelcome && (
+          <WelcomePage key="welcome" onEnter={() => setShowWelcome(false)} />
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        className="min-h-screen bg-[#F8F9FA] text-slate-900 font-sans selection:bg-indigo-100"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: showWelcome ? 0 : 1 }}
+        transition={{ duration: 0.8 }}
+      >
+        {/* Header */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-bottom border-slate-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -79,7 +94,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">上海周末行程</h1>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">2026.03.13 - 03.14</p>
+              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">2026.03.13 - 03.15</p>
             </div>
           </div>
 
@@ -215,6 +230,7 @@ export default function App() {
         </div>
       </main>
 
-    </div>
+      </motion.div>
+    </>
   );
 }

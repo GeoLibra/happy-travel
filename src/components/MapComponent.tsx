@@ -152,7 +152,7 @@ const MapComponent: React.FC<MapProps> = ({
               "capitalize transition-colors",
               hoveredType === type ? "font-bold text-slate-900" : "text-slate-600"
             )}>
-              {type === 'sports' ? '体育/场馆' : type === 'hotel' ? '酒店' : type === 'museum' ? '美术馆' : type === 'theatre' ? '剧院' : '咖啡'}
+              {type === 'sports' ? '体育/场馆' : type === 'hotel' ? '酒店' : type === 'museum' ? '美术馆' : type === 'theatre' ? '剧院' : type === 'park' ? '公园' : '咖啡'}
             </span>
           </div>
         ))}
