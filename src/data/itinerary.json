@@ -96,6 +96,39 @@
           31.173611
         ],
         "description": "入住休息"
+      },
+      {
+        "id": "2-6",
+        "name": "上海辰山植物园",
+        "address": "松江区辰花路3888号",
+        "type": "park",
+        "coordinates": [
+          121.18,
+          31.08
+        ],
+        "description": "亚洲最大的植物园之一"
+      },
+      {
+        "id": "2-7",
+        "name": "顾村公园",
+        "address": "宝山区沪太路4788号",
+        "type": "park",
+        "coordinates": [
+          121.37,
+          31.34
+        ],
+        "description": "上海著名的赏樱胜地"
+      },
+      {
+        "id": "2-8",
+        "name": "上海共青森林公园",
+        "address": "杨浦区军工路2000号",
+        "type": "park",
+        "coordinates": [
+          121.55,
+          31.32
+        ],
+        "description": "森林景观特色公园"
       }
     ]
   }
