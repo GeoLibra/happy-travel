@@ -127,7 +127,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 h-[calc(100vh-88px)]">
         {/* Left Column: Itinerary */}
         <div className={cn(
-          "md:col-span-5 lg:col-span-4 flex flex-col gap-6 overflow-hidden",
+          "md:col-span-5 lg:col-span-4 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 pb-4",
           viewMode === 'map' && "hidden md:flex"
         )}>
           {/* Prominent Image Highlight */}
@@ -141,7 +141,7 @@ export default function App() {
           </div>
 
           {/* Day Selector */}
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+          <div className="flex gap-2 p-1 bg-white/80 backdrop-blur-md rounded-xl shrink-0 sticky top-0 z-10 shadow-sm border border-slate-200/50">
             {ITINERARY_DATA.map((day, idx) => (
               <button
                 key={day.date}
@@ -163,13 +163,13 @@ export default function App() {
           </div>
 
           {/* List */}
-          <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar scroll-smooth">
+          <div className="flex-1 space-y-4">
             <AnimatePresence mode="wait">
               <motion.div
                 key={selectedDayIdx}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
                 className="space-y-4"
               >
