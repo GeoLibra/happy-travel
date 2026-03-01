@@ -11,7 +11,7 @@ interface MapProps {
   hoveredType?: Location['type'] | null;
 }
 
-const getMarkerContent = (loc: Location, state: 'normal' | 'hovered' | 'selected') => {
+const getLabelContent = (loc: Location, state: 'normal' | 'hovered' | 'selected') => {
   let size = 12;
   let border = 2;
   let extraStyle = '';
@@ -28,18 +28,21 @@ const getMarkerContent = (loc: Location, state: 'normal' | 'hovered' | 'selected
     extraStyle = `box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.3s ease;`;
   }
 
-  const textStyle = state === 'selected'
-    ? `position: absolute; top: ${size / 2 + 10}px; white-space: nowrap; color: #0f172a; font-size: 14px; font-weight: 800; text-shadow: 2px 2px 0 rgba(255,255,255,0.9), -2px -2px 0 rgba(255,255,255,0.9), 2px -2px 0 rgba(255,255,255,0.9), -2px 2px 0 rgba(255,255,255,0.9), 0 2px 0 rgba(255,255,255,0.9), 2px 0 0 rgba(255,255,255,0.9), 0 -2px 0 rgba(255,255,255,0.9), -2px 0 0 rgba(255,255,255,0.9); z-index: 10; transition: all 0.3s ease; transform: translateX(-50%); left: 50%;`
-    : `position: absolute; top: ${size / 2 + 8}px; white-space: nowrap; color: #1e293b; font-size: 12px; font-weight: 700; text-shadow: 1px 1px 0 rgba(255,255,255,0.9), -1px -1px 0 rgba(255,255,255,0.9), 1px -1px 0 rgba(255,255,255,0.9), -1px 1px 0 rgba(255,255,255,0.9), 0 1px 0 rgba(255,255,255,0.9), 1px 0 0 rgba(255,255,255,0.9), 0 -1px 0 rgba(255,255,255,0.9), -1px 0 0 rgba(255,255,255,0.9); z-index: 10; transition: all 0.3s ease; transform: translateX(-50%); left: 50%; opacity: ${state === 'hovered' ? 1 : 0.85};`;
+  return `<div style="background-color: ${TYPE_COLORS[loc.type]}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${border}px solid white; ${extraStyle}"></div>`;
+};
 
-  return `
-    <div style="position: relative; display: flex; align-items: center; justify-content: center; width: ${size}px; height: ${size}px;">
-      <div style="background-color: ${TYPE_COLORS[loc.type]}; width: ${size}px; height: ${size}px; border-radius: 50%; border: ${border}px solid white; ${extraStyle}"></div>
-      <div style="${textStyle}">
-        ${loc.name}
-      </div>
-    </div>
-  `;
+const getLabelStyle = (state: 'normal' | 'hovered' | 'selected') => {
+  const isSelected = state === 'selected';
+  const isHovered = state === 'hovered';
+
+  return {
+    fontSize: isSelected ? 16 : 14, // Increase base size
+    fontWeight: isSelected ? '900' : '800', // Make it bolder
+    fillColor: isSelected ? '#1e3a8a' : '#0f172a', // Darker, richer text color
+    strokeColor: '#ffffff', // Solid white stroke/halo
+    strokeWidth: isSelected ? 4 : 3, // Thicker stroke for better readability over varied map backgrounds
+    padding: [2, 5],
+  };
 };
 
 const MapComponent: React.FC<MapProps> = ({
@@ -52,8 +55,10 @@ const MapComponent: React.FC<MapProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const amapInstance = useRef<any>(null);
   const amapConstructor = useRef<any>(null);
+  const labelsLayer = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
   const [isMapReady, setIsMapReady] = useState(false);
+  const [showPOI, setShowPOI] = useState(false);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -99,21 +104,51 @@ const MapComponent: React.FC<MapProps> = ({
 
         amapInstance.current = map;
 
-        // Add markers
+        // Add LabelsLayer for only text collision
+        const layer = new AMap.LabelsLayer({
+          zooms: [3, 20],
+          zIndex: 1000,
+          collision: true, // Enable strict collision detection for labels
+        });
+        map.add(layer);
+        labelsLayer.current = layer;
+
+        // Add Markers and Text Labels
         locations.forEach((loc) => {
+          // 1. The always-visible dot (Marker)
           const marker = new AMap.Marker({
             position: new AMap.LngLat(loc.coordinates[0], loc.coordinates[1]),
-            title: loc.name,
-            content: getMarkerContent(loc, 'normal'),
+            content: getLabelContent(loc, 'normal'),
             anchor: 'center',
+            zIndex: 10,
           });
 
-          marker.on('click', () => {
-            if (onMarkerClick) onMarkerClick(loc);
+          // 2. The collidable text (LabelMarker)
+          const labelMarker = new AMap.LabelMarker({
+            name: loc.name,
+            position: [loc.coordinates[0], loc.coordinates[1]],
+            text: {
+              content: loc.name,
+              direction: 'bottom',
+              offset: [0, 5],
+              style: getLabelStyle('normal'),
+            },
+            extData: { id: loc.id },
+            zooms: [3, 20],
+            rank: 1, // Manage collision priority
           });
+
+          const handleClick = () => {
+            if (onMarkerClick) onMarkerClick(loc);
+          };
+
+          marker.on('click', handleClick);
+          labelMarker.on('click', handleClick);
 
           marker.setMap(map);
-          markersRef.current[loc.id] = marker;
+          layer.add(labelMarker);
+
+          markersRef.current[loc.id] = { marker, labelMarker };
         });
 
         map.setFitView();
@@ -137,7 +172,8 @@ const MapComponent: React.FC<MapProps> = ({
 
     const AMap = amapConstructor.current;
 
-    Object.entries(markersRef.current).forEach(([id, marker]: [string, any]) => {
+    Object.entries(markersRef.current).forEach(([id, elements]: [string, any]) => {
+      const { marker, labelMarker } = elements;
       const loc = locations.find(l => l.id === id);
       if (!loc) return;
 
@@ -145,24 +181,76 @@ const MapComponent: React.FC<MapProps> = ({
       const isHoveredType = loc.type === hoveredType;
 
       if (isSelected) {
-        marker.setContent(getMarkerContent(loc, 'selected'));
+        marker.setContent(getLabelContent(loc, 'selected'));
         marker.setzIndex(100);
+
+        labelMarker.setText({
+          content: loc.name,
+          direction: 'bottom',
+          offset: [0, 8],
+          style: getLabelStyle('selected'),
+        });
+        labelMarker.setzIndex(100);
+
         amapInstance.current.setCenter(new AMap.LngLat(loc.coordinates[0], loc.coordinates[1]));
       } else if (isHoveredType) {
-        marker.setContent(getMarkerContent(loc, 'hovered'));
+        marker.setContent(getLabelContent(loc, 'hovered'));
         marker.setzIndex(90);
+
+        labelMarker.setText({
+          content: loc.name,
+          direction: 'bottom',
+          offset: [0, 5],
+          style: getLabelStyle('hovered'),
+        });
+        labelMarker.setzIndex(90);
       } else {
-        marker.setContent(getMarkerContent(loc, 'normal'));
+        marker.setContent(getLabelContent(loc, 'normal'));
         marker.setzIndex(10);
+
+        labelMarker.setText({
+          content: loc.name,
+          direction: 'bottom',
+          offset: [0, 5],
+          style: getLabelStyle('normal'),
+        });
+        labelMarker.setzIndex(10);
       }
     });
   }, [selectedLocationId, hoveredType, locations, isMapReady]);
 
+  // Update POI visibility when toggled
+  useEffect(() => {
+    if (!amapInstance.current || !isMapReady) return;
+
+    if (showPOI) {
+      amapInstance.current.setFeatures(['bg', 'road', 'building', 'point']);
+    } else {
+      amapInstance.current.setFeatures(['bg', 'road', 'building']);
+    }
+  }, [showPOI, isMapReady]);
+
   return (
     <div className="w-full h-full rounded-2xl overflow-hidden shadow-inner bg-slate-100 relative touch-none">
       <div ref={mapRef} className="w-full h-full" />
-      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-slate-200 text-xs space-y-2 z-10">
-        <div className="font-bold mb-1">图例</div>
+      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-slate-200 text-xs z-10 min-w-[110px]">
+        <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+          <span className="font-bold text-slate-800 text-sm">图例</span>
+          <label className="flex items-center cursor-pointer opacity-70 hover:opacity-100 transition-opacity ml-2">
+            <span className="mr-1.5 text-slate-500 font-medium text-[10px]">地点</span>
+            <div className={`relative inline-block w-6 h-[14px] transition-colors duration-200 ease-in-out rounded-full ${showPOI ? 'bg-blue-400' : 'bg-slate-300'}`}>
+              <div
+                className={`absolute left-[2px] top-[2px] w-2.5 h-2.5 bg-white rounded-full transition-transform duration-200 ease-in-out transform ${showPOI ? 'translate-x-2.5' : 'translate-x-0'}`}
+              />
+            </div>
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={showPOI}
+              onChange={(e) => setShowPOI(e.target.checked)}
+            />
+          </label>
+        </div>
         {Object.entries(TYPE_COLORS).map(([type, color]) => (
           <div
             key={type}

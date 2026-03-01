@@ -32,7 +32,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
           if (prev >= 100) return 100;
           return prev + 1;
         });
-      }, 50); // 5s total duration
+      }, 30); // 5s total duration
     } else {
       setProgress(0);
       if (audioRef.current) {
