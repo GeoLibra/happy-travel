@@ -11,12 +11,14 @@ import {
   Ticket,
   ChevronRight,
   Map as MapIcon,
-  List as ListIcon
+  List as ListIcon,
+  Flag
 } from 'lucide-react';
 import { ITINERARY_DATA, Location, TYPE_COLORS } from './constants';
 import MapComponent from './components/MapComponent';
 import { cn } from './lib/utils';
 import WelcomePage from './components/WelcomePage';
+import tripImage from './img/IMG_9599.jpg';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -128,6 +130,16 @@ export default function App() {
           "md:col-span-5 lg:col-span-4 flex flex-col gap-6 overflow-hidden",
           viewMode === 'map' && "hidden md:flex"
         )}>
+          {/* Prominent Image Highlight */}
+          <div className="w-full h-48 md:h-56 rounded-2xl overflow-hidden shrink-0 relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none">
+            <img
+               src={tripImage}
+               alt="Trip Highlight"
+               className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+            />
+
+          </div>
+
           {/* Day Selector */}
           <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
             {ITINERARY_DATA.map((day, idx) => (
