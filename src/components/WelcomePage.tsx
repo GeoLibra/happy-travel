@@ -179,7 +179,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             <span className={`relative z-10 flex items-center gap-2 skew-x-12 ${isPressing || progress > 0 ? 'text-white' : ''}`}>
               <Zap size={20} className={isPressing || progress > 0 ? "fill-white" : "fill-[#001A30]"} />
               <span className="block">
-                {isPressing ? `正在启动 ENGINE STARTING ${progress}%` : "长按启动按键 HOLD TO START"}
+                {isPressing ? `ENGINE STARTING ${progress}%` : "HOLD TO START"}
               </span>
               <motion.span
                 animate={{ x: [0, 8, 0] }}
