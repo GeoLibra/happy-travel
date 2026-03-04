@@ -127,7 +127,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 h-[calc(100vh-88px)]">
         {/* Left Column: Itinerary */}
         <div className={cn(
-          "md:col-span-5 lg:col-span-4 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 pb-4",
+          "md:col-span-5 lg:col-span-4 flex flex-col gap-6 overflow-y-scroll custom-scrollbar pr-2 pb-4",
           viewMode === 'map' && "hidden md:flex"
         )}>
           {/* Prominent Image Highlight */}
