@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Map as MapIcon,
   List as ListIcon,
-  Flag
+  Flag,
+  Utensils
 } from 'lucide-react';
 import { ITINERARY_DATA, Location, TYPE_COLORS } from './constants';
 import MapComponent from './components/MapComponent';
@@ -28,7 +29,8 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
     case 'museum': return <Palette className={className} />;
     case 'theatre': return <Ticket className={className} />;
     case 'cafe': return <Coffee className={className} />;
-    case 'park': return <MapPin className={className} />; // Or another icon like Tree if available
+    case 'park': return <MapPin className={className} />;
+    case 'restaurant': return <Utensils className={className} />;
     default: return <MapPin className={className} />;
   }
 };
@@ -222,9 +224,18 @@ export default function App() {
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center text-slate-300 group-hover:text-indigo-400 transition-colors">
-                        <ChevronRight size={20} />
-                      </div>
+                      {loc.url && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(loc.url, '_blank', 'noopener,noreferrer');
+                          }}
+                          className="flex items-center text-slate-300 hover:text-indigo-600 transition-colors"
+                          aria-label="打开链接"
+                        >
+                          <ChevronRight size={20} />
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 ))}

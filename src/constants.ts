@@ -4,10 +4,11 @@ export interface Location {
   id: string;
   name: string;
   address: string;
-  type: 'sports' | 'hotel' | 'museum' | 'theatre' | 'cafe' | 'park';
+  type: 'sports' | 'hotel' | 'museum' | 'theatre' | 'cafe' | 'park' | 'restaurant';
   time?: string;
   description?: string;
   coordinates: [number, number]; // [lng, lat]
+  url?: string;
 }
 
 export interface DayPlan {
@@ -23,5 +24,6 @@ export const TYPE_COLORS = {
   museum: '#8b5cf6', // purple
   theatre: '#ef4444', // red
   cafe: '#10b981',   // green
-  park: '#84cc16'    // lime
+  park: '#84cc16',   // lime
+  restaurant: '#ec4899' // pink
 };

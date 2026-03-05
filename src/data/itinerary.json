@@ -206,6 +206,18 @@
         ],
         "description": "重庆火锅",
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304B36485542394C57?naviHidden=yes&page_source=page.click_page&page_instance=&isRN=true&rnName=bulla&rnPath=other%2F1577847662400827712&newPOIParams=%7B%22poiId%22%3A%2242304B36485542394C57%22%2C%22poiName%22%3A%22%25E9%25A9%25AC%25E5%258E%2582%25E8%2580%2581%25E7%2581%25AB%25E9%2594%2585%28%25E4%25B8%258A%25E6%25B5%25B7%25E5%2598%2589%25E5%25AE%259A%25E6%2596%25B0%25E5%259F%258E%25E5%25BA%2597%29%22%2C%22longitude%22%3A121.257658%2C%22latitude%22%3A31.35663%7D&page_instance=undefined&xhsshare=poi_share"
+      },
+      {
+        "id": "3-14",
+        "name": "ANOTHER ROOM 别屋(上海首店)",
+        "address": "上海市淮海中路333号新天地广场3层09及10室",
+        "type": "restaurant",
+        "coordinates": [
+          121.474465,
+          31.220484
+        ],
+        "description": "创意菜",
+        "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304C4B5953335A474A?naviHidden=yes&page_source=page.click_page&page_instance=&isRN=true&rnName=bulla&rnPath=other%2F1578852861818012885&newPOIParams=%7B%22poiId%22%3A%2242304C4B5953335A474A%22%2C%22poiName%22%3A%22ANOTHER%2520ROOM%2520%25E5%2588%25AB%25E5%25B1%258B%28%25E4%25B8%258A%25E6%25B5%25B7%25E9%25A6%2596%25E5%25BA%2597%29%22%2C%22longitude%22%3A121.474316%2C%22latitude%22%3A31.22296%7D&page_instance=undefined&xhsshare=poi_share"
       }
     ]
   },
