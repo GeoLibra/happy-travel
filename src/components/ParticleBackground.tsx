@@ -14,7 +14,7 @@ const COLORS = {
   navy: new THREE.Color('#001A30'),
 };
 
-const PARTICLE_COUNT = 1200;
+const PARTICLE_COUNT = 2000; // 增加粒子数量
 const SPEED_LINE_COUNT = 200;
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress }) => {
@@ -27,10 +27,20 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
   const isPressingRef = useRef(isPressing);
   const progressRef = useRef(progress);
   const clockRef = useRef(new THREE.Clock());
+  const explosionTimeRef = useRef(0); // Tracks time since explosion triggered
 
   // Keep refs in sync
-  useEffect(() => { isPressingRef.current = isPressing; }, [isPressing]);
-  useEffect(() => { progressRef.current = progress; }, [progress]);
+  useEffect(() => {
+    isPressingRef.current = isPressing;
+  }, [isPressing]);
+
+  useEffect(() => {
+    // If progress hit 100, trigger explosion timeline
+    if (progress >= 100 && progressRef.current < 100) {
+      explosionTimeRef.current = clockRef.current.getElapsedTime();
+    }
+    progressRef.current = progress;
+  }, [progress]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     mouseRef.current.targetX = (e.clientX / window.innerWidth - 0.5) * 2;
@@ -67,9 +77,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
-      particlePositions[i3] = (Math.random() - 0.5) * 120;
-      particlePositions[i3 + 1] = (Math.random() - 0.5) * 80;
-      particlePositions[i3 + 2] = (Math.random() - 0.5) * 80;
+      // 更大的初始分布范围
+      particlePositions[i3] = (Math.random() - 0.5) * 200;
+      particlePositions[i3 + 1] = (Math.random() - 0.5) * 150;
+      particlePositions[i3 + 2] = (Math.random() - 0.5) * 150;
 
       const color = colorOptions[Math.floor(Math.random() * colorOptions.length)];
       particleColors[i3] = color.r;
@@ -200,7 +211,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       const prog = progressRef.current;
 
       // Acceleration factor when pressing
-      const accelFactor = isPressNow ? 1.0 + prog * 0.06 : 1.0;
+      const accelFactor = isPressNow ? 1.0 + (prog / 100) * 0.06 : 1.0;
 
       // Smooth mouse follow
       const mouse = mouseRef.current;
@@ -212,27 +223,92 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       camera.position.y = mouse.y * 2;
       camera.lookAt(0, 0, 0);
 
+      // Evaluate Explosion State
+      const timeSinceExplosion = elapsed - explosionTimeRef.current;
+      const isExploding = timeSinceExplosion < 1.5 && explosionTimeRef.current > 0;
+      const explosionForce = isExploding ? Math.max(0, 1.0 - timeSinceExplosion / 1.5) * 8.0 : 0;
+
       // ── Update floating particles ──
       const pPositions = particleGeometry.attributes.position.array as Float32Array;
       for (let i = 0; i < PARTICLE_COUNT; i++) {
         const i3 = i * 3;
         const phase = particlePhases[i];
 
-        // Gentle floating motion
-        pPositions[i3] += Math.sin(elapsed * 0.3 + phase) * 0.02 * accelFactor;
-        pPositions[i3 + 1] += Math.cos(elapsed * 0.2 + phase * 1.3) * 0.015 * accelFactor;
-        pPositions[i3 + 2] += Math.sin(elapsed * 0.15 + phase * 0.7) * 0.01;
+        const px = pPositions[i3];
+        const py = pPositions[i3 + 1];
+        const pz = pPositions[i3 + 2];
 
-        // When pressing, particles drift sideways (wind from speed)
-        if (isPressNow) {
-          pPositions[i3] -= 0.03 * accelFactor;
+        // Default: 粒子向屏幕外（Z轴正方向）运动
+        let dx = Math.sin(elapsed * 0.3 + phase) * 0.02;
+        let dy = Math.cos(elapsed * 0.2 + phase * 1.3) * 0.015;
+        let dz = 0.5; // 正常向屏幕外飘动
+
+        if (isPressNow && prog < 100) {
+          // REVERSE GATHERING: 粒子反向（向屏幕里）加速
+          // 不管粒子在哪，都向屏幕深处（负Z方向）加速，同时向按钮XY位置聚集
+          const targetX = 0;
+          const targetY = -25;
+
+          // XY方向：向按钮聚集
+          const dirX = targetX - px;
+          const dirY = targetY - py;
+          const distXY = Math.sqrt(dirX*dirX + dirY*dirY) || 1;
+
+          // 反向加速力，随着进度增加而增强
+          const reverseForce = (2.0 + Math.pow(prog / 100, 2) * 12.0);
+
+          dx = (dirX / distXY) * reverseForce;
+          dy = (dirY / distXY) * reverseForce;
+          // Z方向：强制向屏幕里（负方向）加速
+          dz = -reverseForce * 1.5;
+
+          // Debug: 打印第一个粒子的信息
+          if (i === 0 && Math.random() < 0.01) {
+            console.log('Particle 0:', { pz, dz, reverseForce, prog });
+          }
+        }
+        else if (isExploding) {
+          // EXPLOSION PHASE: Boom outward from the button center
+          const centerX = 0;
+          const centerY = -25;
+          const centerZ = -40; // 与聚集点相同
+
+          const dirX = px - centerX;
+          const dirY = py - centerY;
+          const dirZ = pz - centerZ;
+
+          // Normalize vector
+          const dist = Math.sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ) || 1;
+
+          // 强大的爆炸力，向外扩散
+          const explosionPower = explosionForce * 3.0;
+          dx = (dirX / dist) * explosionPower;
+          dy = (dirY / dist) * explosionPower + explosionForce * 0.8; // 向上偏移
+          dz = (dirZ / dist) * explosionPower;
+
+          // 添加随机性让爆炸更自然
+          dx += (Math.random() - 0.5) * explosionForce * 2;
+          dy += (Math.random() - 0.5) * explosionForce * 2;
+          dz += (Math.random() - 0.5) * explosionForce * 2;
         }
 
-        // Wrap around boundaries
-        if (pPositions[i3] < -60) pPositions[i3] = 60;
-        if (pPositions[i3] > 60) pPositions[i3] = -60;
-        if (pPositions[i3 + 1] < -40) pPositions[i3 + 1] = 40;
-        if (pPositions[i3 + 1] > 40) pPositions[i3 + 1] = -40;
+        pPositions[i3]     += dx;
+        pPositions[i3 + 1] += dy;
+        pPositions[i3 + 2] += dz;
+
+        // Wrap around boundaries only when NOT exploding/gathering so they don't pop weirdly
+        if (!isPressNow && !isExploding) {
+          if (pPositions[i3] < -100) pPositions[i3] = 100;
+          if (pPositions[i3] > 100) pPositions[i3] = -100;
+          if (pPositions[i3 + 1] < -75) pPositions[i3 + 1] = 75;
+          if (pPositions[i3 + 1] > 75) pPositions[i3 + 1] = -75;
+          // Z轴循环：粒子飞出屏幕外后从后面重新出现
+          if (pPositions[i3 + 2] > 80) {
+            pPositions[i3 + 2] = -80;
+            pPositions[i3] = (Math.random() - 0.5) * 200;
+            pPositions[i3 + 1] = (Math.random() - 0.5) * 150;
+          }
+        }
       }
       particleGeometry.attributes.position.needsUpdate = true;
       (particleMaterial.uniforms.uTime as { value: number }).value = elapsed;
@@ -247,14 +323,26 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         const i3 = i * 3;
         const speed = lineSpeeds[i];
 
-        // Move toward viewer (positive Z)
-        lPositions[i3 + 2] += speed * accelFactor * (isPressNow ? 2.5 : 0.5);
+        if (isPressNow) {
+          // 按住时：速度线反向（向屏幕里）加速
+          lPositions[i3 + 2] -= speed * accelFactor * 3.0;
 
-        // Reset when past camera
-        if (lPositions[i3 + 2] > 50) {
-          lPositions[i3] = (Math.random() - 0.5) * 100;
-          lPositions[i3 + 1] = (Math.random() - 0.5) * 60;
-          lPositions[i3 + 2] = -100;
+          // Reset when too far back
+          if (lPositions[i3 + 2] < -150) {
+            lPositions[i3] = (Math.random() - 0.5) * 100;
+            lPositions[i3 + 1] = (Math.random() - 0.5) * 60;
+            lPositions[i3 + 2] = 50;
+          }
+        } else {
+          // 正常：向屏幕外（向用户）
+          lPositions[i3 + 2] += speed * accelFactor * 0.5;
+
+          // Reset when past camera
+          if (lPositions[i3 + 2] > 50) {
+            lPositions[i3] = (Math.random() - 0.5) * 100;
+            lPositions[i3 + 1] = (Math.random() - 0.5) * 60;
+            lPositions[i3 + 2] = -100;
+          }
         }
       }
       lineGeometry.attributes.position.needsUpdate = true;
