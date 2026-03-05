@@ -4,6 +4,7 @@ import { Flag, ArrowRight, Zap } from 'lucide-react';
 
 import bgImage from '../img/IMG_9596.jpg';
 import f1EngineSound from '../audio/f1-engine.mp3';
+import ParticleBackground from './ParticleBackground';
 
 interface WelcomeProps {
   onEnter: () => void;
@@ -81,29 +82,8 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
            }}
       />
 
-      {/* Speed Lines */}
-      {Array.from({ length: 8 }).map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute h-1 bg-white/20 rounded-full"
-          initial={{
-            left: '-10%',
-            top: `${Math.random() * 100}%`,
-            width: Math.random() * 200 + 50,
-            opacity: 0,
-          }}
-          animate={{
-            left: '110%',
-            opacity: [0, 1, 0],
-          }}
-          transition={{
-            duration: Math.random() * 2 + 1,
-            repeat: Infinity,
-            delay: Math.random() * 2,
-            ease: "linear"
-          }}
-        />
-      ))}
+      {/* Three.js Particle Background */}
+      <ParticleBackground isPressing={isPressing} progress={progress} />
 
       {/* Main Content */}
       <div className="relative z-10 flex flex-col items-center justify-center p-8 text-center max-w-4xl">
