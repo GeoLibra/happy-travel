@@ -19,6 +19,7 @@ import MapComponent from './components/MapComponent';
 import { cn } from './lib/utils';
 import WelcomePage from './components/WelcomePage';
 import tripImage from './img/IMG_9599.jpg';
+import MiniFirework from './components/MiniFirework';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -127,17 +128,22 @@ export default function App() {
       <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 h-[calc(100vh-88px)]">
         {/* Left Column: Itinerary */}
         <div className={cn(
-          "md:col-span-5 lg:col-span-4 flex flex-col gap-6 overflow-y-scroll custom-scrollbar pr-2 pb-4",
+          "md:col-span-5 lg:col-span-4 flex flex-col gap-6 overflow-y-scroll overflow-x-hidden custom-scrollbar pr-4 pb-4 relative z-10",
           viewMode === 'map' && "hidden md:flex"
         )}>
           {/* Prominent Image Highlight */}
-          <div className="w-full h-48 md:h-56 rounded-2xl overflow-hidden shrink-0 relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none">
-            <img
-               src={tripImage}
-               alt="Trip Highlight"
-               className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-            />
-
+          <div className="relative w-full shrink-0 z-20 mt-4">
+            <div className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none">
+              <img
+                 src={tripImage}
+                 alt="Trip Highlight"
+                 className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+              />
+            </div>
+            {/* Firework anchor placed exactly at the top right bounding corner */}
+            <div className="absolute top-0 right-0 w-0 h-0 z-50 pointer-events-none">
+              {!showWelcome && <MiniFirework />}
+            </div>
           </div>
 
           {/* Day Selector */}
