@@ -14,8 +14,8 @@ const COLORS = {
   navy: new THREE.Color('#001A30'),
 };
 
-const PARTICLE_COUNT = 2000; // 增加粒子数量
-const SPEED_LINE_COUNT = 200;
+const PARTICLE_COUNT = 3000; // 增加粒子数量，让效果更密集
+const SPEED_LINE_COUNT = 300; // 也增加速度线
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress }) => {
   const containerRef = useRef<HTMLDivElement>(null);
