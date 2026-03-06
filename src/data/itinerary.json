@@ -58,7 +58,7 @@
         "type": "hotel",
         "coordinates": [
           121.438238,
-          31.198700
+          31.1987
         ],
         "description": "社区位置"
       }
@@ -68,7 +68,7 @@
     "date": "2026-03-14",
     "locations": [
       {
-        "id": "3-2",
+        "id": "3-1",
         "name": "浦东美术馆 (非常毕加索)",
         "address": "浦东新区滨江大道2777号",
         "type": "museum",
@@ -81,7 +81,7 @@
         "url": "https://www.xiaohongshu.com/discovery/item/698317bb000000000a02d9a0?app_platform=ios&app_version=9.19.5&share_from_user_hidden=true&xsec_source=app_share&type=normal&xsec_token=CBEqCaiAPp-Iu7T9klXY7Ead2WGe86AXLFGDAHQW29Vtg=&author_share=1&xhsshare=CopyLink&shareRedId=Nz8zMDo1SU9HQEc0Tkw3S0w8PEBJR0xB&apptime=1772721896&share_id=3d6b29f4e4f74ed093dbd229e4c33a20"
       },
       {
-        "id": "3-3",
+        "id": "3-2",
         "name": "保利上海城市剧院 (谋杀启事)",
         "address": "闵行区都市路4889号",
         "type": "theatre",
@@ -93,7 +93,7 @@
         "description": "阿加莎悬疑推理巨作《谋杀启事》"
       },
       {
-        "id": "3-4",
+        "id": "3-3",
         "name": "Manner Coffee(国客滨江店)",
         "address": "虹口区东大名路500号",
         "type": "cafe",
@@ -104,7 +104,7 @@
         "description": "滨江美景咖啡"
       },
       {
-        "id": "3-5",
+        "id": "3-4",
         "name": "上海辰山植物园",
         "address": "松江区辰花路3888号",
         "type": "park",
@@ -115,7 +115,7 @@
         "description": "亚洲最大的植物园之一"
       },
       {
-        "id": "3-6",
+        "id": "3-5",
         "name": "顾村公园",
         "address": "宝山区沪太路4788号",
         "type": "park",
@@ -126,7 +126,7 @@
         "description": "上海著名的赏樱胜地"
       },
       {
-        "id": "3-7",
+        "id": "3-6",
         "name": "上海共青森林公园",
         "address": "杨浦区军工路2000号",
         "type": "park",
@@ -137,7 +137,7 @@
         "description": "森林景观特色公园"
       },
       {
-        "id": "3-8",
+        "id": "3-7",
         "name": "上海植物园",
         "address": "徐汇区龙吴路1111号",
         "type": "park",
@@ -148,7 +148,7 @@
         "description": "国内最大的市属综合性植物园之一，汇聚海派盆景与四季花卉"
       },
       {
-        "id": "3-9",
+        "id": "3-8",
         "name": "GALANGAL Thai Bistro 泰式小酒馆",
         "address": "徐汇区吴兴路277号吴界F1层",
         "type": "restaurant",
@@ -160,7 +160,7 @@
         "url": "https://www.xiaohongshu.com/discovery/item/677e42c1000000001a0102b2?app_platform=ios&app_version=9.19.5&share_from_user_hidden=true&xsec_source=app_share&type=normal&noteAttributes=life_service_kol&xsec_token=CBDXfk6-OrW4rgcUbUtvoMFauF5wR1NVLktXu7U43Shyk=&author_share=1&xhsshare=CopyLink&shareRedId=Nz8zMDo1SU9HQEc0Tkw3S0w8PEBJR0xB&apptime=1772721796&share_id=096cd34a6b5a44a0b4a9f2c367d5a13c"
       },
       {
-        "id": "3-10",
+        "id": "3-9",
         "name": "苗岭人家(天目中路店)",
         "address": "静安区天目中路383号海文大楼F1层",
         "type": "restaurant",
@@ -172,7 +172,7 @@
         "url": "https://www.xiaohongshu.com/explore/692595a2000000001b0236d0?app_platform=ios&app_version=9.19.5&share_from_user_hidden=true&xsec_source=app_share&type=normal&xsec_token=CBe24YKfbCQRqQUMHwNhCPilGBUp01Zv8ljP15AH-nW4E=&author_share=1&xhsshare=WeixinSession&shareRedId=Nz8zMDo1SU9HQEc0Tkw3S0w8PEBJR0xB&apptime=1772721020&share_id=ddb07186c5394f4ca44b3d8d119e9f69"
       },
       {
-        "id": "3-11",
+        "id": "3-10",
         "name": "胡恰",
         "address": "上海淮海中路333号新天地广场6楼01-02号",
         "type": "restaurant",
@@ -184,7 +184,7 @@
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304C47334438354842?naviHidden=yes&page_source=page.click_page&page_instance=&isRN=true&rnName=bulla&rnPath=other%2F1578485240405151652&newPOIParams=%7B%22poiId%22%3A%2242304C47334438354842%22%2C%22poiName%22%3A%22%25E8%2583%25A1%25E6%2581%25B0%25C2%25B7%25E6%2599%25AF%25E5%25BE%25B7%25E6%25B1%259F%25E8%25A5%25BF%25E8%258F%259C%28%25E4%25B8%258A%25E6%25B5%25B7%25E9%25A6%2596%25E5%25BA%2597%29%22%2C%22longitude%22%3A121.474126%2C%22latitude%22%3A31.222485%7D&page_instance=undefined&xhsshare=poi_share"
       },
       {
-        "id": "3-12",
+        "id": "3-11",
         "name": "冰城老于家(盛世年华花园店)",
         "address": "上海市羽山路2-4双号1层-2,2层",
         "type": "restaurant",
@@ -196,7 +196,7 @@
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/4230494231434558534F?naviHidden=yes&page_source=page.click_page&page_instance=&isRN=true&rnName=bulla&rnPath=other%2F1576848538687607122&newPOIParams=%7B%22poiId%22%3A%224230494231434558534F%22%2C%22poiName%22%3A%22%25E5%2586%25B0%25E5%259F%258E%25E8%2580%2581%25E4%25BA%258E%25E5%25AE%25B6%28%25E7%259B%259B%25E4%25B8%2596%25E5%25B9%25B4%25E5%258D%258E%25E8%258A%25B1%25E5%259B%25AD%25E5%25BA%2597%29%22%2C%22longitude%22%3A121.53664%2C%22latitude%22%3A31.228822%7D&page_instance=undefined&xhsshare=poi_share"
       },
       {
-        "id": "3-13",
+        "id": "3-12",
         "name": "马厂老火锅(上海嘉定新城店)",
         "address": "上海市洪德路334号",
         "type": "restaurant",
@@ -208,7 +208,7 @@
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304B36485542394C57?naviHidden=yes&page_source=page.click_page&page_instance=&isRN=true&rnName=bulla&rnPath=other%2F1577847662400827712&newPOIParams=%7B%22poiId%22%3A%2242304B36485542394C57%22%2C%22poiName%22%3A%22%25E9%25A9%25AC%25E5%258E%2582%25E8%2580%2581%25E7%2581%25AB%25E9%2594%2585%28%25E4%25B8%258A%25E6%25B5%25B7%25E5%2598%2589%25E5%25AE%259A%25E6%2596%25B0%25E5%259F%258E%25E5%25BA%2597%29%22%2C%22longitude%22%3A121.257658%2C%22latitude%22%3A31.35663%7D&page_instance=undefined&xhsshare=poi_share"
       },
       {
-        "id": "3-14",
+        "id": "3-13",
         "name": "ANOTHER ROOM 别屋(上海首店)",
         "address": "上海市淮海中路333号新天地广场3层09及10室",
         "type": "restaurant",
@@ -218,6 +218,114 @@
         ],
         "description": "创意菜",
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304C4B5953335A474A?naviHidden=yes&page_source=page.click_page&page_instance=&isRN=true&rnName=bulla&rnPath=other%2F1578852861818012885&newPOIParams=%7B%22poiId%22%3A%2242304C4B5953335A474A%22%2C%22poiName%22%3A%22ANOTHER%2520ROOM%2520%25E5%2588%25AB%25E5%25B1%258B%28%25E4%25B8%258A%25E6%25B5%25B7%25E9%25A6%2596%25E5%25BA%2597%29%22%2C%22longitude%22%3A121.474316%2C%22latitude%22%3A31.22296%7D&page_instance=undefined&xhsshare=poi_share"
+      },
+      {
+        "id": "3-14",
+        "name": "岚·山野云南菜(上海首店)",
+        "address": "上海市愚园路68号CP静安L6-10",
+        "type": "restaurant",
+        "description": "云贵菜",
+        "url": "https://xhslink.com/m/Aw8KD4CRZWn",
+        "coordinates": [
+          121.4464,
+          31.2257
+        ]
+      },
+      {
+        "id": "3-15",
+        "name": "甬潮·宁波小市",
+        "address": "上海市淮海中路755号新华联大厦东楼4F（近瑞金二路）",
+        "type": "restaurant",
+        "description": "宁波菜",
+        "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304D424E585635454B",
+        "coordinates": [
+          121.4644,
+          31.2187
+        ]
+      },
+      {
+        "id": "3-16",
+        "name": "潘小烧·云南烧烤(外滩店)",
+        "address": "上海市九江路168号一楼(靠近江西中路)",
+        "type": "restaurant",
+        "description": "烧烤",
+        "url": "https://xhslink.com/m/68NUO9eENcU",
+        "coordinates": [
+          121.4866,
+          31.2371
+        ]
+      },
+      {
+        "id": "3-17",
+        "name": "安徽沪办招待所",
+        "address": "上海市新华路185弄5号",
+        "type": "restaurant",
+        "description": "徽菜",
+        "url": "https://xhslink.com/m/I8CyHtUCYi",
+        "coordinates": [
+          121.435,
+          31.2086
+        ]
+      },
+      {
+        "id": "3-18",
+        "name": "甬间里(上海首店)",
+        "address": "上海市长寿路150号",
+        "type": "restaurant",
+        "description": "本帮江浙菜",
+        "url": "https://xhslink.com/m/2tzoKrKtS6W",
+        "coordinates": [
+          121.4521,
+          31.2536
+        ]
+      },
+      {
+        "id": "3-19",
+        "name": "Flambe Bistro·维也纳烤肋排(湖滨道店)",
+        "address": "上海市湖滨道购物中心一楼",
+        "type": "restaurant",
+        "description": "西餐",
+        "url": "https://xhslink.com/m/bEw7uVVNZS",
+        "coordinates": [
+          121.473,
+          31.2205
+        ]
+      },
+      {
+        "id": "3-20",
+        "name": "潇湘阁(吴江路湟普汇店)",
+        "address": "上海市吴江路269号湟普汇商场3层",
+        "type": "restaurant",
+        "description": "湘菜",
+        "url": "https://xhslink.com/m/ArWVSdVah8H",
+        "coordinates": [
+          121.4593,
+          31.2291
+        ]
+      },
+      {
+        "id": "3-21",
+        "name": "巴硒客地道土家菜(华漕店)",
+        "address": "上海市华漕融信绿地国际二期4幢1-7",
+        "type": "restaurant",
+        "description": "农家菜",
+        "url": "https://xhslink.com/m/9cdP5J2ALYU",
+        "coordinates": [
+          121.2808,
+          31.2117
+        ]
+      },
+      {
+        "id": "3-22",
+        "name": "inkool创意韩餐",
+        "address": "上海市长宁路来福士广场东区3号门外1楼46号",
+        "type": "restaurant",
+        "description": "韩式料理",
+        "url": "https://xhslink.com/m/RQuZuEn5VO",
+        "coordinates": [
+          121.4144,
+          31.2164
+        ]
       }
     ]
   },
