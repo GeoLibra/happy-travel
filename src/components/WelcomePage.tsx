@@ -23,17 +23,13 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (isPressing) {
-      if (audioRef.current && progress === 0) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.volume = 0.8;
-        audioRef.current.play().catch(() => {});
-      }
+
       interval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 100) return 100;
           return prev + 1;
         });
-      }, 30); // 5s total duration
+      }, 50); // 5s total duration
     } else {
       setProgress(0);
       if (audioRef.current) {
@@ -46,8 +42,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
 
   useEffect(() => {
     if (progress === 100) {
-      const timer = setTimeout(() => onEnter(), 200);
-      return () => clearTimeout(timer);
+      onEnter()
     }
   }, [progress, onEnter]);
 
@@ -83,7 +78,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
       />
 
       {/* Three.js Particle Background */}
-      <ParticleBackground isPressing={isPressing} progress={progress} />
+      <ParticleBackground isPressing={isPressing} progress={progress} audioRef={audioRef} />
 
       {/* Main Content */}
       <div className="relative z-10 flex flex-col items-center justify-center p-8 text-center max-w-4xl">
@@ -144,6 +139,11 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             onPointerDown={(e) => {
               e.preventDefault();
               setIsPressing(true);
+              if (audioRef.current) {
+                audioRef.current.currentTime = 0;
+                audioRef.current.volume = 0.8;
+                audioRef.current.play().catch(() => {});
+              }
             }}
             onPointerUp={() => setIsPressing(false)}
             onPointerLeave={() => setIsPressing(false)}
