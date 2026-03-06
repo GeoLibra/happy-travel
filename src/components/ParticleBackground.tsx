@@ -79,11 +79,12 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     container.appendChild(renderer.domElement);
 
     // ── Advanced Effects Initializers ──
-    const gpuParticles = new GPUParticleSystem(renderer);
-    const useGPU = gpuParticles.init(scene, stateRef.current.baseUniforms);
+    // const gpuParticles = new GPUParticleSystem(renderer);
+    // const useGPU = gpuParticles.init(scene, stateRef.current.baseUniforms);
+    const useGPU = false; // Force CPU fallback for now
 
-    const godRays = new GodRays();
-    const audioVisualizer = new AudioVisualizer();
+    // const godRays = new GodRays();
+    // const audioVisualizer = new AudioVisualizer();
 
     // We only connect audio after user interacted to bypass browser autoplay policies
     let audioConnected = false;
@@ -244,6 +245,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       const s = stateRef.current;
 
       // Connect audio on first press
+      /*
       if (s.isPressing && !audioConnected && audioRef?.current) {
         audioConnected = audioVisualizer.connect(audioRef.current);
         if (audioConnected) audioVisualizer.resume();
@@ -254,6 +256,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       s.baseUniforms.uBassLevel.value = bands.bass;
       s.baseUniforms.uFieldStrength.value = DEFAULT_FORCE_FIELD_PARAMS.strength + (bands.overall * 2.0);
       s.baseUniforms.uFieldSpeed.value = DEFAULT_FORCE_FIELD_PARAMS.speed + (bands.mid * 0.5);
+      */
 
       // Handle Explosion timing
       if (s.explosionTime === -1) {
@@ -272,11 +275,13 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
       // Update Explosion Core visibility
       if (isExploding) {
+        /*
         explosionCore.material.opacity = explosionForce;
         const scale = 1.0 + (1.0 - explosionForce) * 2.0;
         explosionCore.scale.set(scale, scale, scale);
+        */
       } else {
-        explosionCore.material.opacity = 0;
+        // explosionCore.material.opacity = 0;
       }
 
       // Camera Mouse Sway
@@ -287,13 +292,14 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       camera.lookAt(0, 0, 0);
 
       // ── Update Particles ──
+      /*
       if (useGPU) {
         gpuParticles.update();
         if (gpuParticles.particles) {
           gpuParticles.particles.rotation.z = time * 0.02;
           gpuParticles.particles.rotation.y = Math.sin(time * 0.1) * 0.1;
         }
-      } else if (cpuParticles && particlePhases) {
+      } else */ if (cpuParticles && particlePhases) {
         // CPU fallback loop
         const pArr = cpuParticles.geometry.attributes.position.array as Float32Array;
         for (let i = 0; i < CPU_PARTICLE_COUNT; i++) {
@@ -370,6 +376,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       renderer.render(scene, camera);
 
       if (isExploding) {
+        /*
         godRays.render(
           renderer,
           scene,
@@ -377,6 +384,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
           explosionForce,
           new THREE.Vector3(0, -25, -40) // Explosion center
         );
+        */
       }
     };
 
@@ -386,7 +394,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-      godRays.resize(window.innerWidth, window.innerHeight);
+      // godRays.resize(window.innerWidth, window.innerHeight);
     };
 
     window.addEventListener('resize', handleResize);
@@ -398,9 +406,9 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
 
-      gpuParticles.dispose(scene);
-      godRays.dispose();
-      audioVisualizer.dispose();
+      // gpuParticles.dispose(scene);
+      // godRays.dispose();
+      // audioVisualizer.dispose();
 
       coreGeometry.dispose();
       coreMaterial.dispose();

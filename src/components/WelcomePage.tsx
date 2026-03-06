@@ -55,7 +55,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
         backgroundImage: `url(${bgImage})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
+        backgroundRepeat: 'no-repeat'
       }}
     >
       <div className="absolute inset-0 bg-[#001A30]/80 mix-blend-multiply" />
@@ -81,7 +81,9 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
       <ParticleBackground isPressing={isPressing} progress={progress} audioRef={audioRef} />
 
       {/* Main Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center p-8 text-center max-w-4xl">
+      <div
+        className="relative z-10 flex flex-col items-center justify-center p-8 text-center max-w-4xl transition-all duration-300"
+      >
 
         {/* Intro Tag */}
         <motion.div
