@@ -23,3 +23,17 @@
 body {
   @apply antialiased;
 }
+
+@keyframes glitch {
+  0% { transform: translate(0) }
+  2% { transform: translate(-2px, 1px) }
+  4% { transform: translate(-2px, -1px) }
+  6% { transform: translate(2px, 1px) }
+  8% { transform: translate(2px, -1px) }
+  10% { transform: translate(-1px, 2px) }
+  12% { transform: translate(1px, 2px) }
+  14% { transform: translate(-1px, -2px) }
+  16% { transform: translate(1px, -2px) }
+  18% { transform: translate(0) }
+  100% { transform: translate(0) }
+}

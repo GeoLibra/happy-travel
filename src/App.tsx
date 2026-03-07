@@ -85,7 +85,7 @@ export default function App() {
       </AnimatePresence>
 
       <motion.div
-        className="min-h-screen bg-[#F8F9FA] text-slate-900 font-sans selection:bg-indigo-100"
+        className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans selection:bg-[#E10600]/20"
         initial={{ opacity: 0 }}
         animate={{ opacity: showWelcome ? 0 : 1 }}
         transition={{ duration: 0.8 }}
@@ -104,7 +104,7 @@ export default function App() {
 
         <div className="max-w-7xl mx-auto flex justify-between items-center mt-1">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+            <div className="w-10 h-10 bg-[#001A30] rounded-xl flex items-center justify-center text-[#FFB800] shadow-lg shadow-[#001A30]/20 border border-white/10">
               <MapPin size={24} />
             </div>
             <div>
@@ -124,7 +124,7 @@ export default function App() {
               onClick={() => setViewMode('list')}
               className={cn(
                 "p-2 rounded-md transition-all",
-                viewMode === 'list' ? "bg-white shadow-sm text-indigo-600" : "text-slate-500"
+                viewMode === 'list' ? "bg-white shadow-sm text-[#E10600]" : "text-slate-500"
               )}
             >
               <ListIcon size={20} />
@@ -133,7 +133,7 @@ export default function App() {
               onClick={() => setViewMode('map')}
               className={cn(
                 "p-2 rounded-md transition-all",
-                viewMode === 'map' ? "bg-white shadow-sm text-indigo-600" : "text-slate-500"
+                viewMode === 'map' ? "bg-white shadow-sm text-[#E10600]" : "text-slate-500"
               )}
             >
               <MapIcon size={20} />
@@ -173,10 +173,10 @@ export default function App() {
                   setSelectedLocationId(undefined);
                 }}
                 className={cn(
-                  "flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex flex-col items-center gap-1",
+                  "flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex flex-col items-center gap-1 border-b-[3px]",
                   selectedDayIdx === idx
-                    ? "bg-white text-indigo-600 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "bg-white text-[#001A30] shadow-sm border-[#E10600]"
+                    : "text-slate-500 hover:text-slate-700 border-transparent hover:bg-white/50"
                 )}
               >
                 <span className="text-xs opacity-60">DAY {idx + 1}</span>
@@ -207,9 +207,9 @@ export default function App() {
                     className={cn(
                       "group relative p-5 rounded-2xl border transition-all cursor-pointer",
                       selectedLocationId === loc.id
-                        ? "bg-white border-indigo-200 shadow-xl shadow-indigo-50 ring-1 ring-indigo-100"
+                        ? "bg-white border-[#001A30]/20 shadow-xl shadow-[#001A30]/5 ring-1 ring-[#001A30]/10"
                         : "bg-white/50 border-slate-200 hover:border-slate-300 hover:bg-white",
-                      hoveredType === loc.type && "ring-2 ring-indigo-400/30 bg-indigo-50/30"
+                      hoveredType === loc.type && "ring-2 ring-[#FFB800]/50 bg-[#FFB800]/5"
                     )}
                   >
                     <div className="flex gap-4">
@@ -223,7 +223,7 @@ export default function App() {
                         <div className="flex justify-between items-start mb-1">
                           <h3 className="font-bold text-slate-900 truncate pr-4">{loc.name}</h3>
                           {loc.time && (
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full uppercase">
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-[#E10600] bg-[#E10600]/10 px-2 py-0.5 rounded-full uppercase">
                               <Clock size={10} />
                               {loc.time}
                             </div>
@@ -245,7 +245,7 @@ export default function App() {
                             e.stopPropagation();
                             window.open(loc.url, '_blank', 'noopener,noreferrer');
                           }}
-                          className="flex items-center text-slate-300 hover:text-indigo-600 transition-colors"
+                          className="flex items-center text-slate-300 hover:text-[#E10600] transition-colors"
                           aria-label="打开链接"
                         >
                           <ChevronRight size={20} />

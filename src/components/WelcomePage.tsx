@@ -42,19 +42,40 @@ const F1Car = ({ progress }: { progress: number }) => {
       className="absolute top-[40%] -translate-y-1/2 z-[60] pointer-events-none scale-[1.5] sm:scale-[2.5]"
     >
       <svg width="240" height="60" viewBox="0 0 240 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Rear Wing */}
         <rect x="10" y="15" width="20" height="5" fill="#001A30" />
         <rect x="15" y="20" width="5" height="15" fill="#001A30" />
+        <path d="M10 20 L25 20 L25 35 L10 35 Z" fill="#E10600" /> {/* Red rear wing accent */}
+
+        {/* Main Body (Red Bull Navy) */}
         <path d="M20 35 L60 25 L120 25 L150 15 L180 30 L210 35 L230 40 L230 45 L10 45 Z" fill="#001A30"/>
+
+        {/* Yellow/Red Bull Livery Stripes */}
         <path d="M60 25 L120 25 L150 15 L200 30" stroke="#FFB800" strokeWidth="3" fill="none"/>
         <path d="M30 35 L120 30 L160 20 L210 35" stroke="#E10600" strokeWidth="2" fill="none"/>
         <path d="M120 25 C130 15 140 15 150 25" stroke="#001A30" strokeWidth="3" fill="none"/>
-        <path d="M210 40 L235 40 L235 45 L210 45 Z" fill="#E10600"/>
+
+        {/* Front Wing */}
+        <path d="M210 38 L235 38 L235 45 L210 45 Z" fill="#001A30"/>
+        <path d="M210 40 L235 40 L235 43 L210 43 Z" fill="#E10600"/> {/* Red lip */}
+        <path d="M210 35 L225 35 L225 38 L210 38 Z" fill="#FFB800"/> {/* Yellow upper element */}
+
+        {/* Halo & Cockpit */}
+        <path d="M100 25 Q130 15 150 25" stroke="#000" strokeWidth="2" fill="none" />
+        <circle cx="130" cy="22" r="4" fill="#E10600" /> {/* Driver helmet dot */}
+
+        {/* Wheels */}
         <circle cx="45" cy="45" r="14" fill="#111"/>
         <circle cx="45" cy="45" r="7" fill="#222"/>
-        <circle cx="45" cy="45" r="3" fill="#E10600"/>
+        <circle cx="45" cy="45" r="3" fill="#FFB800"/> {/* Yellow wheel nut */}
         <circle cx="185" cy="45" r="14" fill="#111"/>
         <circle cx="185" cy="45" r="7" fill="#222"/>
-        <circle cx="185" cy="45" r="3" fill="#E10600"/>
+        <circle cx="185" cy="45" r="3" fill="#FFB800"/> {/* Yellow wheel nut */}
+
+        {/* Number 1 Decal */}
+        <text x="85" y="32" fill="#E10600" fontSize="11" fontWeight="900" fontFamily="sans-serif" fontStyle="italic">#1</text>
+
+        {/* Speed Lines (Red/Yellow/White) */}
         <line x1="0" y1="20" x2="-60" y2="20" stroke="#fff" strokeWidth="2" strokeOpacity="0.6"/>
         <line x1="10" y1="35" x2="-80" y2="35" stroke="#fff" strokeWidth="2" strokeOpacity="0.4"/>
         <line x1="5" y1="50" x2="-40" y2="50" stroke="#fff" strokeWidth="2" strokeOpacity="0.8"/>
@@ -242,14 +263,29 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
           <audio ref={audioRef} src={f1EngineSound} preload="auto" />
         </motion.div>
 
-        <motion.p
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 2, duration: 1 }}
-          className="absolute bottom-8 text-xs text-white/30 font-mono"
+          className="absolute bottom-8 flex flex-col items-center justify-center pointer-events-none"
         >
-          // MAX VERSTAPPEN #1 // ORACLE RED BULL RACING
-        </motion.p>
+          <div className="relative flex items-center justify-center text-xs font-mono font-bold tracking-[0.2em] transform -skew-x-12 select-none">
+            {/* The base text */}
+            <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-slate-400 to-[#FFB800]">
+              // MAX VERSTAPPEN #1 // ORACLE RED BULL RACING
+            </span>
+
+            {/* Glitch layer 1 - Red */}
+            <span className="absolute left-[1px] top-0 z-0 text-[#E10600] opacity-70 animate-[glitch_3s_infinite_linear_alternate-reverse] mix-blend-screen whitespace-nowrap">
+              // MAX VERSTAPPEN #1 // ORACLE RED BULL RACING
+            </span>
+
+            {/* Glitch layer 2 - Navy/Blue */}
+            <span className="absolute -left-[1px] top-0 z-0 text-[#001A30] opacity-80 animate-[glitch_2s_infinite_linear_alternate] mix-blend-screen whitespace-nowrap">
+              // MAX VERSTAPPEN #1 // ORACLE RED BULL RACING
+            </span>
+          </div>
+        </motion.div>
       </div>
     </div>
   );
