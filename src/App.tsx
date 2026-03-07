@@ -91,15 +91,30 @@ export default function App() {
         transition={{ duration: 0.8 }}
       >
         {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-bottom border-slate-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 pt-5">
+        {/* Checkered Flag Top Border */}
+        <div
+          className="absolute top-0 left-0 w-full h-2 z-40 opacity-90 shadow-sm"
+          style={{
+            backgroundImage: 'repeating-conic-gradient(#1a1a1a 0% 25%, #f8fafc 0% 50%)',
+            backgroundSize: '16px 16px',
+            backgroundPosition: '0 0'
+          }}
+        />
+
+        <div className="max-w-7xl mx-auto flex justify-between items-center mt-1">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
               <MapPin size={24} />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">上海周末行程</h1>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">2026.03.13 - 03.15</p>
+              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider flex items-center gap-2">
+                2026.03.13 - 03.15
+                <span className="inline-flex items-center text-[9px] font-black bg-[#E10600] text-white px-1.5 py-0.5 rounded-sm italic transform -skew-x-12 tracking-widest">
+                  RACE WEEKEND
+                </span>
+              </p>
             </div>
           </div>
 

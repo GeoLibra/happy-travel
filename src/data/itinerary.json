@@ -68,42 +68,6 @@
     "date": "2026-03-14",
     "locations": [
       {
-        "id": "3-1",
-        "name": "浦东美术馆 (非常毕加索)",
-        "address": "浦东新区滨江大道2777号",
-        "type": "museum",
-        "time": "10:00-22:00",
-        "coordinates": [
-          121.496221,
-          31.238041
-        ],
-        "description": "非常毕加索展览",
-        "url": "https://xhslink.com/m/7ChBx08CvcA?xhsshare=CopyLink&appuid=591070efa9b2ed7ef939ebf8&apptime=1772849356&share_id=23c20d4f56cb4ada90829b01696411bb"
-      },
-      {
-        "id": "3-2",
-        "name": "保利上海城市剧院 (谋杀启事)",
-        "address": "闵行区都市路4889号",
-        "type": "theatre",
-        "time": "14:30",
-        "coordinates": [
-          121.389681,
-          31.105119
-        ],
-        "description": "阿加莎悬疑推理巨作《谋杀启事》"
-      },
-      {
-        "id": "3-3",
-        "name": "Manner Coffee(国客滨江店)",
-        "address": "虹口区东大名路500号",
-        "type": "cafe",
-        "coordinates": [
-          121.496265,
-          31.245559
-        ],
-        "description": "滨江美景咖啡"
-      },
-      {
         "id": "3-4",
         "name": "上海辰山植物园",
         "address": "松江区辰花路3888号",
@@ -146,6 +110,54 @@
           31.147478
         ],
         "description": "国内最大的市属综合性植物园之一，汇聚海派盆景与四季花卉"
+      },
+      {
+        "id": "3-23",
+        "name": "上海大宁公园",
+        "address": "上海市静安区广中西路288号",
+        "type": "park",
+        "description": "静安区(南宁的宁)4.8分景点",
+        "url": "https://xhslink.com/m/9r1xvWOsRvb",
+        "coordinates": [
+          121.443097,
+          31.275776
+        ]
+      },
+      {
+        "id": "3-1",
+        "name": "浦东美术馆 (非常毕加索)",
+        "address": "浦东新区滨江大道2777号",
+        "type": "museum",
+        "time": "10:00-22:00",
+        "coordinates": [
+          121.496221,
+          31.238041
+        ],
+        "description": "非常毕加索展览",
+        "url": "https://xhslink.com/m/7ChBx08CvcA?xhsshare=CopyLink&appuid=591070efa9b2ed7ef939ebf8&apptime=1772849356&share_id=23c20d4f56cb4ada90829b01696411bb"
+      },
+      {
+        "id": "3-2",
+        "name": "保利上海城市剧院 (谋杀启事)",
+        "address": "闵行区都市路4889号",
+        "type": "theatre",
+        "time": "14:30",
+        "coordinates": [
+          121.389681,
+          31.105119
+        ],
+        "description": "阿加莎悬疑推理巨作《谋杀启事》"
+      },
+      {
+        "id": "3-3",
+        "name": "Manner Coffee(国客滨江店)",
+        "address": "虹口区东大名路500号",
+        "type": "cafe",
+        "coordinates": [
+          121.496265,
+          31.245559
+        ],
+        "description": "滨江美景咖啡"
       },
       {
         "id": "3-8",
@@ -325,18 +337,6 @@
         "coordinates": [
           121.4144,
           31.2164
-        ]
-      },
-      {
-        "id": "3-23",
-        "name": "上海大宁公园",
-        "address": "上海市静安区广中西路288号",
-        "type": "park",
-        "description": "静安区(南宁的宁)4.8分景点",
-        "url": "https://xhslink.com/m/9r1xvWOsRvb",
-        "coordinates": [
-          121.443097,
-          31.275776
         ]
       }
     ]
