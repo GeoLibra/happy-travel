@@ -231,16 +231,15 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     scene.add(explosionCore);
 
     // ── Animation Loop ──
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer();
     let frameId = 0;
-    let prevTime = 0;
 
-    const animate = () => {
+    const animate = (timestamp: number) => {
       frameId = requestAnimationFrame(animate);
 
-      const time = clock.getElapsedTime();
-      const delta = Math.min(time - prevTime, 0.1);
-      prevTime = time;
+      timer.update(timestamp);
+      const time = timer.getElapsed();
+      const delta = Math.min(timer.getDelta(), 0.1);
 
       const s = stateRef.current;
 
@@ -388,7 +387,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       }
     };
 
-    animate();
+    animate(performance.now());
 
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;

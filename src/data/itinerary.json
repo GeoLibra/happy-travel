@@ -326,6 +326,18 @@
           121.4144,
           31.2164
         ]
+      },
+      {
+        "id": "3-23",
+        "name": "上海大宁公园",
+        "address": "上海市静安区广中西路288号",
+        "type": "park",
+        "description": "静安区(南宁的宁)4.8分景点",
+        "url": "https://xhslink.com/m/9r1xvWOsRvb",
+        "coordinates": [
+          121.443097,
+          31.275776
+        ]
       }
     ]
   },
