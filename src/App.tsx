@@ -26,7 +26,6 @@ import MV1Badge from './components/MV1Badge';
 import MV1InfoCard from './components/MV1InfoCard';
 import ImagineDragonsBadge from './components/ImagineDragonsBadge';
 import RaceCountdown from './components/RaceCountdown';
-import MV1TelemetryCard from './components/MV1TelemetryCard';
 import f1EngineShiftSound from './audio/f1-engine-2.mp3';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
@@ -38,6 +37,7 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
     case 'cafe': return <Coffee className={className} />;
     case 'park': return <MapPin className={className} />;
     case 'restaurant': return <Utensils className={className} />;
+    case 'citywalk': return <MapIcon className={className} />;
     default: return <MapPin className={className} />;
   }
 };
@@ -99,13 +99,6 @@ export default function App() {
       }, 100);
     }
   }, [selectedLocationId]);
-
-  // Listen for custom event from ParticleBackground raycaster
-  useEffect(() => {
-    const handleCarClick = () => setShowTelemetry(true);
-    window.addEventListener('f1CarClicked', handleCarClick);
-    return () => window.removeEventListener('f1CarClicked', handleCarClick);
-  }, []);
 
   const handleLocationClick = (loc: Location) => {
     playShiftSound();
@@ -210,7 +203,7 @@ export default function App() {
             </div>
           </div>
 
-          <RaceCountdown />
+          {!showWelcome && <RaceCountdown />}
 
           {/* Day Selector with Swipe Support */}
           <motion.div
@@ -363,7 +356,7 @@ export default function App() {
                           )}
                         </div>
                         <p className="text-sm text-slate-500 flex items-center gap-1 mb-2">
-                          <MapPin size={14} className="shrink-0" />
+                          <Flag size={14} className="shrink-0 text-slate-400" />
                           <span className="truncate">{loc.address}</span>
                         </p>
                         {loc.description && (
@@ -411,8 +404,8 @@ export default function App() {
                       </div>
                     )}
                   </motion.div>
-                )}
-                )}
+                  );
+                })}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -463,25 +456,7 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Telemetry Overlay (X-Ray Mode) */}
-      <AnimatePresence>
-        {showTelemetry && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setShowTelemetry(false)}
-          >
-            <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg">
-              <MV1TelemetryCard onClose={() => setShowTelemetry(false)} />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      </motion.div>
+    </motion.div>
     </>
   );
 }

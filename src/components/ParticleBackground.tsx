@@ -4,6 +4,7 @@ import { GPUParticleSystem, GPUEffectUniforms } from './effects/gpuParticles';
 import { GodRays } from './effects/godRays';
 import { AudioVisualizer } from './effects/audioVisualizer';
 import { DEFAULT_FORCE_FIELD_PARAMS } from './effects/forceField';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 interface ParticleBackgroundProps {
   isPressing: boolean;
@@ -20,8 +21,8 @@ const COLORS = {
   navy: new THREE.Color('#001A30'),
 };
 
-const SPEED_LINE_COUNT = 300;
-const CPU_PARTICLE_COUNT = 3000;
+const SPEED_LINE_COUNT = 100;
+const CPU_PARTICLE_COUNT = 500;
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel, onCarClick }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -215,33 +216,14 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       }
     };
 
-    // ── Raycaster Setup for Interactive Garage ──
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-
-    const onMouseClick = (event: MouseEvent) => {
-      // Allow clicks as long as the car is visible to discover the easter egg
-      if (!f1CarGroup || !f1CarGroup.visible) return;
-
-      // Calculate mouse position in normalized device coordinates (-1 to +1)
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-      // Update the picking ray with the camera and mouse position
-      raycaster.setFromCamera(mouse, camera);
-
-      // Calculate objects intersecting the picking ray
-      const intersects = raycaster.intersectObject(f1CarGroup, true);
-
-      if (intersects.length > 0) {
-        console.log("[DEBUG] F1 Car Clicked!");
-        window.dispatchEvent(new CustomEvent('f1CarClicked'));
-        if (onCarClick) onCarClick();
-      }
-    };
-
-    // Use pointer events for better mobile/desktop support
-    window.addEventListener('pointerdown', onMouseClick);
+    // ── Interaction Controls (Orbit) ──
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.enablePan = false;
+    controls.minDistance = 10;
+    controls.maxDistance = 100;
+    controls.enabled = false;
 
     // ── High-Fidelity Speed Trails (Shader Lines) ──
     const TRAIL_COUNT = 15;
@@ -294,29 +276,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     f1Trails.visible = false;
     scene.add(f1Trails);
 
-    // ── Exhaust Sparks (Particles) ──
-    const SPARK_COUNT = 100;
-    const sparkGeometry = new THREE.BufferGeometry();
-    const sPositions = new Float32Array(SPARK_COUNT * 3);
-    const sVelocities = new Float32Array(SPARK_COUNT * 3);
-    for(let i=0; i<SPARK_COUNT; i++) {
-       sPositions[i*3] = -150;
-       sVelocities[i*3] = -Math.random() * 2 - 1;
-       sVelocities[i*3+1] = (Math.random() - 0.5) * 1.5;
-       sVelocities[i*3+2] = (Math.random() - 0.5) * 1.5;
-    }
-    sparkGeometry.setAttribute('position', new THREE.BufferAttribute(sPositions, 3));
-    const sparkMaterial = new THREE.PointsMaterial({
-      color: COLORS.yellow,
-      size: 1.5 * pixelRatio,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true
-    });
-    const exhaustSparks = new THREE.Points(sparkGeometry, sparkMaterial);
-    exhaustSparks.visible = false;
-    scene.add(exhaustSparks);
+
 
     // ── Speed Lines (CPU-driven, low cost) ──
     const lineGeometry = new THREE.BufferGeometry();
@@ -377,17 +337,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     const speedLines = new THREE.Points(lineGeometry, lineMaterial);
     scene.add(speedLines);
 
-    // ── Explosion Core (Light source for God Rays) ──
-    const coreGeometry = new THREE.SphereGeometry(8, 32, 32);
-    const coreMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false
-    });
-    const explosionCore = new THREE.Mesh(coreGeometry, coreMaterial);
-    explosionCore.position.set(0, -25, -40);
-    scene.add(explosionCore);
 
     // ── Animation Loop ──
     const timer = new THREE.Timer();
@@ -416,39 +365,28 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       s.baseUniforms.uFieldStrength.value = DEFAULT_FORCE_FIELD_PARAMS.strength + (bands.overall * 2.0);
       s.baseUniforms.uFieldSpeed.value = DEFAULT_FORCE_FIELD_PARAMS.speed + (bands.mid * 0.5);
       */
-
-      // Handle Explosion timing
-      if (s.explosionTime === -1) {
-        s.explosionTime = time;
-      }
-      const timeSinceExplosion = s.explosionTime > 0 ? time - s.explosionTime : 0;
-      const isExploding = timeSinceExplosion < 1.5 && s.explosionTime > 0;
-      const explosionForce = isExploding ? Math.max(0, 1.0 - timeSinceExplosion / 1.5) : 0;
-
       // Update uniforms
       s.baseUniforms.uTime.value = time;
       s.baseUniforms.uDelta.value = delta;
       s.baseUniforms.uIsPressing.value = s.isPressing;
       s.baseUniforms.uProgress.value = s.progress;
-      s.baseUniforms.uExplosionForce.value = explosionForce;
+      s.baseUniforms.uExplosionForce.value = 0;
 
-      // Update Explosion Core visibility
-      if (isExploding) {
-        /*
-        explosionCore.material.opacity = explosionForce;
-        const scale = 1.0 + (1.0 - explosionForce) * 2.0;
-        explosionCore.scale.set(scale, scale, scale);
-        */
+      // ── Camera Mouse Sway or OrbitControls ──
+      if (s.progress >= 100) {
+        if (!controls.enabled) {
+          controls.enabled = true;
+          if (f1CarGroup) controls.target.copy(f1CarGroup.position);
+        }
+        controls.update();
       } else {
-        // explosionCore.material.opacity = 0;
+        controls.enabled = false;
+        s.mouse.x += (s.mouse.targetX - s.mouse.x) * 0.05;
+        s.mouse.y += (s.mouse.targetY - s.mouse.y) * 0.05;
+        camera.position.x = s.mouse.x * 3;
+        camera.position.y = s.mouse.y * 2;
+        camera.lookAt(0, 0, 0);
       }
-
-      // Camera Mouse Sway
-      s.mouse.x += (s.mouse.targetX - s.mouse.x) * 0.05;
-      s.mouse.y += (s.mouse.targetY - s.mouse.y) * 0.05;
-      camera.position.x = s.mouse.x * 3;
-      camera.position.y = s.mouse.y * 2;
-      camera.lookAt(0, 0, 0);
 
       // ── Update Particles ──
       /*
@@ -475,20 +413,11 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             dx = (dirX / dist) * revForce;
             dy = (dirY / dist) * revForce;
             dz = -revForce * 1.5;
-          } else if (isExploding) {
-            const dirX = pArr[i3] - 0;
-            const dirY = pArr[i3 + 1] - (-25);
-            const dirZ = pArr[i3 + 2] - (-40);
-            const dist = Math.sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ) || 1;
-            const pwr = explosionForce * 3.0;
-            dx = (dirX / dist) * pwr + (Math.random()-0.5)*explosionForce*2;
-            dy = (dirY / dist) * pwr + explosionForce * 0.8 + (Math.random()-0.5)*explosionForce*2;
-            dz = (dirZ / dist) * pwr + (Math.random()-0.5)*explosionForce*2;
           }
 
           pArr[i3] += dx; pArr[i3 + 1] += dy; pArr[i3 + 2] += dz;
 
-          if (!s.isPressing && !isExploding) {
+          if (!s.isPressing && s.progress < 100) {
             if (pArr[i3] < -100) pArr[i3] = 100;
             if (pArr[i3] > 100) pArr[i3] = -100;
             if (pArr[i3 + 1] < -75) pArr[i3 + 1] = 75;
@@ -512,7 +441,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         if (!f1CarGroup.visible) {
            f1CarGroup.visible = true;
            console.log("[DEBUG] Car visible and approaching");
-           exhaustSparks.visible = true;
            f1Trails.visible = true;
         }
 
@@ -531,21 +459,27 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         f1CarGroup.scale.set(targetScale, targetScale, targetScale);
 
         // Rotation: Nose-out until 80%, then "Background Match" turn (135 deg)
-        const turnFactor = Math.min(1, Math.max(0, (s.progress - 80) / 20));
+        // Rotation: Nose-out until 80%, then "Background Match" turn (135 deg)
+        // Disable interpolation when controls are active to not fight OrbitControls
+        if (s.progress < 100) {
+            const turnFactor = Math.min(1, Math.max(0, (s.progress - 80) / 20));
 
-        // Y-axis: From 0 to 135 degrees (3/4 rear-to-side view)
-        const targetRotY = turnFactor * (Math.PI * 0.25);
-        f1CarGroup.rotation.y += (targetRotY - f1CarGroup.rotation.y) * 0.1;
+            // Y-axis: From 0 to 135 degrees (3/4 rear-to-side view)
+            const targetRotY = turnFactor * (Math.PI * 0.25);
+            f1CarGroup.rotation.y += (targetRotY - f1CarGroup.rotation.y) * 0.1;
 
-        // X-axis: Tilt forward (top-down view) to see the roof
-        const targetRotX = turnFactor * 0.25;
-        f1CarGroup.rotation.x += (targetRotX - f1CarGroup.rotation.x) * 0.1;
+            // X-axis: Tilt forward (top-down view) to see the roof
+            const targetRotX = turnFactor * 0.25;
+            f1CarGroup.rotation.x += (targetRotX - f1CarGroup.rotation.x) * 0.1;
 
-        // Z-axis: Subtle dynamic lean
-        const targetRotZ = turnFactor * 0.05 + Math.sin(time * 2) * 0.01;
-        f1CarGroup.rotation.z += (targetRotZ - f1CarGroup.rotation.z) * 0.05;
+            // Z-axis: Subtle dynamic lean
+            const targetRotZ = turnFactor * 0.05 + Math.sin(time * 2) * 0.01;
+            f1CarGroup.rotation.z += (targetRotZ - f1CarGroup.rotation.z) * 0.05;
+        }
+        // When progress >= 100, we just keep the final rotation values intact so it doesn't snap!
 
         // Update Trails (Trailing logic)
+        const isStopped = s.progress >= 99;
         const tArr = trailGeometry.attributes.position.array as Float32Array;
         for(let i=0; i<TRAIL_COUNT; i++) {
             const trailBaseIdx = i * trailSegments * 3;
@@ -564,25 +498,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         }
         trailGeometry.attributes.position.needsUpdate = true;
 
-        // Update Sparks
-        const sArr = sparkGeometry.attributes.position.array as Float32Array;
-        const isStopped = s.progress >= 99;
 
-        for(let i=0; i<SPARK_COUNT; i++) {
-          const i3 = i * 3;
-          sArr[i3] += sVelocities[i3];
-          sArr[i3+1] += (sVelocities[i3+1] - 0.1); // Gravity effect
-          sArr[i3+2] += (sVelocities[i3+2] - 0.5); // Fly towards background
-
-          if (time % 0.1 < 0.02 || isStopped) {
-            const sparkOffset = new THREE.Vector3(0, 1, -11).applyEuler(f1CarGroup.rotation);
-            sArr[i3] = f1CarGroup.position.x + sparkOffset.x + (Math.random()-0.5);
-            sArr[i3+1] = f1CarGroup.position.y + sparkOffset.y + (Math.random()-0.5);
-            sArr[i3+2] = f1CarGroup.position.z + sparkOffset.z;
-          }
-        }
-        sparkGeometry.attributes.position.needsUpdate = true;
-        sparkMaterial.opacity = (Math.random() * 0.7 + 0.3) * (isStopped ? 0.4 : 1.0);
 
         // Fade trails if stopped
         if (isStopped) {
@@ -590,7 +506,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         }
       } else if (f1CarGroup) {
         f1CarGroup.visible = false;
-        exhaustSparks.visible = false;
         f1Trails.visible = false;
       }
 
@@ -621,18 +536,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       // ── Render ──
       renderer.setRenderTarget(null);
       renderer.render(scene, camera);
-
-      if (isExploding) {
-        /*
-        godRays.render(
-          renderer,
-          scene,
-          camera,
-          explosionForce,
-          new THREE.Vector3(0, -25, -40) // Explosion center
-        );
-        */
-      }
     };
 
     animate(performance.now());
@@ -652,21 +555,15 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('pointerdown', onMouseClick);
 
       // gpuParticles.dispose(scene);
       // godRays.dispose();
       // audioVisualizer.dispose();
 
-      coreGeometry.dispose();
-      coreMaterial.dispose();
-
       lineGeometry.dispose();
       lineMaterial.dispose();
       trailGeometry.dispose();
       trailMaterial.dispose();
-      sparkGeometry.dispose();
-      sparkMaterial.dispose();
       if (cpuParticles) {
         cpuParticles.geometry.dispose();
         (cpuParticles.material as THREE.Material).dispose();
@@ -677,9 +574,9 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         container.removeChild(renderer.domElement);
       }
     };
-  }, [audioRef]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [audioRef]);
 
-  return <div ref={containerRef} style={{ position: 'fixed', inset: 0, zIndex: 60, pointerEvents: 'none' }} />;
+  return <div ref={containerRef} style={{ position: 'fixed', inset: 0, zIndex: 75, pointerEvents: progress >= 100 ? 'auto' : 'none' }} />;
 };
 
 export default ParticleBackground;

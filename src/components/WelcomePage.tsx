@@ -193,16 +193,16 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
       </AnimatePresence>
 
       {/* Main Content - Only visible after loading */}
-      <div className={`transition-opacity duration-1000 ${modelLoading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+      <div className={`transition-opacity duration-1000 absolute inset-0 z-[70] pointer-events-none ${modelLoading ? 'opacity-0' : 'opacity-100'}`}>
         <div className="absolute inset-0 flex flex-col items-center justify-center px-4 py-8 pointer-events-none overflow-hidden">
-          <div className="flex flex-col items-center justify-center text-center max-w-4xl w-full transition-all duration-300 pointer-events-auto">
+          <div className="flex flex-col items-center justify-center text-center max-w-4xl w-full transition-all duration-300 pointer-events-none">
             {/* Tag */}
             <motion.div
               initial={{ y: -50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
               onClick={handleTagClick}
-              className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-sm bg-[#E10600] text-white text-xs sm:text-sm font-bold tracking-[0.15em] sm:tracking-[0.2em] mb-4 sm:mb-8 shadow-[0_0_15px_rgba(225,6,0,0.5)] transform -skew-x-12 cursor-pointer active:scale-95 transition-transform"
+              className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-sm bg-[#E10600] text-white text-xs sm:text-sm font-bold tracking-[0.15em] sm:tracking-[0.2em] mb-4 sm:mb-8 shadow-[0_0_15px_rgba(225,6,0,0.5)] transform -skew-x-12 cursor-pointer active:scale-95 transition-transform pointer-events-auto"
             >
               <Flag size={14} className="skew-x-12" />
               <span className="skew-x-12">RACE WEEKEND</span>
@@ -249,12 +249,15 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               className="mb-6 sm:mb-0 landscape:mb-4"
             >
               <button
-                onPointerDown={(e) => {
+                onClick={(e) => {
                   e.preventDefault();
                   if (progress >= 100) {
                     onEnter();
-                    return;
                   }
+                }}
+                onPointerDown={(e) => {
+                  if (progress >= 100) return;
+                  e.preventDefault();
                   setIsPressing(true);
                   if (audioRef.current) {
                     audioRef.current.currentTime = 0;
@@ -265,14 +268,14 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
                 onPointerUp={() => setIsPressing(false)}
                 onPointerLeave={() => setIsPressing(false)}
                 onContextMenu={(e) => e.preventDefault()}
-                className="group relative inline-flex items-center justify-center gap-2 sm:gap-3 px-8 sm:px-12 py-3 sm:py-5 bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl landscape:text-xl uppercase tracking-wider transform -skew-x-12 transition-all hover:bg-white hover:scale-105 active:scale-95 overflow-hidden select-none touch-none shadow-[0_0_20px_rgba(255,184,0,0.4)]"
+                className="group relative z-[90] inline-flex items-center justify-center gap-2 sm:gap-3 px-8 sm:px-12 py-3 sm:py-5 w-[280px] sm:w-[360px] bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl landscape:text-xl uppercase tracking-wider transform -skew-x-12 transition-all hover:bg-white hover:scale-105 active:scale-95 overflow-hidden select-none pointer-events-auto cursor-pointer shadow-[0_0_20px_rgba(255,184,0,0.4)]"
               >
                 <div className="absolute left-0 top-0 bottom-0 bg-[#E10600] z-0 transition-[width] duration-75 ease-linear pointer-events-none" style={{ width: `${progress}%` }} />
-                <span className={`relative z-10 flex items-center gap-2 skew-x-12 ${isPressing || progress > 0 ? 'text-white' : ''} ${progress >= 100 ? 'text-[#001A30] font-black' : ''}`}>
-                  <Zap size={20} className={isPressing || progress > 0 ? "fill-white" : "fill-[#001A30]"} />
-                  <span className="block">{
+                <span className={`relative z-10 flex items-center justify-center gap-2 skew-x-12 ${isPressing || progress > 0 ? 'text-white' : ''} ${progress >= 100 ? 'text-[#001A30] font-black' : ''}`}>
+                  < Zap size={20} className={isPressing || progress > 0 ? "fill-white" : "fill-[#001A30]"} />
+                  <span className="block whitespace-nowrap">{
                     progress >= 100
-                      ? "TAP CAR OR ENTER"
+                      ? "ENTER"
                       : isPressing
                         ? `ENGINE STARTING ${progress}%`
                         : (modelLoading ? "CALIBRATING..." : "HOLD TO START")
