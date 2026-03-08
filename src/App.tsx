@@ -210,6 +210,8 @@ export default function App() {
 
           {!showWelcome && <RaceCountdown />}
 
+      {/* Spacer for countdown */}
+      <div className="h-[100px] shrink-0" />
           {/* Day Selector with Swipe Support */}
           <motion.div
             drag="x"

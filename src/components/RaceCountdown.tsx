@@ -285,7 +285,8 @@ const RaceCountdown: React.FC = () => {
 
       const rect = wrapper.getBoundingClientRect();
       const isLandscape = window.innerWidth > window.innerHeight;
-      const MARGIN_TOP = rect.top + 15 + (isLandscape ? 50 : 0);
+      // Simpler positioning - just based on wrapper position
+      const MARGIN_TOP = rect.top + (isLandscape ? 20 : 15);
       const CANVAS_W = rect.width;
 
       const time = getRemainingTime();
@@ -319,7 +320,7 @@ const RaceCountdown: React.FC = () => {
       const numDigitPairs = 3; // Hrs, Mins, Secs
 
       const totalWidth = daysWidth + (hasDays ? blockGap : 0) + (numBlocksGap * blockGap) + (numDigitPairs * twoDigitWidth) - blockGap;
-      const dynamicMarginLeft = rect.left + Math.max(0, Math.round((CANVAS_W - totalWidth) / 2));
+      const dynamicMarginLeft = isLandscape ? rect.left + Math.max(0, Math.round((rect.width - totalWidth) / 2)) : Math.max(0, Math.round((window.innerWidth - totalWidth) / 2));
 
       // Initial check skip hook
       if (currentSecondsRef.current !== -1) {
@@ -433,7 +434,7 @@ const RaceCountdown: React.FC = () => {
     >
       <canvas
          ref={canvasRef}
-         className="fixed top-0 left-0 w-screen h-screen pointer-events-none drop-shadow-sm z-[100]"
+         className="fixed top-0 left-0 w-screen h-screen pointer-events-none drop-shadow-sm z-[15]"
          aria-label="Race Countdown Canvas"
          onClick={(e) => {
            console.log('[RaceCountdown] Canvas clicked (should not happen with pointer-events-none)', {

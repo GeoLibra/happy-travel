@@ -256,7 +256,10 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
                     target: e.target,
                     currentTarget: e.currentTarget,
                   });
-                  e.preventDefault();
+                  // Only prevent default on touch devices
+        if (e.pointerType === 'touch') {
+          e.preventDefault();
+        }
                   if (progress >= 100) {
                     console.log('[WelcomePage] Calling onEnter()');
                     onEnter();
@@ -273,7 +276,10 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
                     console.log('[WelcomePage] Progress already 100, ignoring pointer down');
                     return;
                   }
-                  e.preventDefault();
+                  // Only prevent default on touch devices
+        if (e.pointerType === 'touch') {
+          e.preventDefault();
+        }
                   console.log('[WelcomePage] Setting isPressing to true');
                   setIsPressing(true);
                   if (audioRef.current) {
