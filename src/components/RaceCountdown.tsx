@@ -58,7 +58,7 @@ const RaceCountdown: React.FC = () => {
       canvas.height = window.innerHeight * dpr;
       ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform before scaling
       ctx.scale(dpr, dpr);
-      
+
       // Clear particles on orientation change
       particlesRef.current = [];
     };
@@ -286,7 +286,7 @@ const RaceCountdown: React.FC = () => {
       const rect = wrapper.getBoundingClientRect();
       const isLandscape = window.innerWidth > window.innerHeight;
       // Simpler positioning - just based on wrapper position
-      const MARGIN_TOP = rect.top - 40;
+      const MARGIN_TOP = rect.top + 5;
       const CANVAS_W = rect.width;
 
       const time = getRemainingTime();

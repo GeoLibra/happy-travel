@@ -312,7 +312,15 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
                   <motion.span animate={{ x: [0, 8, 0] }} transition={{ repeat: Infinity, duration: 1 }}><ArrowRight size={24} strokeWidth={3} /></motion.span>
                 </span>
               </button>
-              <audio ref={audioRef} src={f1EngineSound} preload="auto" />
+              <audio
+        ref={audioRef}
+        src={f1EngineSound}
+        preload="auto"
+        onEnded={() => {
+          console.log('[WelcomePage] Audio ended, auto-navigating');
+          onEnter();
+        }}
+      />
             </motion.div>
 
             {/* Glitch Overlay & Stats */}
