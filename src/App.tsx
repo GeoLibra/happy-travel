@@ -97,24 +97,24 @@ export default function App() {
   useEffect(() => {
     const successAudio = new Audio(successSound);
     successAudio.preload = 'auto';
-    
+
     const handleMotion = (event: DeviceMotionEvent) => {
       const { accelerationIncludingGravity } = event;
       if (!accelerationIncludingGravity) return;
-      
+
       const { x, y, z } = accelerationIncludingGravity;
       if (!x || !y || !z) return;
-      
+
       const currentTime = Date.now();
       const timeDiff = currentTime - shakeState.current.lastTime;
-      
+
       if (timeDiff > 100) {
         const deltaX = Math.abs(x - shakeState.current.lastX);
         const deltaY = Math.abs(y - shakeState.current.lastY);
         const deltaZ = Math.abs(z - shakeState.current.lastZ);
-        
+
         const totalDelta = deltaX + deltaY + deltaZ;
-        
+
         if (totalDelta > 25 && !showRose) {
           // Play success sound
           successAudio.currentTime = 0;
@@ -122,11 +122,11 @@ export default function App() {
           // Show rose
           setShowRose(true);
         }
-        
+
         shakeState.current = { lastX: x, lastY: y, lastZ: z, lastTime: currentTime };
       }
     };
-    
+
     if (window.DeviceMotionEvent) {
       if (typeof (window.DeviceMotionEvent as any).requestPermission === 'function') {
         (window.DeviceMotionEvent as any).requestPermission().then((response: string) => {
@@ -138,7 +138,7 @@ export default function App() {
         window.addEventListener('devicemotion', handleMotion);
       }
     }
-    
+
     return () => {
       window.removeEventListener('devicemotion', handleMotion);
     };
@@ -309,12 +309,11 @@ export default function App() {
           onClick={() => setShowRose(false)}
         />
       )}
-    </div>
 
           {!showWelcome && <RaceCountdown />}
 
-      {/* Spacer for countdown */}
-      <div className="h-[10px] shrink-0" />
+          {/* Spacer for countdown */}
+          <div className="h-[10px] shrink-0" />
           {/* Day Selector with Swipe Support */}
           <motion.div
             drag="x"
