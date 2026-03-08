@@ -10,6 +10,7 @@ interface ParticleBackgroundProps {
   progress: number;
   audioRef?: React.RefObject<HTMLAudioElement | null>;
   loadedModel?: THREE.Group | null;
+  onCarClick?: () => void;
 }
 
 const COLORS = {
@@ -22,7 +23,7 @@ const COLORS = {
 const SPEED_LINE_COUNT = 300;
 const CPU_PARTICLE_COUNT = 3000;
 
-const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel }) => {
+const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel, onCarClick }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Track state in ref to avoid re-triggering the animation loop closure
@@ -213,6 +214,34 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         console.log("[ParticleBackground] 3D F1 Model dynamically injected and pre-compiled");
       }
     };
+
+    // ── Raycaster Setup for Interactive Garage ──
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    const onMouseClick = (event: MouseEvent) => {
+      // Allow clicks as long as the car is visible to discover the easter egg
+      if (!f1CarGroup || !f1CarGroup.visible) return;
+
+      // Calculate mouse position in normalized device coordinates (-1 to +1)
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      // Update the picking ray with the camera and mouse position
+      raycaster.setFromCamera(mouse, camera);
+
+      // Calculate objects intersecting the picking ray
+      const intersects = raycaster.intersectObject(f1CarGroup, true);
+
+      if (intersects.length > 0) {
+        console.log("[DEBUG] F1 Car Clicked!");
+        window.dispatchEvent(new CustomEvent('f1CarClicked'));
+        if (onCarClick) onCarClick();
+      }
+    };
+
+    // Use pointer events for better mobile/desktop support
+    window.addEventListener('pointerdown', onMouseClick);
 
     // ── High-Fidelity Speed Trails (Shader Lines) ──
     const TRAIL_COUNT = 15;
@@ -478,8 +507,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       }
 
       // ── Update F1 Car & Effects ──
-      // Show car as soon as user starts pressing (0%+)
-      if (s.isPressing && f1CarGroup) {
+      // Show car as soon as user starts pressing (0%+) or if fully loaded
+      if ((s.isPressing || s.progress >= 100) && f1CarGroup) {
         if (!f1CarGroup.visible) {
            f1CarGroup.visible = true;
            console.log("[DEBUG] Car visible and approaching");
@@ -623,6 +652,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('pointerdown', onMouseClick);
 
       // gpuParticles.dispose(scene);
       // godRays.dispose();

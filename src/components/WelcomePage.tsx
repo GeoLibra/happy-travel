@@ -77,7 +77,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-    if (isPressing) {
+    if (isPressing && progress < 100) {
 
       interval = setInterval(() => {
         setProgress((prev) => {
@@ -85,7 +85,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
           return prev + 1;
         });
       }, 50); // 5s total duration
-    } else {
+    } else if (!isPressing && progress < 100) {
       setProgress(0);
       if (audioRef.current) {
         audioRef.current.pause();
@@ -93,16 +93,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
       }
     }
     return () => clearInterval(interval);
-  }, [isPressing]);
-
-  useEffect(() => {
-    if (progress === 100) {
-      const timer = setTimeout(() => {
-        onEnter();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [progress, onEnter]);
+  }, [isPressing, progress]);
 
   if (!mounted) return null;
 
@@ -260,6 +251,10 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               <button
                 onPointerDown={(e) => {
                   e.preventDefault();
+                  if (progress >= 100) {
+                    onEnter();
+                    return;
+                  }
                   setIsPressing(true);
                   if (audioRef.current) {
                     audioRef.current.currentTime = 0;
@@ -273,12 +268,14 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
                 className="group relative inline-flex items-center justify-center gap-2 sm:gap-3 px-8 sm:px-12 py-3 sm:py-5 bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl landscape:text-xl uppercase tracking-wider transform -skew-x-12 transition-all hover:bg-white hover:scale-105 active:scale-95 overflow-hidden select-none touch-none shadow-[0_0_20px_rgba(255,184,0,0.4)]"
               >
                 <div className="absolute left-0 top-0 bottom-0 bg-[#E10600] z-0 transition-[width] duration-75 ease-linear pointer-events-none" style={{ width: `${progress}%` }} />
-                <span className={`relative z-10 flex items-center gap-2 skew-x-12 ${isPressing || progress > 0 ? 'text-white' : ''}`}>
+                <span className={`relative z-10 flex items-center gap-2 skew-x-12 ${isPressing || progress > 0 ? 'text-white' : ''} ${progress >= 100 ? 'text-[#001A30] font-black' : ''}`}>
                   <Zap size={20} className={isPressing || progress > 0 ? "fill-white" : "fill-[#001A30]"} />
                   <span className="block">{
-                    isPressing
-                      ? `ENGINE STARTING ${progress}%`
-                      : (modelLoading ? "CALIBRATING..." : "HOLD TO START")
+                    progress >= 100
+                      ? "TAP CAR OR ENTER"
+                      : isPressing
+                        ? `ENGINE STARTING ${progress}%`
+                        : (modelLoading ? "CALIBRATING..." : "HOLD TO START")
                   }</span>
                   <motion.span animate={{ x: [0, 8, 0] }} transition={{ repeat: Infinity, duration: 1 }}><ArrowRight size={24} strokeWidth={3} /></motion.span>
                 </span>

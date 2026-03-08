@@ -25,6 +25,9 @@ import MiniFirework from './components/MiniFirework';
 import MV1Badge from './components/MV1Badge';
 import MV1InfoCard from './components/MV1InfoCard';
 import ImagineDragonsBadge from './components/ImagineDragonsBadge';
+import RaceCountdown from './components/RaceCountdown';
+import MV1TelemetryCard from './components/MV1TelemetryCard';
+import f1EngineShiftSound from './audio/f1-engine-2.mp3';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -46,11 +49,34 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list'); // For mobile toggle
   const [hoveredType, setHoveredType] = useState<Location['type'] | null>(null);
   const [showMV1Card, setShowMV1Card] = useState(false);
+  const [showTelemetry, setShowTelemetry] = useState(false);
 
   const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const allLocations = useMemo(() => ITINERARY_DATA.flatMap(d => d.locations), []);
   const currentDay = ITINERARY_DATA[selectedDayIdx];
+  const shiftAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    shiftAudioRef.current = new Audio(f1EngineShiftSound);
+    shiftAudioRef.current.volume = 0.4;
+    shiftAudioRef.current.preload = 'auto';
+  }, []);
+
+  const playShiftSound = () => {
+    if (shiftAudioRef.current) {
+        // Play a random short segment of the engine sound to simulate different shifts
+        const randomStart = Math.random() * 2;
+        shiftAudioRef.current.currentTime = randomStart;
+        shiftAudioRef.current.play().catch(() => {});
+        // Stop after 0.3s
+        setTimeout(() => {
+            if(shiftAudioRef.current) {
+                shiftAudioRef.current.pause();
+            }
+        }, 300);
+    }
+  };
 
   // Scroll into view when selectedLocationId changes
   useEffect(() => {
@@ -74,7 +100,15 @@ export default function App() {
     }
   }, [selectedLocationId]);
 
+  // Listen for custom event from ParticleBackground raycaster
+  useEffect(() => {
+    const handleCarClick = () => setShowTelemetry(true);
+    window.addEventListener('f1CarClicked', handleCarClick);
+    return () => window.removeEventListener('f1CarClicked', handleCarClick);
+  }, []);
+
   const handleLocationClick = (loc: Location) => {
+    playShiftSound();
     setSelectedLocationId(loc.id);
     if (window.innerWidth < 768) {
       setViewMode('map');
@@ -94,6 +128,7 @@ export default function App() {
         initial={{ opacity: 0 }}
         animate={{ opacity: showWelcome ? 0 : 1 }}
         transition={{ duration: 0.8 }}
+        style={{ pointerEvents: showWelcome ? 'none' : 'auto' }}
       >
         {/* Header */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 pt-5">
@@ -175,6 +210,8 @@ export default function App() {
             </div>
           </div>
 
+          <RaceCountdown />
+
           {/* Day Selector with Swipe Support */}
           <motion.div
             drag="x"
@@ -197,6 +234,7 @@ export default function App() {
                 key={day.date}
                 onClick={(e) => {
                   e.preventDefault();
+                  if (selectedDayIdx !== idx) playShiftSound();
                   setSelectedDayIdx(idx);
                   setSelectedLocationId(undefined);
                 }}
@@ -421,6 +459,23 @@ export default function App() {
           >
             <div onClick={(e) => e.stopPropagation()}>
               <MV1InfoCard onClose={() => setShowMV1Card(false)} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Telemetry Overlay (X-Ray Mode) */}
+      <AnimatePresence>
+        {showTelemetry && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setShowTelemetry(false)}
+          >
+            <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg">
+              <MV1TelemetryCard onClose={() => setShowTelemetry(false)} />
             </div>
           </motion.div>
         )}

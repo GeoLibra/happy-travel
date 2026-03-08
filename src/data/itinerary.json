@@ -158,7 +158,7 @@
           31.245559
         ],
         "description": "滨江美景咖啡",
-      "url": "https://xhslink.com/m/3NMuQxtXShk"
+        "url": "https://xhslink.com/m/3NMuQxtXShk"
       },
       {
         "id": "3-8",
@@ -339,6 +339,18 @@
           121.4144,
           31.2164
         ]
+      },
+      {
+        "id": "3-24",
+        "name": "Gate M西岸梦中心",
+        "address": "上海市龙腾大道2266号",
+        "type": "shopping",
+        "coordinates": [
+          121.464089,
+          31.161916
+        ],
+        "description": "商场 | 龙华",
+        "url": "https://xhslink.com/m/5zgvvJTRh50"
       }
     ]
   },
