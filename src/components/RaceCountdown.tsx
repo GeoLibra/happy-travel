@@ -286,7 +286,7 @@ const RaceCountdown: React.FC = () => {
       const rect = wrapper.getBoundingClientRect();
       const isLandscape = window.innerWidth > window.innerHeight;
       // Simpler positioning - just based on wrapper position
-      const MARGIN_TOP = rect.top + (isLandscape ? 20 : 15);
+      const MARGIN_TOP = rect.top - 40;
       const CANVAS_W = rect.width;
 
       const time = getRemainingTime();

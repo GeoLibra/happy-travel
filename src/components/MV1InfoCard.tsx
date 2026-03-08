@@ -133,10 +133,8 @@ const MV1InfoCard: React.FC<MV1InfoCardProps> = ({ onClose }) => {
           )}
         </AnimatePresence>
 
-        {/* Quote */}
         <div className="mt-4 pt-4 border-t border-white/10">
           <p className="text-white/60 text-xs italic text-center">
-            "Simply lovely" - 维斯塔潘经典无线电
           </p>
         </div>
       </div>
