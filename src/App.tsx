@@ -1,4 +1,15 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+// Shake detection state
+interface ShakeState {
+  lastX: number;
+  lastY: number;
+  lastZ: number;
+  lastTime: number;
+}
+interface RoseEasterEggProps {
+  show: boolean;
+  onClose: () => void;
+}
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Calendar,
@@ -27,6 +38,7 @@ import MV1InfoCard from './components/MV1InfoCard';
 import ImagineDragonsBadge from './components/ImagineDragonsBadge';
 import RaceCountdown from './components/RaceCountdown';
 import f1EngineShiftSound from './audio/f1-engine-2.mp3';
+import successSound from './audio/success.mp3';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -50,6 +62,9 @@ export default function App() {
   const [hoveredType, setHoveredType] = useState<Location['type'] | null>(null);
   const [showMV1Card, setShowMV1Card] = useState(false);
   const [showTelemetry, setShowTelemetry] = useState(false);
+  // Rose easter egg state
+  const [showRose, setShowRose] = useState(false);
+  const shakeState = useRef<{ lastX: number; lastY: number; lastZ: number; lastTime: number }>({ lastX: 0, lastY: 0, lastZ: 0, lastTime: Date.now() });
 
   const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -77,6 +92,57 @@ export default function App() {
         }, 300);
     }
   };
+
+  // Shake detection and rose easter egg
+  useEffect(() => {
+    const successAudio = new Audio(successSound);
+    successAudio.preload = 'auto';
+    
+    const handleMotion = (event: DeviceMotionEvent) => {
+      const { accelerationIncludingGravity } = event;
+      if (!accelerationIncludingGravity) return;
+      
+      const { x, y, z } = accelerationIncludingGravity;
+      if (!x || !y || !z) return;
+      
+      const currentTime = Date.now();
+      const timeDiff = currentTime - shakeState.current.lastTime;
+      
+      if (timeDiff > 100) {
+        const deltaX = Math.abs(x - shakeState.current.lastX);
+        const deltaY = Math.abs(y - shakeState.current.lastY);
+        const deltaZ = Math.abs(z - shakeState.current.lastZ);
+        
+        const totalDelta = deltaX + deltaY + deltaZ;
+        
+        if (totalDelta > 25 && !showRose) {
+          // Play success sound
+          successAudio.currentTime = 0;
+          successAudio.play().catch(() => {});
+          // Show rose
+          setShowRose(true);
+        }
+        
+        shakeState.current = { lastX: x, lastY: y, lastZ: z, lastTime: currentTime };
+      }
+    };
+    
+    if (window.DeviceMotionEvent) {
+      if (typeof (window.DeviceMotionEvent as any).requestPermission === 'function') {
+        (window.DeviceMotionEvent as any).requestPermission().then((response: string) => {
+          if (response === 'granted') {
+            window.addEventListener('devicemotion', handleMotion);
+          }
+        }).catch(() => {});
+      } else {
+        window.addEventListener('devicemotion', handleMotion);
+      }
+    }
+    
+    return () => {
+      window.removeEventListener('devicemotion', handleMotion);
+    };
+  }, [showRose]);
 
   // Scroll into view when selectedLocationId changes
   useEffect(() => {
@@ -206,7 +272,44 @@ export default function App() {
             <div className="absolute top-0 right-0 w-0 h-0 z-50 pointer-events-none">
               {!showWelcome && <MiniFirework />}
             </div>
-          </div>
+      </div>
+      {/* Rose Easter Egg - Shake to reveal */}
+      <AnimatePresence>
+        {showRose && !showWelcome && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0, rotate: -180 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={{ opacity: 0, scale: 0.5, rotate: 180 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+            className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none"
+          >
+            <div className="relative">
+              {/* Rose head */}
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ repeat: Infinity, duration: 3 }}
+                className="text-[120px] drop-shadow-2xl"
+              >
+                🌹
+              </motion.div>
+              {/* Sparkle effect */}
+              <motion.div
+                className="absolute -inset-8 bg-gradient-radial from-[#E10600]/30 to-transparent rounded-full"
+                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Click anywhere to close rose */}
+      {showRose && !showWelcome && (
+        <div
+          className="absolute inset-0 z-50 cursor-pointer"
+          onClick={() => setShowRose(false)}
+        />
+      )}
+    </div>
 
           {!showWelcome && <RaceCountdown />}
 
