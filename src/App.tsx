@@ -176,37 +176,59 @@ export default function App() {
           </div>
 
           {/* Day Selector */}
-          <div className="flex gap-2 p-1 bg-white/80 backdrop-blur-md rounded-xl shrink-0 sticky top-0 z-10 shadow-sm border border-slate-200/50 overflow-hidden">
+          <div className="flex gap-2 p-1 bg-white/80 backdrop-blur-md rounded-xl shrink-0 sticky top-0 z-20 shadow-sm border border-slate-200/50 overflow-hidden">
             {ITINERARY_DATA.map((day, idx) => (
               <button
                 key={day.date}
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
                   setSelectedDayIdx(idx);
                   setSelectedLocationId(undefined);
                 }}
                 className={cn(
-                  "flex-1 py-3 px-2 sm:px-4 rounded-lg font-semibold transition-all flex flex-col items-center gap-1 border-b-[3px] min-w-0",
+                  "flex-1 py-3 px-2 sm:px-4 rounded-lg font-semibold transition-all flex flex-col items-center gap-1 min-w-0 relative",
                   selectedDayIdx === idx
-                    ? "bg-white text-[#001A30] shadow-sm border-[#E10600]"
-                    : "text-slate-500 hover:text-slate-700 border-transparent hover:bg-white/50"
+                    ? "text-[#001A30]"
+                    : "text-slate-500 hover:text-slate-700 hover:bg-white/50"
                 )}
               >
-                <span className="text-xs opacity-60 whitespace-nowrap">DAY {idx + 1}</span>
-                <span className="text-sm whitespace-nowrap">{day.date.split('-').slice(1).join('.')}</span>
+                <span className="text-xs opacity-60 whitespace-nowrap relative z-10">DAY {idx + 1}</span>
+                <span className="text-sm whitespace-nowrap relative z-10">{day.date.split('-').slice(1).join('.')}</span>
+
+                {selectedDayIdx === idx && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 bg-white shadow-sm border-b-[3px] border-[#E10600] rounded-lg"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
               </button>
             ))}
           </div>
 
-          {/* List */}
-          <div className="flex-1 space-y-4">
+          {/* List Component with Swipe Support */}
+          <div className="flex-1 min-h-0 relative">
             <AnimatePresence mode="wait">
               <motion.div
                 key={selectedDayIdx}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.2}
+                onDragEnd={(_, info) => {
+                  const threshold = 50;
+                  if (info.offset.x < -threshold && selectedDayIdx < ITINERARY_DATA.length - 1) {
+                    setSelectedDayIdx(selectedDayIdx + 1);
+                    setSelectedLocationId(undefined);
+                  } else if (info.offset.x > threshold && selectedDayIdx > 0) {
+                    setSelectedDayIdx(selectedDayIdx - 1);
+                    setSelectedLocationId(undefined);
+                  }
+                }}
+                className="space-y-4 touch-pan-y"
               >
                 {currentDay.locations.map((loc, idx) => {
                   const isF1Circuit = loc.name.includes('赛车场') || loc.name.includes('F1');

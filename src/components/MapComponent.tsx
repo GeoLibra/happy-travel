@@ -71,51 +71,32 @@ const getLabelContent = (loc: Location, state: 'normal' | 'hovered' | 'selected'
     `;
   }
 
-  // Special styling for F1 Circuit - Use F1 car icon
+  // Special styling for F1 Circuit - Use F1 car emoji with stylized glow
   if (isF1Circuit) {
-    const pulseAnimation = state === 'selected' ? 'animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;' : '';
-    const carSize = state === 'selected' ? size + 12 : state === 'hovered' ? size + 8 : size + 4;
+    const pulseAnimation = state === 'selected' ? 'animation: f1-pulse 1.5s ease-out infinite;' : '';
+    const scale = state === 'selected' ? 1.6 : state === 'hovered' ? 1.3 : 1.1;
     return `
-      <div style="position: relative; width: ${carSize}px; height: ${carSize}px;">
+      <div style="position: relative; width: 40px; height: 40px; display: flex; items-center; justify-center; transform: scale(${scale}); transition: transform 0.3s ease;">
+        <style>
+          @keyframes f1-pulse {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            70% { transform: scale(1.5); opacity: 0; }
+            100% { transform: scale(1.5); opacity: 0; }
+          }
+        </style>
+        <!-- Pulse effect -->
         <div style="
           position: absolute;
-          top: 50%;
-          left: 50%;
+          top: 50%; left: 50%; width: 30px; height: 30px;
           transform: translate(-50%, -50%);
-          background: conic-gradient(from 0deg, #E10600 0%, #FFB800 50%, #001A30 100%);
-          width: ${carSize}px;
-          height: ${carSize}px;
+          background: radial-gradient(circle, #E10600 0%, transparent 70%);
           border-radius: 50%;
           ${pulseAnimation}
         "></div>
-        <svg width="${carSize}" height="${carSize}" viewBox="0 0 60 60" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
-          <!-- F1 Car Icon -->
-          <g transform="translate(10, 20) scale(0.15)">
-            <!-- Rear Wing -->
-            <rect x="10" y="15" width="20" height="5" fill="#001A30" />
-            <path d="M10 20 L25 20 L25 35 L10 35 Z" fill="#E10600" />
-
-            <!-- Main Body -->
-            <path d="M20 35 L60 25 L120 25 L150 15 L180 30 L210 35 L230 40 L230 45 L10 45 Z" fill="#001A30"/>
-
-            <!-- Livery Stripes -->
-            <path d="M60 25 L120 25 L150 15 L200 30" stroke="#FFB800" stroke-width="3" fill="none"/>
-            <path d="M30 35 L120 30 L160 20 L210 35" stroke="#E10600" stroke-width="2" fill="none"/>
-
-            <!-- Front Wing -->
-            <path d="M210 38 L235 38 L235 45 L210 45 Z" fill="#001A30"/>
-            <path d="M210 40 L235 40 L235 43 L210 43 Z" fill="#E10600"/>
-
-            <!-- Wheels -->
-            <circle cx="45" cy="45" r="14" fill="#111"/>
-            <circle cx="45" cy="45" r="7" fill="#FFB800"/>
-            <circle cx="185" cy="45" r="14" fill="#111"/>
-            <circle cx="185" cy="45" r="7" fill="#FFB800"/>
-
-            <!-- Number 1 -->
-            <text x="85" y="32" fill="#FFB800" font-size="11" font-weight="900" font-style="italic">#1</text>
-          </g>
-        </svg>
+        <!-- F1 Car Emoji -->
+        <div style="position: relative; z-index: 2; font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+          🏎️
+        </div>
       </div>
     `;
   }
