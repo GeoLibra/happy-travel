@@ -212,7 +212,15 @@ const MapComponent: React.FC<MapProps> = ({
           });
 
           const handleClick = () => {
-            if (onMarkerClick) onMarkerClick(loc);
+            console.log('[MapComponent] Marker clicked', {
+              locationId: loc.id,
+              locationName: loc.name,
+              hasCallback: !!onMarkerClick,
+            });
+            if (onMarkerClick) {
+              console.log('[MapComponent] Calling onMarkerClick callback');
+              onMarkerClick(loc);
+            }
           };
 
           marker.on('click', handleClick);

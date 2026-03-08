@@ -4,9 +4,9 @@ import { digit } from './digit';
 
 // ── CONFIGURATION & CONSTANTS ──
 const TARGET_DATE = new Date('2026-03-15T15:00:00+08:00').getTime();
-const RADIUS = 1.5; // Particle radius
+const RADIUS = 2.0; // Particle radius (increased for better stacking visibility)
 const COLORS = ["#33B5E5", "#0099CC", "#AA66CC", "#9933CC", "#99CC00", "#669900", "#FFBB33", "#FF8800", "#FF4444", "#CC0000"];
-const MAX_PARTICLES = 1500; // Cap to prevent lag from floor accumulation
+const MAX_PARTICLES = 2000; // Cap to prevent lag from floor accumulation
 
 interface Particle {
   x: number;
@@ -58,6 +58,9 @@ const RaceCountdown: React.FC = () => {
       canvas.height = window.innerHeight * dpr;
       ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform before scaling
       ctx.scale(dpr, dpr);
+      
+      // Clear particles on orientation change
+      particlesRef.current = [];
     };
 
     setCanvasSize();
@@ -123,7 +126,7 @@ const RaceCountdown: React.FC = () => {
       }
     };
 
-    // A simple 1D height map for fast O(1) stacking collision instead of O(N^2) particle-particle
+    // Enhanced 1D height map for better stacking collision
     const columnHeights = new Map<number, number>();
 
     const updateParticles = () => {
@@ -132,10 +135,13 @@ const RaceCountdown: React.FC = () => {
       const FLOOR = window.innerHeight;
 
       // First pass: Build the height map of already settled particles
+      // Use finer column resolution for better stacking
+      const COLUMN_WIDTH = curRadius * 1.8; // Tighter columns for better stacking
+
       for (let i = 0; i < pArr.length; i++) {
         const p = pArr[i];
         if (p.vy === 0 && p.g === 0) {
-           const colKey = Math.floor(p.x / (curRadius * 2));
+           const colKey = Math.floor(p.x / COLUMN_WIDTH);
            const currentHeight = columnHeights.get(colKey) || FLOOR;
            if (p.y < currentHeight) {
               columnHeights.set(colKey, p.y);
@@ -152,23 +158,30 @@ const RaceCountdown: React.FC = () => {
         p.y += p.vy;
         p.vy += p.g; // Apply gravity
 
-        const colKey = Math.floor(p.x / (curRadius * 2));
-        const localFloor = (columnHeights.get(colKey) || FLOOR) - curRadius * 1.5;
+        const colKey = Math.floor(p.x / COLUMN_WIDTH);
+        const localFloor = (columnHeights.get(colKey) || FLOOR) - curRadius * 2; // Stack tighter
 
         // Bounce on calculated local floor (the viewport floor OR another particle)
         if (p.y >= localFloor) {
            p.y = localFloor;
 
-           if (Math.abs(p.vy) < 2.5) {
+           if (Math.abs(p.vy) < 2.0) { // Lower threshold for faster settling
               // Settle permanently
               p.vy = 0;
               p.g = 0;
-              // Add small random jitter so columns don't look perfectly flat and unnatural
-              p.x += (Math.random() - 0.5) * curRadius;
+              // Minimal jitter for cleaner stacking
+              p.x += (Math.random() - 0.5) * curRadius * 0.3;
               p.vx = 0;
+
+              // Update the column height immediately for next particles
+              const settledColKey = Math.floor(p.x / COLUMN_WIDTH);
+              const currentHeight = columnHeights.get(settledColKey) || FLOOR;
+              if (p.y < currentHeight) {
+                 columnHeights.set(settledColKey, p.y);
+              }
            } else {
-              p.vy = -p.vy * 0.4; // Vertical bounce reduction
-              p.vx *= 0.6; // Horizontal friction
+              p.vy = -p.vy * 0.35; // Less bouncy for faster stacking
+              p.vx *= 0.7; // More horizontal friction
            }
         }
       }
@@ -271,7 +284,8 @@ const RaceCountdown: React.FC = () => {
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
       const rect = wrapper.getBoundingClientRect();
-      const MARGIN_TOP = rect.top + 15;
+      const isLandscape = window.innerWidth > window.innerHeight;
+      const MARGIN_TOP = rect.top + 15 + (isLandscape ? 50 : 0);
       const CANVAS_W = rect.width;
 
       const time = getRemainingTime();
@@ -421,6 +435,12 @@ const RaceCountdown: React.FC = () => {
          ref={canvasRef}
          className="fixed top-0 left-0 w-screen h-screen pointer-events-none drop-shadow-sm z-[100]"
          aria-label="Race Countdown Canvas"
+         onClick={(e) => {
+           console.log('[RaceCountdown] Canvas clicked (should not happen with pointer-events-none)', {
+             target: e.target,
+             currentTarget: e.currentTarget,
+           });
+         }}
       />
     </motion.div>
   );

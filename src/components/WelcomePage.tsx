@@ -250,14 +250,31 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             >
               <button
                 onClick={(e) => {
+                  console.log('[WelcomePage] Button clicked', {
+                    progress,
+                    isPressing,
+                    target: e.target,
+                    currentTarget: e.currentTarget,
+                  });
                   e.preventDefault();
                   if (progress >= 100) {
+                    console.log('[WelcomePage] Calling onEnter()');
                     onEnter();
+                  } else {
+                    console.log('[WelcomePage] Progress < 100, not entering yet');
                   }
                 }}
                 onPointerDown={(e) => {
-                  if (progress >= 100) return;
+                  console.log('[WelcomePage] Button pointer down', {
+                    progress,
+                    isPressing,
+                  });
+                  if (progress >= 100) {
+                    console.log('[WelcomePage] Progress already 100, ignoring pointer down');
+                    return;
+                  }
                   e.preventDefault();
+                  console.log('[WelcomePage] Setting isPressing to true');
                   setIsPressing(true);
                   if (audioRef.current) {
                     audioRef.current.currentTime = 0;
@@ -265,8 +282,14 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
                     audioRef.current.play().catch(() => {});
                   }
                 }}
-                onPointerUp={() => setIsPressing(false)}
-                onPointerLeave={() => setIsPressing(false)}
+                onPointerUp={() => {
+                  console.log('[WelcomePage] Button pointer up');
+                  setIsPressing(false);
+                }}
+                onPointerLeave={() => {
+                  console.log('[WelcomePage] Button pointer leave');
+                  setIsPressing(false);
+                }}
                 onContextMenu={(e) => e.preventDefault()}
                 className="group relative z-[90] inline-flex items-center justify-center gap-2 sm:gap-3 px-8 sm:px-12 py-3 sm:py-5 w-[280px] sm:w-[360px] bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl landscape:text-xl uppercase tracking-wider transform -skew-x-12 transition-all hover:bg-white hover:scale-105 active:scale-95 overflow-hidden select-none pointer-events-auto cursor-pointer shadow-[0_0_20px_rgba(255,184,0,0.4)]"
               >

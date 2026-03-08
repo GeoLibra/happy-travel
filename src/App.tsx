@@ -101,6 +101,11 @@ export default function App() {
   }, [selectedLocationId]);
 
   const handleLocationClick = (loc: Location) => {
+    console.log('[App] Location clicked', {
+      locationId: loc.id,
+      locationName: loc.name,
+      currentSelectedId: selectedLocationId,
+    });
     playShiftSound();
     setSelectedLocationId(loc.id);
     if (window.innerWidth < 768) {

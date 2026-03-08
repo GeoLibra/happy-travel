@@ -576,7 +576,111 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     };
   }, [audioRef]);
 
-  return <div ref={containerRef} style={{ position: 'fixed', inset: 0, zIndex: 75, pointerEvents: progress >= 100 ? 'auto' : 'none' }} />;
+  return <div
+    ref={containerRef}
+    style={{ position: 'fixed', inset: 0, zIndex: 75, pointerEvents: progress >= 100 ? 'auto' : 'none' }}
+    onMouseDown={(e) => {
+      console.log('[ParticleBackground] MouseDown detected', {
+        progress,
+        pointerEvents: progress >= 100 ? 'auto' : 'none',
+        target: e.target,
+        tagName: (e.target as HTMLElement).tagName,
+      });
+    }}
+    onClick={(e) => {
+      console.log('[ParticleBackground] Click detected', {
+        progress,
+        pointerEvents: progress >= 100 ? 'auto' : 'none',
+        clientX: e.clientX,
+        clientY: e.clientY,
+        target: e.target,
+        tagName: (e.target as HTMLElement).tagName,
+      });
+
+      // Smart event forwarding when progress >= 100
+      if (progress >= 100) {
+        const canvas = containerRef.current?.querySelector('canvas');
+        if (!canvas) {
+          console.log('[ParticleBackground] Canvas not found');
+          return;
+        }
+
+        // Check if click is near center (where 3D car is positioned)
+        const rect = canvas.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        // Calculate distance from center
+        const distanceFromCenter = Math.sqrt(x * x + y * y);
+
+        console.log('[ParticleBackground] Click position', {
+          normalizedX: x,
+          normalizedY: y,
+          distanceFromCenter,
+          threshold: 0.4,
+        });
+
+        // If click is near center (on the car), handle car click
+        if (distanceFromCenter < 0.4) {
+          console.log('[ParticleBackground] Click on 3D model (center region)');
+          if (onCarClick) {
+            console.log('[ParticleBackground] Calling onCarClick callback');
+            onCarClick();
+            e.stopPropagation();
+          } else {
+            console.log('[ParticleBackground] No onCarClick callback provided');
+          }
+          // Let OrbitControls handle the interaction
+        } else {
+          console.log('[ParticleBackground] Click on empty space, forwarding to underlying element');
+          // Click is on empty space, forward to underlying element
+          const target = containerRef.current;
+          if (target) {
+            // Temporarily disable pointer events to get element below
+            target.style.pointerEvents = 'none';
+            let underlyingElement = document.elementFromPoint(e.clientX, e.clientY);
+            target.style.pointerEvents = 'auto';
+
+            console.log('[ParticleBackground] Underlying element found:', {
+              tagName: underlyingElement?.tagName,
+              className: underlyingElement?.className,
+              id: underlyingElement?.id,
+              element: underlyingElement,
+            });
+
+            // If we found a child element (like span inside button), find the closest clickable parent
+            if (underlyingElement) {
+              // Find closest button or clickable element
+              const clickableElement = underlyingElement.closest('button, a, [role="button"], [onclick]');
+              if (clickableElement) {
+                console.log('[ParticleBackground] Found clickable parent:', {
+                  tagName: clickableElement.tagName,
+                  className: clickableElement.className,
+                });
+                underlyingElement = clickableElement as HTMLElement;
+              }
+            }
+
+            // Forward click to underlying element
+            if (underlyingElement && underlyingElement !== target) {
+              console.log('[ParticleBackground] Dispatching click event to underlying element');
+              underlyingElement.dispatchEvent(new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                clientX: e.clientX,
+                clientY: e.clientY,
+              }));
+              console.log('[ParticleBackground] Click event dispatched successfully');
+            } else {
+              console.log('[ParticleBackground] No valid underlying element to forward to');
+            }
+          }
+        }
+      } else {
+        console.log('[ParticleBackground] Progress < 100, pointer-events should be none');
+      }
+    }}
+  />;
 };
 
 export default ParticleBackground;
