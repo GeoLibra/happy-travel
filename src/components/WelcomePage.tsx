@@ -13,17 +13,17 @@ const StartLights = ({ progress, isPressing }: { progress: number, isPressing: b
   const lightsOn = isGreen ? 5 : Math.ceil(progress / 20);
 
   return (
-    <div className="absolute top-12 sm:top-4 md:top-6 landscape:top-2 left-1/2 -translate-x-1/2 z-50 flex gap-1 sm:gap-1.5 md:gap-2.5 p-1.5 sm:p-2.5 md:p-3 landscape:p-1.5 bg-[#001A30]/80 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/10 shadow-[0_10px_40px_rgba(0,0,0,0.5)] animate-in fade-in duration-300">
+    <div className="absolute top-8 sm:top-12 md:top-16 landscape:top-4 left-1/2 -translate-x-1/2 z-50 flex gap-2 sm:gap-4 md:gap-6 landscape:gap-2 p-2 sm:p-5 landscape:p-2 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in duration-300">
       {[...Array(5)].map((_, i) => {
         const isOn = i < lightsOn;
         const colorClass = isGreen
-          ? 'bg-[#22c55e] shadow-[0_0_20px_#22c55e,0_0_40px_#22c55e]'
-          : 'bg-[#E10600] shadow-[0_0_20px_#E10600,0_0_40px_#E10600]';
+          ? 'bg-[#22c55e] shadow-[0_0_30px_#22c55e,0_0_60px_#22c55e]'
+          : 'bg-[#E10600] shadow-[0_0_25px_#E10600,0_0_50px_#E10600]';
 
         return (
-          <div key={i} className="flex flex-col gap-1 sm:gap-1.5 md:gap-2 landscape:gap-1 p-1 sm:p-1.5 md:p-2 landscape:p-1 bg-black/90 rounded-lg sm:rounded-xl border border-white/5 shadow-inner">
-             <div className={`w-3 h-3 sm:w-4 sm:h-4 md:w-8 md:h-8 landscape:w-3 landscape:h-3 rounded-full transition-all duration-75 ${isOn ? colorClass : 'bg-white/5'}`} />
-             <div className={`w-3 h-3 sm:w-4 sm:h-4 md:w-8 md:h-8 landscape:w-3 landscape:h-3 rounded-full transition-all duration-75 ${isOn ? colorClass : 'bg-white/5'}`} />
+          <div key={i} className="flex flex-col gap-1.5 sm:gap-3 landscape:gap-1 p-1 sm:p-2.5 landscape:p-1 bg-[#1a1a1a] rounded-lg border border-white/5 shadow-inner">
+             <div className={`w-6 h-6 sm:w-10 sm:h-10 md:w-14 md:h-14 landscape:w-5 landscape:h-5 rounded-full transition-all duration-75 ${isOn ? colorClass : 'bg-white/5'}`} />
+             <div className={`w-6 h-6 sm:w-10 sm:h-10 md:w-14 md:h-14 landscape:w-5 landscape:h-5 rounded-full transition-all duration-75 ${isOn ? colorClass : 'bg-white/5'}`} />
           </div>
         )
       })}
@@ -198,9 +198,9 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
         )}
       </AnimatePresence>
 
-      {/* Main Content with dynamic scaling for short screens */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-4 py-safe pointer-events-none overflow-y-auto">
-        <div className="flex flex-col items-center justify-center text-center max-w-4xl w-full transition-all duration-300 pointer-events-auto py-20 sm:py-8 landscape:py-4 landscape:gap-1"
+      {/* Main Content */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-4 py-8 pointer-events-none overflow-hidden">
+        <div className="flex flex-col items-center justify-center text-center max-w-4xl w-full transition-all duration-300 pointer-events-auto"
         >
           {/* Tag */}
           <motion.div
@@ -208,10 +208,9 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
             onClick={handleTagClick}
-            className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-sm bg-[#E10600] text-white text-xs sm:text-sm font-bold tracking-[0.15em] sm:tracking-[0.2em] mb-4 sm:mb-6 md:mb-8 landscape:mb-2 shadow-[0_0_15px_rgba(225,6,0,0.5)] transform -skew-x-12 cursor-pointer active:scale-95 transition-transform mt-16 sm:mt-0 landscape:mt-8"
+            className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-sm bg-[#E10600] text-white text-xs sm:text-sm font-bold tracking-[0.15em] sm:tracking-[0.2em] mb-4 sm:mb-8 shadow-[0_0_15px_rgba(225,6,0,0.5)] transform -skew-x-12 cursor-pointer active:scale-95 transition-transform"
           >
-            <Flag size={12} className="skew-x-12 sm:hidden" />
-            <Flag size={14} className="skew-x-12 hidden sm:block" />
+            <Flag size={14} className="skew-x-12" />
             <span className="skew-x-12">RACE WEEKEND</span>
           </motion.div>
 
@@ -222,13 +221,13 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
             className="relative"
           >
-            <h1 className="absolute -left-1 -top-1 text-4xl sm:text-5xl md:text-8xl landscape:text-3xl font-black text-[#E10600] tracking-tighter uppercase opacity-50 blur-[2px]">
+            <h1 className="absolute -left-1 -top-1 text-4xl sm:text-6xl md:text-8xl landscape:text-5xl font-black text-[#E10600] tracking-tighter uppercase opacity-50 blur-[2px]">
               Ready to Race
             </h1>
-            <h1 className="absolute -right-1 -bottom-1 text-4xl sm:text-5xl md:text-8xl landscape:text-3xl font-black text-[#FFB800] tracking-tighter uppercase opacity-50 blur-[2px]">
+            <h1 className="absolute -right-1 -bottom-1 text-4xl sm:text-6xl md:text-8xl landscape:text-5xl font-black text-[#FFB800] tracking-tighter uppercase opacity-50 blur-[2px]">
               Ready to Race
             </h1>
-            <h1 className="relative text-4xl sm:text-5xl md:text-8xl landscape:text-3xl font-black text-white tracking-tighter uppercase drop-shadow-2xl italic">
+            <h1 className="relative text-4xl sm:text-6xl md:text-8xl landscape:text-5xl font-black text-white tracking-tighter uppercase drop-shadow-2xl italic">
               Ready To <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#E10600] to-[#FFB800]">Race</span>
             </h1>
           </motion.div>
@@ -238,12 +237,12 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
              initial={{ y: 30, opacity: 0 }}
              animate={{ y: 0, opacity: 1 }}
              transition={{ duration: 0.6, delay: 0.8, ease: "easeOut" }}
-             className="mt-3 mb-6 sm:mt-4 sm:mb-8 md:mt-6 md:mb-12 landscape:mt-2 landscape:mb-3 flex flex-col items-center gap-1 sm:gap-2"
+             className="mt-4 mb-8 sm:mt-6 sm:mb-12 landscape:mt-2 landscape:mb-6 flex flex-col items-center gap-1 sm:gap-2"
           >
-            <h2 className="text-xl sm:text-2xl md:text-3xl landscape:text-lg font-bold text-white tracking-wide uppercase">
+            <h2 className="text-xl sm:text-2xl md:text-3xl landscape:text-2xl font-bold text-white tracking-wide uppercase">
               欢迎开启上海狂欢周末
             </h2>
-            <p className="text-[#A0AAB4] text-sm sm:text-base md:text-lg landscape:text-xs font-medium tracking-wide mt-1 sm:mt-2 landscape:mt-0 px-4 whitespace-nowrap">
+            <p className="text-[#A0AAB4] text-sm sm:text-base md:text-lg landscape:text-sm font-medium tracking-wide mt-1 sm:mt-2 landscape:mt-0 px-4">
               引擎轰鸣碰撞摇滚风暴，一场魔都竞速与梦龙狂欢的探索之旅。
             </p>
           </motion.div>
@@ -253,7 +252,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, delay: 1.2, ease: "backOut" }}
-            className="mb-4 sm:mb-0 landscape:mb-2"
+            className="mb-6 sm:mb-0 landscape:mb-4"
           >
             <button
               onPointerDown={(e) => {
@@ -268,13 +267,13 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               onPointerUp={() => setIsPressing(false)}
               onPointerLeave={() => setIsPressing(false)}
               onContextMenu={(e) => e.preventDefault()}
-              className="group relative inline-flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-10 landscape:px-6 py-3 sm:py-4 landscape:py-2 bg-[#FFB800] text-[#001A30] font-black text-base sm:text-xl landscape:text-sm uppercase tracking-wider transform -skew-x-12 transition-all hover:bg-white hover:scale-105 active:scale-95 overflow-hidden select-none touch-none"
+              className="group relative inline-flex items-center justify-center gap-2 sm:gap-3 px-8 sm:px-12 py-3 sm:py-5 bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl landscape:text-xl uppercase tracking-wider transform -skew-x-12 transition-all hover:bg-white hover:scale-105 active:scale-95 overflow-hidden select-none touch-none shadow-[0_0_20px_rgba(255,184,0,0.4)]"
             >
               <div className="absolute left-0 top-0 bottom-0 bg-[#E10600] z-0 transition-[width] duration-75 ease-linear pointer-events-none" style={{ width: `${progress}%` }} />
               <span className={`relative z-10 flex items-center gap-2 skew-x-12 ${isPressing || progress > 0 ? 'text-white' : ''}`}>
-                <Zap size={16} className={`sm:w-5 sm:h-5 landscape:w-4 landscape:h-4 ${isPressing || progress > 0 ? "fill-white" : "fill-[#001A30]"}`} />
-                <span className="block text-sm sm:text-xl landscape:text-sm">{isPressing ? `ENGINE STARTING ${progress}%` : "HOLD TO START"}</span>
-                <motion.span animate={{ x: [0, 8, 0] }} transition={{ repeat: Infinity, duration: 1 }}><ArrowRight size={20} strokeWidth={3} className="sm:w-6 sm:h-6 landscape:w-5 landscape:h-5" /></motion.span>
+                <Zap size={20} className={isPressing || progress > 0 ? "fill-white" : "fill-[#001A30]"} />
+                <span className="block">{isPressing ? `ENGINE STARTING ${progress}%` : "HOLD TO START"}</span>
+                <motion.span animate={{ x: [0, 8, 0] }} transition={{ repeat: Infinity, duration: 1 }}><ArrowRight size={24} strokeWidth={3} /></motion.span>
               </span>
             </button>
             <audio ref={audioRef} src={f1EngineSound} preload="auto" />
@@ -285,9 +284,9 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 2, duration: 1 }}
-            className="mt-4 sm:mt-6 md:mt-12 landscape:mt-2 flex flex-col items-center justify-center pointer-events-none gap-2 sm:gap-3 landscape:gap-1"
+            className="mt-4 sm:mt-12 flex flex-col items-center justify-center pointer-events-none gap-3"
           >
-            <div className="relative flex items-center justify-center text-[9px] sm:text-xs landscape:text-[8px] font-mono font-bold tracking-[0.15em] sm:tracking-[0.2em] landscape:tracking-[0.1em] transform -skew-x-12 px-2">
+            <div className="relative flex items-center justify-center text-[10px] sm:text-xs font-mono font-bold tracking-[0.15em] sm:tracking-[0.2em] transform -skew-x-12">
               <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-slate-400 to-[#FFB800]">
                 // MAX VERSTAPPEN #1 // ORACLE RED BULL RACING
               </span>
@@ -303,13 +302,13 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 2.5, duration: 0.8 }}
-              className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 landscape:gap-2 text-[9px] sm:text-[10px] landscape:text-[8px] font-bold text-slate-400 uppercase tracking-widest px-4"
+              className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest px-4"
             >
-              <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 sm:w-2 sm:h-2 landscape:w-1.5 landscape:h-1.5 rounded-full bg-[#FFB800] animate-pulse" /><span>4x World Champion</span></div>
-              <div className="w-px h-2 sm:h-3 landscape:h-2 bg-slate-600 hidden sm:block" />
-              <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 sm:w-2 sm:h-2 landscape:w-1.5 landscape:h-1.5 rounded-full bg-[#E10600] animate-pulse" style={{ animationDelay: '0.5s' }} /><span>71 Wins</span></div>
-              <div className="w-px h-2 sm:h-3 landscape:h-2 bg-slate-600 hidden sm:block" />
-              <div className="flex items-center gap-1"><div className="w-1.5 h-1.5 sm:w-2 sm:h-2 landscape:w-1.5 landscape:h-1.5 rounded-full bg-[#001A30] animate-pulse" style={{ animationDelay: '1s' }} /><span>48 Pole Positions</span></div>
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#FFB800] animate-pulse" /><span>4x World Champion</span></div>
+              <div className="w-px h-3 bg-slate-600 hidden sm:block" />
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#E10600] animate-pulse" style={{ animationDelay: '0.5s' }} /><span>71 Wins</span></div>
+              <div className="w-px h-3 bg-slate-600 hidden sm:block" />
+              <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#001A30] animate-pulse" style={{ animationDelay: '1s' }} /><span>48 Pole Positions</span></div>
             </motion.div>
           </motion.div>
         </div>
