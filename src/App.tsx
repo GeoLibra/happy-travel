@@ -175,8 +175,23 @@ export default function App() {
             </div>
           </div>
 
-          {/* Day Selector */}
-          <div className="flex gap-2 p-1 bg-white/80 backdrop-blur-md rounded-xl shrink-0 sticky top-0 z-20 shadow-sm border border-slate-200/50 overflow-hidden">
+          {/* Day Selector with Swipe Support */}
+          <motion.div
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.1}
+            onDragEnd={(_, info) => {
+              const threshold = 40;
+              if (info.offset.x < -threshold && selectedDayIdx < ITINERARY_DATA.length - 1) {
+                setSelectedDayIdx(selectedDayIdx + 1);
+                setSelectedLocationId(undefined);
+              } else if (info.offset.x > threshold && selectedDayIdx > 0) {
+                setSelectedDayIdx(selectedDayIdx - 1);
+                setSelectedLocationId(undefined);
+              }
+            }}
+            className="flex gap-2 p-1 bg-white/80 backdrop-blur-md rounded-xl shrink-0 sticky top-0 z-20 shadow-sm border border-slate-200/50 overflow-hidden touch-pan-y"
+          >
             {ITINERARY_DATA.map((day, idx) => (
               <button
                 key={day.date}
@@ -204,7 +219,7 @@ export default function App() {
                 )}
               </button>
             ))}
-          </div>
+          </motion.div>
 
           {/* List Component with Swipe Support */}
           <div className="flex-1 min-h-0 relative">

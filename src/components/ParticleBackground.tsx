@@ -9,6 +9,7 @@ interface ParticleBackgroundProps {
   isPressing: boolean;
   progress: number;
   audioRef?: React.RefObject<HTMLAudioElement | null>;
+  loadedModel?: THREE.Group | null;
 }
 
 const COLORS = {
@@ -21,7 +22,7 @@ const COLORS = {
 const SPEED_LINE_COUNT = 300;
 const CPU_PARTICLE_COUNT = 3000;
 
-const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef }) => {
+const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Track state in ref to avoid re-triggering the animation loop closure
@@ -47,6 +48,11 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
   useEffect(() => {
     stateRef.current.isPressing = isPressing;
   }, [isPressing]);
+
+  const modelRef = useRef<THREE.Group | null>(null);
+  useEffect(() => {
+    modelRef.current = loadedModel || null;
+  }, [loadedModel]);
 
   useEffect(() => {
     if (progress >= 70 && stateRef.current.progress < 70) {
@@ -159,6 +165,130 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       scene.add(cpuParticles);
     }
 
+    // ── 3D Lighting for F1 Model ──
+    const ambientLight = new THREE.HemisphereLight(0xffffff, 0x001A30, 0.8);
+    scene.add(ambientLight);
+
+    const mainLight = new THREE.DirectionalLight(0xFFB800, 1.5);
+    mainLight.position.set(10, 20, 10);
+    scene.add(mainLight);
+
+    const rimLight = new THREE.DirectionalLight(0xE10600, 1.0);
+    rimLight.position.set(-10, 5, -5);
+    scene.add(rimLight);
+
+    // ── F1 Car 3D Model Integration ──
+    let f1CarGroup: THREE.Group | null = null;
+
+    // We'll check for modelRef.current dynamically in the animate loop to support late arrivals
+    const checkModelInjection = () => {
+      if (!f1CarGroup && modelRef.current) {
+        f1CarGroup = modelRef.current;
+        f1CarGroup.scale.set(4, 4, 4);
+        f1CarGroup.rotation.y = 0; // Face the camera directly
+        f1CarGroup.position.set(0, -10, -150); // Start deep in the screen
+        f1CarGroup.visible = false;
+
+        console.log("[DEBUG] Model injected. Vertices count hint:", f1CarGroup.children.length);
+
+        f1CarGroup.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            const mat = mesh.material as THREE.MeshStandardMaterial;
+            if (mat) {
+              mat.metalness = 0.8;
+              mat.roughness = 0.2;
+              mat.envMapIntensity = 1.0;
+            }
+          }
+        });
+
+        scene.add(f1CarGroup);
+
+        // Performance Optimization: Pre-compile the model to avoid lag spikes
+        if (renderer && scene && camera) {
+          renderer.compile(scene, camera);
+        }
+
+        console.log("[ParticleBackground] 3D F1 Model dynamically injected and pre-compiled");
+      }
+    };
+
+    // ── High-Fidelity Speed Trails (Shader Lines) ──
+    const TRAIL_COUNT = 15;
+    const trailSegments = 20;
+    const trailGeometry = new THREE.BufferGeometry();
+    const trailPosAttrib = new Float32Array(TRAIL_COUNT * trailSegments * 3);
+    const trailColorAttrib = new Float32Array(TRAIL_COUNT * trailSegments * 3);
+    const trailAlphaAttrib = new Float32Array(TRAIL_COUNT * trailSegments);
+
+    for(let i=0; i<TRAIL_COUNT; i++) {
+        const color = Math.random() < 0.4 ? COLORS.red : Math.random() < 0.7 ? COLORS.yellow : COLORS.white;
+        for(let j=0; j<trailSegments; j++) {
+            const idx = (i * trailSegments + j);
+            trailColorAttrib[idx * 3] = color.r;
+            trailColorAttrib[idx * 3 + 1] = color.g;
+            trailColorAttrib[idx * 3 + 2] = color.b;
+            trailAlphaAttrib[idx] = 1.0 - (j / trailSegments);
+        }
+    }
+
+    trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPosAttrib, 3));
+    trailGeometry.setAttribute('color', new THREE.BufferAttribute(trailColorAttrib, 3));
+    trailGeometry.setAttribute('alpha', new THREE.BufferAttribute(trailAlphaAttrib, 1));
+
+    const trailMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      vertexShader: `
+        attribute vec3 color;
+        attribute float alpha;
+        varying float vAlpha;
+        varying vec3 vColor;
+        void main() {
+          vAlpha = alpha;
+          vColor = color;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying float vAlpha;
+        varying vec3 vColor;
+        void main() {
+          gl_FragColor = vec4(vColor, vAlpha * 0.6);
+        }
+      `
+    });
+
+    const f1Trails = new THREE.LineSegments(trailGeometry, trailMaterial);
+    f1Trails.visible = false;
+    scene.add(f1Trails);
+
+    // ── Exhaust Sparks (Particles) ──
+    const SPARK_COUNT = 100;
+    const sparkGeometry = new THREE.BufferGeometry();
+    const sPositions = new Float32Array(SPARK_COUNT * 3);
+    const sVelocities = new Float32Array(SPARK_COUNT * 3);
+    for(let i=0; i<SPARK_COUNT; i++) {
+       sPositions[i*3] = -150;
+       sVelocities[i*3] = -Math.random() * 2 - 1;
+       sVelocities[i*3+1] = (Math.random() - 0.5) * 1.5;
+       sVelocities[i*3+2] = (Math.random() - 0.5) * 1.5;
+    }
+    sparkGeometry.setAttribute('position', new THREE.BufferAttribute(sPositions, 3));
+    const sparkMaterial = new THREE.PointsMaterial({
+      color: COLORS.yellow,
+      size: 1.5 * pixelRatio,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+    const exhaustSparks = new THREE.Points(sparkGeometry, sparkMaterial);
+    exhaustSparks.visible = false;
+    scene.add(exhaustSparks);
+
     // ── Speed Lines (CPU-driven, low cost) ──
     const lineGeometry = new THREE.BufferGeometry();
     const lPositions = new Float32Array(SPEED_LINE_COUNT * 3);
@@ -236,6 +366,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
     const animate = (timestamp: number) => {
       frameId = requestAnimationFrame(animate);
+      checkModelInjection();
 
       timer.update(timestamp);
       const time = timer.getElapsed();
@@ -346,6 +477,94 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         cpuParticles.rotation.y = Math.sin(time * 0.1) * 0.1;
       }
 
+      // ── Update F1 Car & Effects ──
+      // Show car as soon as user starts pressing (0%+)
+      if (s.isPressing && f1CarGroup) {
+        if (!f1CarGroup.visible) {
+           f1CarGroup.visible = true;
+           console.log("[DEBUG] Car visible and approaching");
+           exhaustSparks.visible = true;
+           f1Trails.visible = true;
+        }
+
+        // 0-100% Progress mapping
+        const progressFactor = s.progress / 100;
+
+        // Position: Move from deep screen (-150) to hero position (0)
+        // This prevents the car from feeling like it's "passing" the screen plane.
+        const targetZ = -150 + (progressFactor * 150);
+        f1CarGroup.position.z += (targetZ - f1CarGroup.position.z) * 0.1;
+        f1CarGroup.position.x = 0; // Stay centered
+        f1CarGroup.position.y = -10 + (progressFactor * 5) + Math.sin(time * 15) * 0.05;
+
+        // Scale: Grow to a balanced size
+        const targetScale = 4 + (progressFactor * 2); // Final scale 6
+        f1CarGroup.scale.set(targetScale, targetScale, targetScale);
+
+        // Rotation: Nose-out until 80%, then "Background Match" turn (135 deg)
+        const turnFactor = Math.min(1, Math.max(0, (s.progress - 80) / 20));
+
+        // Y-axis: From 0 to 135 degrees (3/4 rear-to-side view)
+        const targetRotY = turnFactor * (Math.PI * 0.25);
+        f1CarGroup.rotation.y += (targetRotY - f1CarGroup.rotation.y) * 0.1;
+
+        // X-axis: Tilt forward (top-down view) to see the roof
+        const targetRotX = turnFactor * 0.25;
+        f1CarGroup.rotation.x += (targetRotX - f1CarGroup.rotation.x) * 0.1;
+
+        // Z-axis: Subtle dynamic lean
+        const targetRotZ = turnFactor * 0.05 + Math.sin(time * 2) * 0.01;
+        f1CarGroup.rotation.z += (targetRotZ - f1CarGroup.rotation.z) * 0.05;
+
+        // Update Trails (Trailing logic)
+        const tArr = trailGeometry.attributes.position.array as Float32Array;
+        for(let i=0; i<TRAIL_COUNT; i++) {
+            const trailBaseIdx = i * trailSegments * 3;
+            for(let j=trailSegments-1; j>0; j--) {
+                const cur = trailBaseIdx + j * 3;
+                const prev = trailBaseIdx + (j-1) * 3;
+                tArr[cur] = tArr[prev];
+                tArr[cur+1] = tArr[prev+1];
+                tArr[cur+2] = tArr[prev+2];
+            }
+            // Adjust trail origin based on current rotation (exhaust is behind car)
+            const trailOffset = new THREE.Vector3(0, 1.5, -10).applyEuler(f1CarGroup.rotation);
+            tArr[trailBaseIdx] = f1CarGroup.position.x + trailOffset.x;
+            tArr[trailBaseIdx + 1] = f1CarGroup.position.y + trailOffset.y + (Math.random() - 0.5) * 2.0;
+            tArr[trailBaseIdx + 2] = f1CarGroup.position.z + trailOffset.z;
+        }
+        trailGeometry.attributes.position.needsUpdate = true;
+
+        // Update Sparks
+        const sArr = sparkGeometry.attributes.position.array as Float32Array;
+        const isStopped = s.progress >= 99;
+
+        for(let i=0; i<SPARK_COUNT; i++) {
+          const i3 = i * 3;
+          sArr[i3] += sVelocities[i3];
+          sArr[i3+1] += (sVelocities[i3+1] - 0.1); // Gravity effect
+          sArr[i3+2] += (sVelocities[i3+2] - 0.5); // Fly towards background
+
+          if (time % 0.1 < 0.02 || isStopped) {
+            const sparkOffset = new THREE.Vector3(0, 1, -11).applyEuler(f1CarGroup.rotation);
+            sArr[i3] = f1CarGroup.position.x + sparkOffset.x + (Math.random()-0.5);
+            sArr[i3+1] = f1CarGroup.position.y + sparkOffset.y + (Math.random()-0.5);
+            sArr[i3+2] = f1CarGroup.position.z + sparkOffset.z;
+          }
+        }
+        sparkGeometry.attributes.position.needsUpdate = true;
+        sparkMaterial.opacity = (Math.random() * 0.7 + 0.3) * (isStopped ? 0.4 : 1.0);
+
+        // Fade trails if stopped
+        if (isStopped) {
+          f1Trails.visible = false;
+        }
+      } else if (f1CarGroup) {
+        f1CarGroup.visible = false;
+        exhaustSparks.visible = false;
+        f1Trails.visible = false;
+      }
+
       // ── Update Speed Lines ──
       const lArr = lineGeometry.attributes.position.array as Float32Array;
       const accelFactor = s.isPressing ? 1.0 + (s.progress / 100) * 0.06 : 1.0;
@@ -414,6 +633,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
       lineGeometry.dispose();
       lineMaterial.dispose();
+      trailGeometry.dispose();
+      trailMaterial.dispose();
+      sparkGeometry.dispose();
+      sparkMaterial.dispose();
       if (cpuParticles) {
         cpuParticles.geometry.dispose();
         (cpuParticles.material as THREE.Material).dispose();
@@ -426,13 +649,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     };
   }, [audioRef]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return (
-    <div
-      ref={containerRef}
-      className="absolute inset-0 z-0"
-      style={{ pointerEvents: 'none' }}
-    />
-  );
+  return <div ref={containerRef} style={{ position: 'fixed', inset: 0, zIndex: 60, pointerEvents: 'none' }} />;
 };
 
 export default ParticleBackground;
