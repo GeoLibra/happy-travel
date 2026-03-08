@@ -63,7 +63,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   useEffect(() => {
     setMounted(true);
     // Initial Model Loading
-    loadModelWithCache('/models/F1.glb', (p) => {
+    loadModelWithCache('/models/red_bull_f1.glb', (p) => {
       setModelProgress(p);
     }).then((gltf) => {
       setLoadedModel(gltf.scene);

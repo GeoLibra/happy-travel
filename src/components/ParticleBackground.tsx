@@ -186,7 +186,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     const checkModelInjection = () => {
       if (!f1CarGroup && modelRef.current) {
         f1CarGroup = modelRef.current;
-        f1CarGroup.scale.set(4, 4, 4);
+        f1CarGroup.scale.set(16, 16, 16);
         f1CarGroup.rotation.y = 0; // Face the camera directly
         f1CarGroup.position.set(0, -10, -150); // Start deep in the screen
         f1CarGroup.visible = false;
@@ -455,7 +455,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         f1CarGroup.position.y = -10 + (progressFactor * 5) + Math.sin(time * 15) * 0.05;
 
         // Scale: Grow to a balanced size
-        const targetScale = 4 + (progressFactor * 2); // Final scale 6
+        const targetScale = 8 + (progressFactor * 4); // Final scale 12
         f1CarGroup.scale.set(targetScale, targetScale, targetScale);
 
         // Rotation: Nose-out until 80%, then "Background Match" turn (135 deg)
