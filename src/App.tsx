@@ -69,9 +69,14 @@ export default function App() {
   const [showRoseModal, setShowRoseModal] = useState(false);
   const [motionPermissionGranted, setMotionPermissionGranted] = useState(false);
   const shakeState = useRef<{ lastX: number; lastY: number; lastZ: number; lastTime: number }>({ lastX: 0, lastY: 0, lastZ: 0, lastTime: Date.now() });
+  const isModalOpenRef = useRef(showRoseModal);
   const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const secretClickRef = useRef(0);
   const secretClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    isModalOpenRef.current = showRoseModal;
+  }, [showRoseModal]);
 
   const allLocations = useMemo(() => ITINERARY_DATA.flatMap(d => d.locations), []);
   const currentDay = ITINERARY_DATA[selectedDayIdx];
@@ -118,19 +123,24 @@ export default function App() {
   };
 
   const requestMotionPermission = async () => {
+    console.log('[App] Requesting motion permission...');
     if (typeof (window.DeviceMotionEvent as any)?.requestPermission === 'function') {
       try {
         const response = await (window.DeviceMotionEvent as any).requestPermission();
+        console.log('[App] Permission response:', response);
         if (response === 'granted') {
           setMotionPermissionGranted(true);
+          return true;
         }
       } catch (e) {
-        console.error('Permission request failed', e);
+        console.error('[App] Permission request failed', e);
       }
     } else {
-      // For browsers that don't need permission (like Android or older OS)
+      console.log('[App] Browser does not require permission');
       setMotionPermissionGranted(true);
+      return true;
     }
+    return false;
   };
 
   // Shake detection and rose easter egg
@@ -141,25 +151,28 @@ export default function App() {
     successAudio.preload = 'auto';
 
     const handleMotion = (event: DeviceMotionEvent) => {
-      const { accelerationIncludingGravity } = event;
-      if (!accelerationIncludingGravity) return;
+      // 优先使用不含重力的加速度，如果没有再降级使用含重力的
+      const acceleration = event.acceleration || event.accelerationIncludingGravity;
+      if (!acceleration) return;
 
-      const { x, y, z } = accelerationIncludingGravity;
+      const { x, y, z } = acceleration;
       if (x === null || y === null || z === null) return;
 
       const currentTime = Date.now();
       const timeDiff = currentTime - shakeState.current.lastTime;
 
+      // 保持 100ms 的采样间隔
       if (timeDiff > 100) {
         const deltaX = Math.abs(x - shakeState.current.lastX);
         const deltaY = Math.abs(y - shakeState.current.lastY);
         const deltaZ = Math.abs(z - shakeState.current.lastZ);
 
-        const totalDelta = deltaX + deltaY + deltaZ;
+        // 标准摇一摇速率计算公式：位移差 / 时间差 * 10000
+        const speed = ((deltaX + deltaY + deltaZ) / timeDiff) * 10000;
 
-        // totalDelta > 15 is easier to trigger than the previous 22/25
-        if (totalDelta > 15 && !showRoseModal) {
-          console.log('[App] Shake detected!', { totalDelta });
+        // SHAKE_THRESHOLD 摇晃阈值，通常设定在 800 到 1500 之间。
+        if (speed > 1000 && !isModalOpenRef.current) {
+          console.log('[App] Shake detected!', { speed });
           // Play success sound
           successAudio.currentTime = 0;
           successAudio.play().catch(() => {});
@@ -175,7 +188,7 @@ export default function App() {
     return () => {
       window.removeEventListener('devicemotion', handleMotion);
     };
-  }, [motionPermissionGranted, showRoseModal]);
+  }, [motionPermissionGranted]);
 
   // Scroll into view when selectedLocationId changes
   useEffect(() => {
@@ -216,9 +229,11 @@ export default function App() {
     <>
       <AnimatePresence>
         {showWelcome && (
-          <WelcomePage key="welcome" onEnter={() => {
+          <WelcomePage key="welcome" onEnter={async () => {
+            console.log('[App] Entering application...');
+            // 必须在同步事件链路的首位请求权限
+            await requestMotionPermission();
             setShowWelcome(false);
-            requestMotionPermission();
           }} />
         )}
       </AnimatePresence>
