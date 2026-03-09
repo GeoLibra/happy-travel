@@ -502,6 +502,18 @@ export default function App() {
         </div>
       </main>
 
+      {/* Rose Button - Click to trigger */}
+      <motion.button
+        initial={{ scale: 0, rotate: -180 }}
+        animate={{ scale: showWelcome ? 0 : 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.8 }}
+        onClick={() => setShowRoseModal(true)}
+        className="fixed bottom-6 right-24 z-40 w-14 h-14 bg-gradient-to-br from-rose-500 to-pink-600 rounded-full shadow-2xl flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-transform border-2 border-white/30 group"
+        aria-label="绽放玫瑰"
+      >
+        <span className="text-2xl group-hover:scale-110 transition-transform">🌹</span>
+      </motion.button>
+
       {/* MV1 Floating Button */}
       <motion.button
         initial={{ scale: 0, rotate: -180 }}
