@@ -40,7 +40,6 @@ import RaceCountdown from './components/RaceCountdown';
 import RoseModal from './components/RoseModal';
 import f1EngineShiftSound from './audio/f1-engine-2.mp3';
 import successSound from './audio/success.mp3';
-import RoseModal from './components/RoseModal';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
