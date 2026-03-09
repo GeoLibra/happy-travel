@@ -12,6 +12,18 @@
           31.289831
         ],
         "description": "入住休息"
+      },
+      {
+        "id": "1-2",
+        "name": "LANN I 蘭·泰式古法按摩 (安亭嘉亭荟店)",
+        "address": "嘉定区墨玉南路989号嘉亭荟中里3层1314室",
+        "type": "spa",
+        "coordinates": [
+          121.162,
+          31.288
+        ],
+        "description": "泰式古法按摩",
+        "url": "https://m.dianping.com/shop/k7juCZ6EwfVMECxR"
       }
     ]
   },
@@ -351,6 +363,18 @@
         ],
         "description": "F1快闪活动",
         "url": "https://xhslink.com/m/5zgvvJTRh50"
+      },
+      {
+        "id": "3-25",
+        "name": "九间泰·正宗泰式古法按摩SPA (徐汇日月光中心店)",
+        "address": "上海市徐汇区漕宝路33号徐汇日月光中心L4层",
+        "type": "spa",
+        "coordinates": [
+          121.432906,
+          31.169006
+        ],
+        "description": "泰式按摩SPA",
+        "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304A44435952493243"
       }
     ]
   },

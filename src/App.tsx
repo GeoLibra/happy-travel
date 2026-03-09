@@ -25,7 +25,8 @@ import {
   List as ListIcon,
   Flag,
   Utensils,
-  Music
+  Music,
+  Flower2
 } from 'lucide-react';
 import { ITINERARY_DATA, Location, TYPE_COLORS } from './constants';
 import MapComponent from './components/MapComponent';
@@ -51,6 +52,7 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
     case 'park': return <MapPin className={className} />;
     case 'restaurant': return <Utensils className={className} />;
     case 'citywalk': return <MapIcon className={className} />;
+    case 'spa': return <Flower2 className={className} />;
     default: return <MapPin className={className} />;
   }
 };
