@@ -33,41 +33,19 @@ export default function RoseModal({ isOpen, onClose }: RoseModalProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.25, ease: "easeInOut" }}
+          transition={{ duration: 0.25 }}
           onClick={handleBackdropClick}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-0 bg-black/80 backdrop-blur-sm"
+          // pointer-events-auto 确保背景层可点击
+          className="fixed inset-0 z-[100] flex items-center justify-center p-0 bg-black/80 backdrop-blur-sm cursor-pointer"
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.88, y: 24 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.88, y: 24 }}
-            transition={{
-              duration: 0.45,
-              ease: [0.34, 1.56, 0.64, 1],
-            }}
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full h-full max-w-4xl max-h-[80vh] flex items-center justify-center"
+            initial={{ opacity: 0, scale: 0.88 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.88 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+            className="relative w-full h-full max-w-4xl max-h-[80vh] flex items-center justify-center cursor-default"
           >
             <ThreeRose isOpen={isOpen} />
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors z-[110]"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
           </motion.div>
         </motion.div>
       )}

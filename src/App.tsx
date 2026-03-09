@@ -67,9 +67,11 @@ export default function App() {
   const [showTelemetry, setShowTelemetry] = useState(false);
   // Rose easter egg state - Three.js Rose Modal
   const [showRoseModal, setShowRoseModal] = useState(false);
+  const [motionPermissionGranted, setMotionPermissionGranted] = useState(false);
   const shakeState = useRef<{ lastX: number; lastY: number; lastZ: number; lastTime: number }>({ lastX: 0, lastY: 0, lastZ: 0, lastTime: Date.now() });
-
   const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const secretClickRef = useRef(0);
+  const secretClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const allLocations = useMemo(() => ITINERARY_DATA.flatMap(d => d.locations), []);
   const currentDay = ITINERARY_DATA[selectedDayIdx];
@@ -96,8 +98,45 @@ export default function App() {
     }
   };
 
+  const handleSecretClick = () => {
+    console.log('[App] Secret click registered', secretClickRef.current + 1);
+    secretClickRef.current += 1;
+
+    if (secretClickTimeoutRef.current) clearTimeout(secretClickTimeoutRef.current);
+
+    if (secretClickRef.current >= 5) {
+      console.log('[App] Secret click trigger: Opening Rose Modal');
+      setShowRoseModal(true);
+      secretClickRef.current = 0;
+      const successAudio = new Audio(successSound);
+      successAudio.play().catch(() => {});
+    } else {
+      secretClickTimeoutRef.current = setTimeout(() => {
+        secretClickRef.current = 0;
+      }, 2000);
+    }
+  };
+
+  const requestMotionPermission = async () => {
+    if (typeof (window.DeviceMotionEvent as any)?.requestPermission === 'function') {
+      try {
+        const response = await (window.DeviceMotionEvent as any).requestPermission();
+        if (response === 'granted') {
+          setMotionPermissionGranted(true);
+        }
+      } catch (e) {
+        console.error('Permission request failed', e);
+      }
+    } else {
+      // For browsers that don't need permission (like Android or older OS)
+      setMotionPermissionGranted(true);
+    }
+  };
+
   // Shake detection and rose easter egg
   useEffect(() => {
+    if (!motionPermissionGranted) return;
+
     const successAudio = new Audio(successSound);
     successAudio.preload = 'auto';
 
@@ -106,7 +145,7 @@ export default function App() {
       if (!accelerationIncludingGravity) return;
 
       const { x, y, z } = accelerationIncludingGravity;
-      if (!x || !y || !z) return;
+      if (x === null || y === null || z === null) return;
 
       const currentTime = Date.now();
       const timeDiff = currentTime - shakeState.current.lastTime;
@@ -118,7 +157,9 @@ export default function App() {
 
         const totalDelta = deltaX + deltaY + deltaZ;
 
-        if (totalDelta > 25 && !showRoseModal) {
+        // totalDelta > 15 is easier to trigger than the previous 22/25
+        if (totalDelta > 15 && !showRoseModal) {
+          console.log('[App] Shake detected!', { totalDelta });
           // Play success sound
           successAudio.currentTime = 0;
           successAudio.play().catch(() => {});
@@ -130,22 +171,11 @@ export default function App() {
       }
     };
 
-    if (window.DeviceMotionEvent) {
-      if (typeof (window.DeviceMotionEvent as any).requestPermission === 'function') {
-        (window.DeviceMotionEvent as any).requestPermission().then((response: string) => {
-          if (response === 'granted') {
-            window.addEventListener('devicemotion', handleMotion);
-          }
-        }).catch(() => {});
-      } else {
-        window.addEventListener('devicemotion', handleMotion);
-      }
-    }
-
+    window.addEventListener('devicemotion', handleMotion);
     return () => {
       window.removeEventListener('devicemotion', handleMotion);
     };
-  }, [showRoseModal]);
+  }, [motionPermissionGranted, showRoseModal]);
 
   // Scroll into view when selectedLocationId changes
   useEffect(() => {
@@ -186,7 +216,10 @@ export default function App() {
     <>
       <AnimatePresence>
         {showWelcome && (
-          <WelcomePage key="welcome" onEnter={() => setShowWelcome(false)} />
+          <WelcomePage key="welcome" onEnter={() => {
+            setShowWelcome(false);
+            requestMotionPermission();
+          }} />
         )}
       </AnimatePresence>
 
@@ -218,7 +251,7 @@ export default function App() {
                 #1
               </div>
             </div>
-            <div>
+            <div onClick={handleSecretClick} className="cursor-pointer active:scale-95 transition-transform">
               <h1 className="text-xl font-bold tracking-tight">上海周末行程</h1>
               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider flex items-center gap-2">
                 2026.03.13 - 03.15
@@ -264,7 +297,7 @@ export default function App() {
         )}>
           {/* Prominent Image Highlight */}
           <div className="relative w-full shrink-0 z-20 mt-4">
-            <div className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none cursor-pointer" onClick={() => setShowRoseModal(true)}>
+            <div className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none">
               <img
                  src={tripImage}
                  alt="Trip Highlight"
@@ -276,10 +309,8 @@ export default function App() {
               {!showWelcome && <MiniFirework />}
             </div>
       </div>
-{/* Rose Easter Egg - Shake to reveal Three.js Rose */}
 
           {!showWelcome && <RaceCountdown />}
-      <RoseModal isOpen={showRoseModal} onClose={() => setShowRoseModal(false)} />
 
           {/* Spacer for countdown */}
           <div className="h-[10px] shrink-0" />
@@ -534,6 +565,8 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <RoseModal isOpen={showRoseModal} onClose={() => setShowRoseModal(false)} />
     </motion.div>
     </>
   );

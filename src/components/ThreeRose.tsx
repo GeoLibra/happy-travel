@@ -1,136 +1,75 @@
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
+import localforage from "localforage";
 
 // ═══════════════════════════════════════════════════════════════
-// 参数曲面花瓣几何生成器
+// localforage 配置（与 model-loader.ts 保持一致）
 // ═══════════════════════════════════════════════════════════════
-function buildPetalGeometry({
-  width = 0.6,
-  height = 1.0,
-  bowDepth = 0.28,
-  curlDepth = 0.22,
-  tipCurl = 0.18,
-  baseNarrow = 0.55,
-  segU = 24,
-  segV = 32,
-}: {
-  width?: number;
-  height?: number;
-  bowDepth?: number;
-  curlDepth?: number;
-  tipCurl?: number;
-  baseNarrow?: number;
-  segU?: number;
-  segV?: number;
-} = {}) {
-  const verts: number[] = [];
-  const uvArr: number[] = [];
-  const idxArr: number[] = [];
+localforage.config({
+  name: "happy-travel-3d-cache",
+  storeName: "models",
+});
 
-  for (let j = 0; j <= segV; j++) {
-    const v = j / segV;
+const MODEL_URL = "/models/red_rose3.obj";
 
-    // 轮廓宽度：底部收窄 + sin 卵形 + 顶端收圆
-    const baseW = Math.pow(v, 0.35);
-    const tipW = 1 - Math.pow(Math.max(0, v - 0.75) / 0.25, 2);
-    const narrowBase = 1 - baseNarrow * Math.pow(1 - v, 2.5);
-    const profileW = Math.sin(v * Math.PI) * 0.7 + 0.3 * baseW;
-    const finalW = profileW * tipW * narrowBase * width;
+// ═══════════════════════════════════════════════════════════════
+// OBJ 带缓存加载（复用 model-loader.ts 的流式读取 + 缓存策略）
+// OBJ 是纯文本，缓存为 string；GLTF 是二进制，缓存为 ArrayBuffer
+// ═══════════════════════════════════════════════════════════════
+async function loadObjWithCache(
+  url: string,
+  onProgress?: (p: number) => void
+): Promise<THREE.Group> {
+  const loader = new OBJLoader();
 
-    // 纵向弓形
-    const bowZ = Math.sin(v * Math.PI) * bowDepth;
-
-    // 顶端外翻
-    const tipFactor = Math.max(0, (v - 0.82) / 0.18);
-    const tipZ = -Math.pow(tipFactor, 2) * tipCurl;
-
-    for (let i = 0; i <= segU; i++) {
-      const u = i / segU;
-      const uc = u - 0.5;
-
-      const x = uc * 2 * finalW;
-      const y = v * height;
-
-      // 横向内卷：边缘卷，中心不卷
-      const curlProfile =
-        Math.sin(v * Math.PI * 0.9 + 0.1) * (1 - Math.pow(v, 3));
-      const curlZ =
-        -Math.pow(Math.abs(uc) * 2, 1.8) * curlDepth * curlProfile;
-
-      const z = bowZ + curlZ + tipZ;
-
-      verts.push(x, y, z);
-      uvArr.push(u, v);
-    }
+  // 尝试从缓存读取
+  const cached = await localforage.getItem<string>(url);
+  if (cached) {
+    console.log("[ThreeRose] OBJ loaded from cache");
+    onProgress?.(100);
+    return loader.parse(cached);
   }
 
-  for (let j = 0; j < segV; j++) {
-    for (let i = 0; i < segU; i++) {
-      const a = j * (segU + 1) + i;
-      const b = a + 1;
-      const c = a + (segU + 1);
-      const d = c + 1;
-      idxArr.push(a, c, b, b, c, d);
-    }
+  // 缓存未命中，流式 fetch
+  console.log("[ThreeRose] Fetching OBJ from server");
+  const response = await fetch(url);
+  if (!response.body) throw new Error("Response body is null");
+
+  const contentLength = response.headers.get("Content-Length");
+  const total = contentLength ? parseInt(contentLength, 10) : 0;
+  let loaded = 0;
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    if (total > 0) onProgress?.(Math.round((loaded / total) * 100));
   }
 
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvArr, 2));
-  geo.setIndex(idxArr);
-  geo.computeVertexNormals();
-  return geo;
+  // 合并 chunks → 文本
+  const merged = new Uint8Array(loaded);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  const text = new TextDecoder().decode(merged);
+
+  // 写入缓存
+  await localforage.setItem(url, text);
+
+  return loader.parse(text);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 纹理
+// 纹理（茎用，花头由 OBJ 材质接管）
 // ═══════════════════════════════════════════════════════════════
-function createPetalTexture(): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = 512;
-  c.height = 512;
-  const ctx = c.getContext("2d")!;
-
-  // 径向渐变底色：深红→鲜红→粉边
-  const g = ctx.createRadialGradient(256, 380, 20, 256, 256, 280);
-  g.addColorStop(0.0, "#7a0010");
-  g.addColorStop(0.3, "#b8001a");
-  g.addColorStop(0.6, "#d42030");
-  g.addColorStop(0.85, "#e04050");
-  g.addColorStop(1.0, "#ee7080");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 512, 512);
-
-  // 纵向渐变：根部更暗
-  const vg = ctx.createLinearGradient(0, 512, 0, 0);
-  vg.addColorStop(0.0, "rgba(30,0,0,0.55)");
-  vg.addColorStop(0.25, "rgba(20,0,0,0.2)");
-  vg.addColorStop(0.6, "rgba(0,0,0,0.0)");
-  vg.addColorStop(1.0, "rgba(255,180,180,0.12)");
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, 512, 512);
-
-  // 两侧暗边（卷曲阴影感）
-  const eg = ctx.createLinearGradient(0, 0, 512, 0);
-  eg.addColorStop(0.0, "rgba(0,0,0,0.4)");
-  eg.addColorStop(0.18, "rgba(0,0,0,0.0)");
-  eg.addColorStop(0.82, "rgba(0,0,0,0.0)");
-  eg.addColorStop(1.0, "rgba(0,0,0,0.4)");
-  ctx.fillStyle = eg;
-  ctx.fillRect(0, 0, 512, 512);
-
-  // 中央高光条
-  const hl = ctx.createLinearGradient(220, 0, 292, 0);
-  hl.addColorStop(0, "rgba(255,200,200,0.0)");
-  hl.addColorStop(0.5, "rgba(255,200,200,0.13)");
-  hl.addColorStop(1, "rgba(255,200,200,0.0)");
-  ctx.fillStyle = hl;
-  ctx.fillRect(0, 0, 512, 512);
-
-  return new THREE.CanvasTexture(c);
-}
-
 function createStemTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
   c.width = 64;
@@ -153,29 +92,6 @@ interface ThreeRoseProps {
   isOpen: boolean;
 }
 
-interface PetalData {
-  mesh: THREE.Mesh;
-  spiralAngle: number;
-  layerIdx: number;
-  targetTilt: number;
-  targetRadius: number;
-  targetHeight: number;
-  initTilt: number;
-  initRadius: number;
-  initHeight: number;
-}
-
-interface LayerConfig {
-  count: number;
-  tilt: number;
-  radius: number;
-  heightOff: number;
-  scale: number;
-  curl: number;
-  bow: number;
-  baseNarrow: number;
-}
-
 // ═══════════════════════════════════════════════════════════════
 // 主组件
 // ═══════════════════════════════════════════════════════════════
@@ -189,7 +105,6 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
 
     // ── 场景 ─────────────────────────────────────────────
     const scene = new THREE.Scene();
-    // 透明背景，融入 Modal
     scene.fog = new THREE.Fog(0x1b4a42, 10, 22);
 
     const camera = new THREE.PerspectiveCamera(40, W / H, 0.01, 50);
@@ -237,74 +152,99 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     controls.maxDistance = 10;
     controls.update();
 
-    // ── 材质 ─────────────────────────────────────────────
-    const petalTex = createPetalTexture();
-    const stemTex = createStemTexture();
-
-    const newPetalMat = () =>
-      new THREE.MeshStandardMaterial({
-        map: petalTex,
-        side: THREE.DoubleSide,
-        roughness: 0.38,
-        metalness: 0.0,
-        transparent: false,
-      });
-
-    const stemMat = new THREE.MeshStandardMaterial({
-      map: stemTex,
-      roughness: 0.8,
-      metalness: 0.0,
-    });
-
+    // ── 材质（茎/叶/萼片用） ─────────────────────────────
     const greenMat = new THREE.MeshStandardMaterial({
-      color: 0x2a6030,
+      color: 0x1a331a, // Darker green
       side: THREE.DoubleSide,
-      roughness: 0.65,
+      roughness: 0.9,
     });
 
     // ── 花茎 ─────────────────────────────────────────────
+    // 基于用户提供的有机曲线映射至场景比例 (0 -> 2.42)
     const stemCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(0.07, 0.45, 0.02),
-      new THREE.Vector3(-0.05, 0.95, -0.01),
-      new THREE.Vector3(0.04, 1.5, 0.01),
-      new THREE.Vector3(0, 2.0, 0),
+      new THREE.Vector3(0.01, 0, 0.01),
+      new THREE.Vector3(0, 0.6, 0),
+      new THREE.Vector3(-0.01, 1.4, -0.01),
+      new THREE.Vector3(0.02, 2.0, 0.01),
+      new THREE.Vector3(0, 2.4, 0),
     ]);
     const stemMesh = new THREE.Mesh(
-      new THREE.TubeGeometry(stemCurve, 48, 0.025, 8, false),
-      stemMat
+      new THREE.TubeGeometry(stemCurve, 64, 0.022, 12, false),
+      greenMat
     );
     stemMesh.castShadow = true;
     scene.add(stemMesh);
 
-    // ── 叶片 ─────────────────────────────────────────────
-    const addLeaf = (
-      pos: THREE.Vector3,
-      ry: number,
-      rx: number,
-      sc: number
-    ) => {
-      const s = new THREE.Shape();
-      s.moveTo(0, 0);
-      s.bezierCurveTo(0.28, 0.04, 0.48, 0.38, 0.2, 0.72);
-      s.bezierCurveTo(0.08, 0.88, -0.08, 0.88, -0.2, 0.72);
-      s.bezierCurveTo(-0.48, 0.38, -0.28, 0.04, 0, 0);
-      const m = new THREE.Mesh(new THREE.ShapeGeometry(s, 18), greenMat);
-      m.scale.setScalar(sc);
-      m.position.copy(pos);
-      m.rotation.set(rx, ry, 0, "YXZ");
-      m.castShadow = true;
-      scene.add(m);
-    };
-    addLeaf(new THREE.Vector3(0.09, 0.95, 0), 0.55, -0.4, 0.65);
-    addLeaf(new THREE.Vector3(-0.07, 1.38, 0), -0.75, -0.35, 0.52);
+    // ── 叶片 (Bezier Shape) ─────────────────────────────
+    const leafShape = new THREE.Shape();
+    leafShape.moveTo(0, 0);
+    leafShape.bezierCurveTo(0.04, 0.08, 0.16, 0.12, 0.24, 0);
+    leafShape.bezierCurveTo(0.16, -0.12, 0.04, -0.08, 0, 0);
+    const leafGeo = new THREE.ShapeGeometry(leafShape);
 
-    // ── 花托 & 萼片 ───────────────────────────────────────
+    const leafGroup = new THREE.Group();
+    scene.add(leafGroup);
+
+    // 叶片位置 (t 沿曲线)
+    const leafPositions = [
+      { t: 0.35, side: 1 },
+      { t: 0.55, side: -1 },
+      { t: 0.75, side: 1 },
+    ];
+
+    leafPositions.forEach((pos) => {
+      const p = stemCurve.getPoint(pos.t);
+      const tangent = stemCurve.getTangent(pos.t);
+
+      const g = new THREE.Group();
+      g.position.copy(p);
+
+      // 叶柄 (Petiole)
+      const petiole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.005, 0.005, 0.12, 8),
+        greenMat
+      );
+      petiole.rotation.z = pos.side * Math.PI / 3;
+      petiole.position.x = pos.side * 0.05;
+      g.add(petiole);
+
+      // 叶片主瓣
+      const leaf = new THREE.Mesh(leafGeo, greenMat);
+      leaf.position.set(pos.side * 0.15, pos.side * 0.05, 0);
+      leaf.rotation.set(Math.PI / 2, pos.side * Math.PI / 2, 0);
+      leaf.scale.setScalar(0.8);
+      leaf.castShadow = true;
+      g.add(leaf);
+
+      leafGroup.add(g);
+    });
+
+    // ── 刺 (Thorns) ───────────────────────────────────────
+    const thornGeo = new THREE.ConeGeometry(0.008, 0.05, 4);
+    const thornGroup = new THREE.Group();
+    scene.add(thornGroup);
+
+    for (let i = 0; i < 15; i++) {
+        const t = 0.1 + (i * 0.06);
+        const p = stemCurve.getPoint(t);
+        const angle = i * Math.PI * 0.75;
+        const mesh = new THREE.Mesh(thornGeo, greenMat);
+        mesh.position.set(
+            p.x + Math.cos(angle) * 0.02,
+            p.y,
+            p.z + Math.sin(angle) * 0.02
+        );
+        mesh.rotation.set(Math.PI / 2, 0, angle);
+        mesh.castShadow = true;
+        thornGroup.add(mesh);
+    }
+
+    // ── 花托 & 萼片 (Calyx) ───────────────────────────────
     const receptacle = new THREE.Mesh(
-      new THREE.SphereGeometry(0.09, 14, 14),
-      new THREE.MeshStandardMaterial({ color: 0x2a6030, roughness: 0.7 })
+      new THREE.SphereGeometry(0.08, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+      greenMat
     );
-    receptacle.position.set(0, 2.06, 0);
+    receptacle.position.set(0, 2.4, 0);
     scene.add(receptacle);
 
     for (let i = 0; i < 5; i++) {
@@ -316,90 +256,88 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
       ss.bezierCurveTo(-0.1, 0.22, -0.07, 0.02, 0, 0);
       const sm = new THREE.Mesh(
         new THREE.ShapeGeometry(ss, 10),
-        greenMat.clone()
+        greenMat
       );
-      sm.position.set(Math.cos(ang) * 0.1, 2.08, Math.sin(ang) * 0.1);
-      sm.rotation.set(0.52, ang + Math.PI, 0, "YXZ");
+      sm.position.set(Math.cos(ang) * 0.08, 2.41, Math.sin(ang) * 0.08);
+      sm.rotation.set(0.6, ang + Math.PI, 0, "YXZ");
+      sm.scale.setScalar(0.2); // 萼片较小
       scene.add(sm);
     }
 
-    // ════════════════════════════════════════════════════════
-    // 核心：5层分层 + 黄金角叶序 构建玫瑰花头
-    // ════════════════════════════════════════════════════════
-    const GOLDEN = 2.39996323; // 黄金角 rad ≈ 137.5°
-    const CENTER = new THREE.Vector3(0, 2.42, 0);
+    const headGroup = new THREE.Group();
+    // 花头挂载点位于花茎顶端
+    headGroup.position.set(0, 2.4, 0);
+    // 初始缩放为 0
+    headGroup.scale.setScalar(0);
+    scene.add(headGroup);
 
-    // 从内到外5层，参数精心调校
-    const layers: LayerConfig[] = [
-      // 第1层：最内，近乎竖直的筒形花心
-      { count: 3,  tilt: 0.10, radius: 0.055, heightOff:  0.28, scale: 0.30, curl: 0.62, bow: 0.20, baseNarrow: 0.72 },
-      // 第2层：内层包裹
-      { count: 5,  tilt: 0.30, radius: 0.14,  heightOff:  0.18, scale: 0.44, curl: 0.50, bow: 0.25, baseNarrow: 0.65 },
-      // 第3层：中层半开
-      { count: 6,  tilt: 0.58, radius: 0.26,  heightOff:  0.06, scale: 0.60, curl: 0.36, bow: 0.27, baseNarrow: 0.58 },
-      // 第4层：中外层展开
-      { count: 7,  tilt: 0.85, radius: 0.40,  heightOff: -0.07, scale: 0.74, curl: 0.24, bow: 0.25, baseNarrow: 0.50 },
-      // 第5层：最外层充分展开
-      { count: 8,  tilt: 1.12, radius: 0.57,  heightOff: -0.20, scale: 0.90, curl: 0.14, bow: 0.21, baseNarrow: 0.42 },
-    ];
+    const components = {
+        stem: stemMesh,
+        leaves: leafGroup,
+        thorns: thornGroup,
+        head: headGroup
+    };
 
-    // 每层预生成共享几何（节省内存）
-    const layerGeos = layers.map((cfg) =>
-      buildPetalGeometry({
-        width: 0.52,
-        height: 0.88,
-        bowDepth: cfg.bow,
-        curlDepth: cfg.curl,
-        tipCurl: 0.12 + (1 - cfg.curl) * 0.1,
-        baseNarrow: cfg.baseNarrow,
-      })
-    );
+    let cancelled = false;
 
-    const allPetals: PetalData[] = [];
-    let globalIdx = 0;
+    loadObjWithCache(MODEL_URL, (p) => {
+      console.log(`[ThreeRose] OBJ progress: ${p}%`);
+    })
+      .then((obj) => {
+        if (cancelled) return;
 
-    layers.forEach((cfg, layerIdx) => {
-      for (let i = 0; i < cfg.count; i++) {
-        const spiralAngle = globalIdx * GOLDEN;
-        globalIdx++;
-
-        // 花蕾初始状态（紧闭）
-        const initTilt = 0.05 + layerIdx * 0.02;
-        const initRadius = 0.02 + layerIdx * 0.01;
-        const initHeight = cfg.heightOff + 0.18 * (1 - layerIdx / (layers.length - 1));
-
-        const mesh = new THREE.Mesh(layerGeos[layerIdx], newPetalMat());
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.scale.setScalar(cfg.scale);
-        mesh.rotation.order = "YXZ";
-        mesh.rotation.y = spiralAngle + Math.PI;
-        mesh.rotation.x = initTilt;
-        mesh.position.set(
-          CENTER.x + Math.cos(spiralAngle) * initRadius,
-          CENTER.y + initHeight,
-          CENTER.z + Math.sin(spiralAngle) * initRadius
-        );
-        scene.add(mesh);
-
-        allPetals.push({
-          mesh,
-          spiralAngle,
-          layerIdx,
-          targetTilt: cfg.tilt,
-          targetRadius: cfg.radius,
-          targetHeight: cfg.heightOff,
-          initTilt,
-          initRadius,
-          initHeight,
+        // 应用材质
+        obj.traverse((child) => {
+          if (!(child as THREE.Mesh).isMesh) return;
+          const mesh = child as THREE.Mesh;
+          const mat = new THREE.MeshStandardMaterial({
+            metalness: 0,
+            roughness: 0.65,
+            side: THREE.DoubleSide,
+          });
+          if (mesh.name === "rose" || mesh.name === "") {
+            mat.color.set("#b22222");
+          } else if (
+            mesh.name === "calyx" ||
+            mesh.name === "leaf1" ||
+            mesh.name === "leaf2"
+          ) {
+            mat.color.set("#1a4a1a");
+          } else {
+            mat.color.set("#b22222");
+          }
+          mesh.material = mat;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
         });
-      }
-    });
 
-    // ════════════════════════════════════════════════════════
-    // 绽放动画：外层先开 → 内层后开
-    // ════════════════════════════════════════════════════════
-    const TOTAL_DUR = 6000;
+        // 居中：原点对齐模型底部中心，与花茎顶端无缝衔接
+        const box = new THREE.Box3().setFromObject(obj);
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        obj.position.x = -center.x;
+        obj.position.z = -center.z;
+        obj.position.y = -box.min.y - 1.5;
+
+        // 旋转对齐（根据模型朝向调整）
+        obj.rotation.y = Math.PI / 1.7;
+
+        // 根据模型实际尺寸自动缩放到合适大小
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const targetSize = 1.2; // 花头目标直径
+        obj.scale.setScalar(targetSize / maxDim);
+
+        headGroup.add(obj);
+        console.log("[ThreeRose] OBJ model added to scene");
+      })
+      .catch((err) => {
+        console.error("[ThreeRose] Failed to load OBJ:", err);
+      });
+
+    // ── 绽放动画 ──────────────────────────────────────────
+    const TOTAL_DUR = 3200;
     let t0: number | null = null;
 
     const easeOutBack = (t: number, overshoot = 1.2): number => {
@@ -408,33 +346,28 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
       return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
     };
 
-    const easeInOutCubic = (t: number): number =>
-      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
     let raf: number;
     const animate = (ts: number) => {
       raf = requestAnimationFrame(animate);
       if (!t0) t0 = ts;
       const gT = Math.min((ts - t0) / TOTAL_DUR, 1.0);
 
-      allPetals.forEach((p) => {
-        // 外层(layerIdx=4)无延迟，内层(layerIdx=0)延迟最大
-        const delayFrac =
-          (layers.length - 1 - p.layerIdx) / (layers.length - 1);
-        const delay = delayFrac * 0.30;
-        const raw = Math.max(0, Math.min(1, (gT - delay) / (1.0 - delay)));
-        const localT = easeOutBack(raw);
-        const smoothT = easeInOutCubic(raw);
+      // 1. 花茎先生长 (0.0 -> 0.5)
+      const stemProg = Math.min(1, gT / 0.5);
+      components.stem.scale.set(1, stemProg, 1);
 
-        p.mesh.rotation.x =
-          p.initTilt + (p.targetTilt - p.initTilt) * localT;
-        const r = p.initRadius + (p.targetRadius - p.initRadius) * localT;
-        p.mesh.position.set(
-          CENTER.x + Math.cos(p.spiralAngle) * r,
-          CENTER.y + p.initHeight + (p.targetHeight - p.initHeight) * smoothT,
-          CENTER.z + Math.sin(p.spiralAngle) * r
-        );
-      });
+      // 2. 叶片和刺在生长过程中出现 (0.2 -> 0.6)
+      const detailProg = Math.max(0, Math.min(1, (gT - 0.2) / 0.4));
+      components.leaves.scale.setScalar(detailProg);
+      components.thorns.scale.setScalar(detailProg);
+
+      // 3. 花头绽放 (0.4 -> 1.0)
+      const headRaw = Math.max(0, Math.min(1, (gT - 0.4) / 0.6));
+      const headScale = easeOutBack(headRaw);
+      components.head.scale.setScalar(headScale);
+
+      // 花头缓慢自转
+      components.head.rotation.y = ts * 0.00018 + headRaw * 0.4;
 
       controls.update();
       renderer.render(scene, camera);
@@ -453,6 +386,7 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     window.addEventListener("resize", onResize);
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       renderer.dispose();
