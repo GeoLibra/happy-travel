@@ -31,7 +31,7 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
 
     // Setup scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xfff5f7);
+    // Transparent background
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
