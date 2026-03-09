@@ -262,7 +262,7 @@ export default function App() {
         )}>
           {/* Prominent Image Highlight */}
           <div className="relative w-full shrink-0 z-20 mt-4">
-            <div className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none">
+            <div className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none cursor-pointer" onClick={() => setShowRoseModal(true)}>
               <img
                  src={tripImage}
                  alt="Trip Highlight"
