@@ -37,8 +37,10 @@ import MV1Badge from './components/MV1Badge';
 import MV1InfoCard from './components/MV1InfoCard';
 import ImagineDragonsBadge from './components/ImagineDragonsBadge';
 import RaceCountdown from './components/RaceCountdown';
+import RoseModal from './components/RoseModal';
 import f1EngineShiftSound from './audio/f1-engine-2.mp3';
 import successSound from './audio/success.mp3';
+import RoseModal from './components/RoseModal';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -62,8 +64,8 @@ export default function App() {
   const [hoveredType, setHoveredType] = useState<Location['type'] | null>(null);
   const [showMV1Card, setShowMV1Card] = useState(false);
   const [showTelemetry, setShowTelemetry] = useState(false);
-  // Rose easter egg state
-  const [showRose, setShowRose] = useState(false);
+  // Rose easter egg state - Three.js Rose Modal
+  const [showRoseModal, setShowRoseModal] = useState(false);
   const shakeState = useRef<{ lastX: number; lastY: number; lastZ: number; lastTime: number }>({ lastX: 0, lastY: 0, lastZ: 0, lastTime: Date.now() });
 
   const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -115,12 +117,12 @@ export default function App() {
 
         const totalDelta = deltaX + deltaY + deltaZ;
 
-        if (totalDelta > 25 && !showRose) {
+        if (totalDelta > 25 && !showRoseModal) {
           // Play success sound
           successAudio.currentTime = 0;
           successAudio.play().catch(() => {});
-          // Show rose
-          setShowRose(true);
+          // Show Three.js Rose Modal
+          setShowRoseModal(true);
         }
 
         shakeState.current = { lastX: x, lastY: y, lastZ: z, lastTime: currentTime };
@@ -142,7 +144,7 @@ export default function App() {
     return () => {
       window.removeEventListener('devicemotion', handleMotion);
     };
-  }, [showRose]);
+  }, [showRoseModal]);
 
   // Scroll into view when selectedLocationId changes
   useEffect(() => {
@@ -273,44 +275,10 @@ export default function App() {
               {!showWelcome && <MiniFirework />}
             </div>
       </div>
-      {/* Rose Easter Egg - Shake to reveal */}
-      <AnimatePresence>
-        {showRose && !showWelcome && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0, rotate: -180 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            exit={{ opacity: 0, scale: 0.5, rotate: 180 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-            className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none"
-          >
-            <div className="relative">
-              {/* Rose head */}
-              <motion.div
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 3 }}
-                className="text-[120px] drop-shadow-2xl"
-              >
-                🌹
-              </motion.div>
-              {/* Sparkle effect */}
-              <motion.div
-                className="absolute -inset-8 bg-gradient-radial from-[#E10600]/30 to-transparent rounded-full"
-                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {/* Click anywhere to close rose */}
-      {showRose && !showWelcome && (
-        <div
-          className="absolute inset-0 z-50 cursor-pointer"
-          onClick={() => setShowRose(false)}
-        />
-      )}
+{/* Rose Easter Egg - Shake to reveal Three.js Rose */}
 
           {!showWelcome && <RaceCountdown />}
+      <RoseModal isOpen={showRoseModal} onClose={() => setShowRoseModal(false)} />
 
           {/* Spacer for countdown */}
           <div className="h-[10px] shrink-0" />
