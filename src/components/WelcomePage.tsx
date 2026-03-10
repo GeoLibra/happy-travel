@@ -329,6 +329,11 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               ref={audioRef}
               src={f1EngineSound}
               preload="auto"
+              onEnded={() => {
+                if (progress >= 100) {
+                  onEnter();
+                }
+              }}
             />
 
             </motion.div>
