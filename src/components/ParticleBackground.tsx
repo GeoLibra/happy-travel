@@ -400,15 +400,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         // CPU fallback loop
         const pArr = cpuParticles.geometry.attributes.position.array as Float32Array;
 
-        // Debug log (only log occasionally to avoid spam)
-        if (Math.random() < 0.01) {
-          console.log('[ParticleBackground] Particle state:', {
-            progress: s.progress,
-            isPressing: s.isPressing,
-            shouldAccelerate: s.progress > 0 && s.progress < 100,
-          });
-        }
-
         for (let i = 0; i < CPU_PARTICLE_COUNT; i++) {
           const i3 = i * 3;
           let dx, dy, dz;
@@ -422,11 +413,30 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             dx = (dirX / dist) * revForce;
             dy = (dirY / dist) * revForce;
             dz = -revForce * 1.5;
+
+            // Debug first particle
+            if (i === 0 && Math.random() < 0.02) {
+              console.log('[ParticleBackground] First particle accelerating:', {
+                progress: s.progress,
+                revForce,
+                dz,
+                currentZ: pArr[i3 + 2]
+              });
+            }
           } else {
             // 默认漂浮状态
             dx = Math.sin(time * 0.3 + particlePhases[i]) * 0.02;
             dy = Math.cos(time * 0.2 + particlePhases[i] * 1.3) * 0.015;
             dz = 0.5;
+
+            // Debug first particle
+            if (i === 0 && Math.random() < 0.02) {
+              console.log('[ParticleBackground] First particle floating:', {
+                progress: s.progress,
+                dz,
+                currentZ: pArr[i3 + 2]
+              });
+            }
           }
 
           pArr[i3] += dx; pArr[i3 + 1] += dy; pArr[i3 + 2] += dz;

@@ -289,7 +289,15 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
                   audioRef.current.play().catch(() => {});
                 }
               }}
-              onPointerUp={() => setIsPressing(false)}
+              onPointerUp={() => {
+                setIsPressing(false);
+              }}
+              onPointerLeave={() => {
+                setIsPressing(false);
+              }}
+              onPointerCancel={() => {
+                setIsPressing(false);
+              }}
               onClick={() => {
                 if (progress >= 100) {
                   onEnter();
