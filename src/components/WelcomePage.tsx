@@ -72,6 +72,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
     let interval: ReturnType<typeof setInterval>;
 
     if (isPressing && progress < 100) {
+      // 按住时增加进度
       interval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 100) {
@@ -80,21 +81,16 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
           return prev + 1;
         });
       }, 50);
-    } else if (!isPressing && progress < 100 && progress < 30) {
+    } else if (!isPressing && progress > 0 && progress < 30) {
+      // 松手且进度<30%：重置进度
       setProgress(0);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
-    }
-
-    return () => clearInterval(interval);
-
-  }, [isPressing, progress]);
-
-  useEffect(() => {
-    if (progress >= 30 && progress < 100) {
-      const interval = setInterval(() => {
+    } else if (!isPressing && progress >= 30 && progress < 100) {
+      // 松手但进度>=30%：自动继续增长
+      interval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 100) {
             return 100;
@@ -102,10 +98,10 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
           return prev + 1;
         });
       }, 50);
-
-      return () => clearInterval(interval);
     }
-  }, [progress]);
+
+    return () => clearInterval(interval);
+  }, [isPressing, progress]);
 
 
 

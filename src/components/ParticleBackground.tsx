@@ -399,14 +399,22 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       } else */ if (cpuParticles && particlePhases) {
         // CPU fallback loop
         const pArr = cpuParticles.geometry.attributes.position.array as Float32Array;
+
+        // Debug log (only log occasionally to avoid spam)
+        if (Math.random() < 0.01) {
+          console.log('[ParticleBackground] Particle state:', {
+            progress: s.progress,
+            isPressing: s.isPressing,
+            shouldAccelerate: s.progress > 0 && s.progress < 100,
+          });
+        }
+
         for (let i = 0; i < CPU_PARTICLE_COUNT; i++) {
           const i3 = i * 3;
-          let dx = Math.sin(time * 0.3 + particlePhases[i]) * 0.02;
-          let dy = Math.cos(time * 0.2 + particlePhases[i] * 1.3) * 0.015;
-          let dz = 0.5;
+          let dx, dy, dz;
 
-          if (s.isPressing && s.progress < 100) {
-            // 按住时：向中心聚集
+          // 只要进度>0且<100，就向中心反向加速聚集
+          if (s.progress > 0 && s.progress < 100) {
             const dirX = 0 - pArr[i3];
             const dirY = -25 - pArr[i3 + 1];
             const dist = Math.sqrt(dirX*dirX + dirY*dirY) || 1;
@@ -414,33 +422,26 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             dx = (dirX / dist) * revForce;
             dy = (dirY / dist) * revForce;
             dz = -revForce * 1.5;
-          } else if (!s.isPressing && s.progress > 0 && s.progress < 30) {
-            // 松手且进度在0-30%之间：反向加速远离中心
-            const dirX = pArr[i3] - 0;
-            const dirY = pArr[i3 + 1] - (-25);
-            const dist = Math.sqrt(dirX*dirX + dirY*dirY) || 1;
-            const explosionForce = 8.0 + Math.pow(s.progress / 30, 2) * 15.0;
-            dx = (dirX / dist) * explosionForce;
-            dy = (dirY / dist) * explosionForce;
-            dz = explosionForce * 2.0;
+          } else {
+            // 默认漂浮状态
+            dx = Math.sin(time * 0.3 + particlePhases[i]) * 0.02;
+            dy = Math.cos(time * 0.2 + particlePhases[i] * 1.3) * 0.015;
+            dz = 0.5;
           }
 
           pArr[i3] += dx; pArr[i3 + 1] += dy; pArr[i3 + 2] += dz;
 
-          // 边界重置
-          if (pArr[i3] < -100) pArr[i3] = 100;
-          if (pArr[i3] > 100) pArr[i3] = -100;
-          if (pArr[i3 + 1] < -75) pArr[i3 + 1] = 75;
-          if (pArr[i3 + 1] > 75) pArr[i3 + 1] = -75;
-          if (pArr[i3 + 2] > 80) {
-            pArr[i3 + 2] = -80;
-            pArr[i3] = (Math.random() - 0.5) * 200;
-            pArr[i3 + 1] = (Math.random() - 0.5) * 150;
-          }
-          if (pArr[i3 + 2] < -100) {
-            pArr[i3 + 2] = 50;
-            pArr[i3] = (Math.random() - 0.5) * 200;
-            pArr[i3 + 1] = (Math.random() - 0.5) * 150;
+          // 边界重置（只在正常漂浮状态下）
+          if (s.progress === 0) {
+            if (pArr[i3] < -100) pArr[i3] = 100;
+            if (pArr[i3] > 100) pArr[i3] = -100;
+            if (pArr[i3 + 1] < -75) pArr[i3 + 1] = 75;
+            if (pArr[i3 + 1] > 75) pArr[i3 + 1] = -75;
+            if (pArr[i3 + 2] > 80) {
+              pArr[i3 + 2] = -80;
+              pArr[i3] = (Math.random() - 0.5) * 200;
+              pArr[i3 + 1] = (Math.random() - 0.5) * 150;
+            }
           }
         }
         cpuParticles.geometry.attributes.position.needsUpdate = true;
