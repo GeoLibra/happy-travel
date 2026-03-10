@@ -102,7 +102,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     let particlePhases: Float32Array | null = null;
 
     if (!useGPU) {
-      console.log("Using CPU particles fallback");
+
       const pGeometry = new THREE.BufferGeometry();
       const pPositions = new Float32Array(CPU_PARTICLE_COUNT * 3);
       const pColors = new Float32Array(CPU_PARTICLE_COUNT * 3);
@@ -191,7 +191,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         f1CarGroup.position.set(0, -10, -150); // Start deep in the screen
         f1CarGroup.visible = false;
 
-        console.log("[DEBUG] Model injected. Vertices count hint:", f1CarGroup.children.length);
+
 
         f1CarGroup.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
@@ -212,7 +212,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
           renderer.compile(scene, camera);
         }
 
-        console.log("[ParticleBackground] 3D F1 Model dynamically injected and pre-compiled");
+
       }
     };
 
@@ -415,14 +415,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             dz = -revForce * 1.5;
 
             // Debug first particle
-            if (i === 0 && Math.random() < 0.02) {
-              console.log('[ParticleBackground] First particle accelerating:', {
-                progress: s.progress,
-                revForce,
-                dz,
-                currentZ: pArr[i3 + 2]
-              });
-            }
+
           } else {
             // 默认漂浮状态
             dx = Math.sin(time * 0.3 + particlePhases[i]) * 0.02;
@@ -430,13 +423,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             dz = 0.5;
 
             // Debug first particle
-            if (i === 0 && Math.random() < 0.02) {
-              console.log('[ParticleBackground] First particle floating:', {
-                progress: s.progress,
-                dz,
-                currentZ: pArr[i3 + 2]
-              });
-            }
+
           }
 
           pArr[i3] += dx; pArr[i3 + 1] += dy; pArr[i3 + 2] += dz;
@@ -465,7 +452,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       if ((s.isPressing || s.progress >= 30) && f1CarGroup) {
         if (!f1CarGroup.visible) {
            f1CarGroup.visible = true;
-           console.log("[DEBUG] Car visible and approaching");
+
            f1Trails.visible = true;
         }
 
@@ -605,28 +592,16 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     ref={containerRef}
     style={{ position: 'fixed', inset: 0, zIndex: 75, pointerEvents: progress >= 100 ? 'auto' : 'none' }}
     onMouseDown={(e) => {
-      console.log('[ParticleBackground] MouseDown detected', {
-        progress,
-        pointerEvents: progress >= 100 ? 'auto' : 'none',
-        target: e.target,
-        tagName: (e.target as HTMLElement).tagName,
-      });
+
     }}
     onClick={(e) => {
-      console.log('[ParticleBackground] Click detected', {
-        progress,
-        pointerEvents: progress >= 100 ? 'auto' : 'none',
-        clientX: e.clientX,
-        clientY: e.clientY,
-        target: e.target,
-        tagName: (e.target as HTMLElement).tagName,
-      });
+
 
       // Smart event forwarding when progress >= 100
       if (progress >= 100) {
         const canvas = containerRef.current?.querySelector('canvas');
         if (!canvas) {
-          console.log('[ParticleBackground] Canvas not found');
+
           return;
         }
 
@@ -638,26 +613,21 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         // Calculate distance from center
         const distanceFromCenter = Math.sqrt(x * x + y * y);
 
-        console.log('[ParticleBackground] Click position', {
-          normalizedX: x,
-          normalizedY: y,
-          distanceFromCenter,
-          threshold: 0.4,
-        });
+
 
         // If click is near center (on the car), handle car click
         if (distanceFromCenter < 0.4) {
-          console.log('[ParticleBackground] Click on 3D model (center region)');
+
           if (onCarClick) {
-            console.log('[ParticleBackground] Calling onCarClick callback');
+
             onCarClick();
             e.stopPropagation();
           } else {
-            console.log('[ParticleBackground] No onCarClick callback provided');
+
           }
           // Let OrbitControls handle the interaction
         } else {
-          console.log('[ParticleBackground] Click on empty space, forwarding to underlying element');
+
           // Click is on empty space, forward to underlying element
           const target = containerRef.current;
           if (target) {
@@ -666,43 +636,35 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             let underlyingElement = document.elementFromPoint(e.clientX, e.clientY);
             target.style.pointerEvents = 'auto';
 
-            console.log('[ParticleBackground] Underlying element found:', {
-              tagName: underlyingElement?.tagName,
-              className: underlyingElement?.className,
-              id: underlyingElement?.id,
-              element: underlyingElement,
-            });
+
 
             // If we found a child element (like span inside button), find the closest clickable parent
             if (underlyingElement) {
               // Find closest button or clickable element
               const clickableElement = underlyingElement.closest('button, a, [role="button"], [onclick]');
               if (clickableElement) {
-                console.log('[ParticleBackground] Found clickable parent:', {
-                  tagName: clickableElement.tagName,
-                  className: clickableElement.className,
-                });
+
                 underlyingElement = clickableElement as HTMLElement;
               }
             }
 
             // Forward click to underlying element
             if (underlyingElement && underlyingElement !== target) {
-              console.log('[ParticleBackground] Dispatching click event to underlying element');
+
               underlyingElement.dispatchEvent(new MouseEvent('click', {
                 bubbles: true,
                 cancelable: true,
                 clientX: e.clientX,
                 clientY: e.clientY,
               }));
-              console.log('[ParticleBackground] Click event dispatched successfully');
+
             } else {
-              console.log('[ParticleBackground] No valid underlying element to forward to');
+
             }
           }
         }
       } else {
-        console.log('[ParticleBackground] Progress < 100, pointer-events should be none');
+
       }
     }}
   />;
