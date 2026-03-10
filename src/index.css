@@ -37,3 +37,10 @@ body {
   18% { transform: translate(0) }
   100% { transform: translate(0) }
 }
+/* Hide AMap branding to keep the UI clean and premium */
+.amap-logo, .amap-copyright {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
