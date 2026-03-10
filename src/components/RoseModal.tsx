@@ -8,10 +8,12 @@ interface RoseModalProps {
 }
 
 export default function RoseModal({ isOpen, onClose }: RoseModalProps) {
+  // 处理点击背景遮罩层关闭弹窗
   const handleBackdropClick = useCallback(() => {
     onClose();
   }, [onClose]);
 
+  // 处理 Esc 键关闭和锁定背景滚动
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -48,7 +50,8 @@ export default function RoseModal({ isOpen, onClose }: RoseModalProps) {
             className="relative w-[90vw] h-[80vh] max-w-4xl cursor-default"
             style={{ minWidth: '600px', minHeight: '600px' }}
           >
-            <ThreeRose isOpen={isOpen} />
+            {/* 修正：直接传入 isOpen 状态，并使用组件 props 中的 onClose */}
+            <ThreeRose isOpen={isOpen} onClose={onClose} />
           </motion.div>
         </motion.div>
       )}

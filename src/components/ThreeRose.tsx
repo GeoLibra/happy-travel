@@ -59,7 +59,7 @@ async function loadGltfWithCache(
   });
 }
 
-// ✨ 新增：用 Canvas 动态生成一个发光圆点贴图，消除方形马赛克感
+// 用 Canvas 动态生成一个发光圆点贴图
 const createGlowTexture = () => {
   const canvas = document.createElement("canvas");
   canvas.width = 64;
@@ -67,7 +67,6 @@ const createGlowTexture = () => {
   const context = canvas.getContext("2d");
   if (context) {
     const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32);
-    // 中心不透明，边缘透明，形成发光光晕
     gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
     gradient.addColorStop(0.2, "rgba(255, 255, 255, 0.8)");
     gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.2)");
@@ -80,10 +79,13 @@ const createGlowTexture = () => {
 
 interface ThreeRoseProps {
   isOpen: boolean;
+  onClose?: () => void; // 新增关闭回调
 }
 
-export default function ThreeRose({ isOpen }: ThreeRoseProps) {
+export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
   const mountRef = useRef<HTMLDivElement>(null);
+  // 用于记录鼠标/手指点击的初始位置，区分“点击关闭”和“拖拽旋转”
+  const pointerRef = useRef({ x: 0, y: 0, time: 0 });
 
   useEffect(() => {
     if (!isOpen || !mountRef.current) return;
@@ -105,8 +107,8 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     if (!mountRef.current) return;
 
     const scene = new THREE.Scene();
-    // 修改雾的颜色为黑色，凸显出橙色的光芒
-    scene.fog = new THREE.Fog(0x000000, 5, 25);
+    // 移除 Fog 以保证背景彻底透明
+    // scene.fog = new THREE.Fog(0x000000, 5, 25);
 
     const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
     camera.position.set(0, 0, 5);
@@ -115,8 +117,8 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
-    // 渲染器背景设置为深色/黑色，图2的效果必须在暗调背景下才好看
-    renderer.setClearColor(0x050505, 1);
+    // 背景设为完全透明 (alpha = 0)
+    renderer.setClearColor(0x000000, 0);
     mountRef.current.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.2));
@@ -132,7 +134,7 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     controls.maxDistance = 10;
     controls.update();
 
-    // ✨ 优化 1：大幅增加粒子数量
+    // 粒子系统配置
     const particleCount = 40000;
     const particleGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
@@ -146,26 +148,22 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
       positions[i3 + 1] = 1.5;
       positions[i3 + 2] = 0;
 
-      // ✨ 优化 2：调整为金红/橙红配色，契合图2的余烬效果
+      // 金红/橙红配色
       const colorMix = Math.random();
       if (colorMix < 0.5) {
-        // 核心亮橙色 (50%)
         colors[i3] = 1.0;
         colors[i3 + 1] = 0.4 + Math.random() * 0.3;
         colors[i3 + 2] = 0.1;
       } else if (colorMix < 0.8) {
-        // 深红色 (30%)
         colors[i3] = 0.8 + Math.random() * 0.2;
         colors[i3 + 1] = 0.1 + Math.random() * 0.1;
         colors[i3 + 2] = 0.05;
       } else {
-        // 点缀金黄色 (20%)
         colors[i3] = 1.0;
         colors[i3 + 1] = 0.7 + Math.random() * 0.2;
         colors[i3 + 2] = 0.2 + Math.random() * 0.2;
       }
 
-      // 粒子大小差异化
       sizes[i] = 0.01 + Math.random() * 0.03;
     }
 
@@ -173,15 +171,15 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
-    // ✨ 优化 3：赋予材质贴图及 AdditiveBlending
+    // 使用 AdditiveBlending 和贴图实现发光点云
     const particleMaterial = new THREE.PointsMaterial({
-      size: 0.04, // 配合密度调小尺寸
-      map: createGlowTexture(), // 使用圆形发光贴图
+      size: 0.04,
+      map: createGlowTexture(),
       vertexColors: true,
       transparent: true,
       opacity: 0.8,
-      blending: THREE.AdditiveBlending, // ✨ 核心：叠加发光模式
-      depthWrite: false, // 保证重叠的粒子不会互相遮挡遮罩
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
       depthTest: true,
       sizeAttenuation: true
     });
@@ -244,7 +242,6 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
 
       if (meshes.length > 0) {
         const posAttr = particleGeometry.attributes.position;
-        // 获取所有顶点以供随机采样
         const allVertices: THREE.Vector3[] = [];
         meshes.forEach(mesh => {
             const geoPos = mesh.geometry.attributes.position;
@@ -259,10 +256,8 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
 
         if (allVertices.length > 0) {
             for (let i = 0; i < particleCount; i++) {
-              // 随机取一个顶点
               const baseVertex = allVertices[Math.floor(Math.random() * allVertices.length)];
 
-              // ✨ 优化 4：大幅减小发散程度，收紧轮廓，让形状更清晰
               const offsetValue = 0.02 + Math.random() * 0.03;
               const localPos = baseVertex.clone();
               localPos.x += (Math.random() - 0.5) * offsetValue;
@@ -283,7 +278,7 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
       modelLoaded = true;
     });
 
-    const PARTICLE_PHASE = 2500; // 稍微拉长纯粒子展示时间
+    const PARTICLE_PHASE = 2500;
     const TRANSITION_DUR = 2500;
     let t0: number | null = null;
 
@@ -314,7 +309,6 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
 
         for (let i = 0; i < particleCount; i++) {
           const i3 = i * 3;
-          // 削弱波动幅度，让点云更静谧高雅
           const floatOffset = Math.sin(elapsed * 0.001 + i * 0.1) * 0.008;
           const driftX = Math.cos(elapsed * 0.0008 + i * 0.15) * 0.004;
           const driftZ = Math.sin(elapsed * 0.0007 + i * 0.12) * 0.004;
@@ -353,7 +347,6 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
         modelGroup.visible = true;
       }
 
-      // 让整体缓慢自转，效果更棒
       modelGroup.rotation.y = elapsed * 0.0002;
       particleSystem.rotation.y = elapsed * 0.0002;
 
@@ -383,16 +376,36 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     };
   };
 
+  // 记录按下位置和时间
+  const handlePointerDown = (e: React.PointerEvent) => {
+    pointerRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+  };
+
+  // 判断是点击还是拖动
+  const handlePointerUp = (e: React.PointerEvent) => {
+    const dx = e.clientX - pointerRef.current.x;
+    const dy = e.clientY - pointerRef.current.y;
+    const dt = Date.now() - pointerRef.current.time;
+
+    // 如果鼠标位移小于 5 像素，且按压时间小于 300 毫秒，则判定为点击
+    if (Math.sqrt(dx * dx + dy * dy) < 5 && dt < 300) {
+      onClose?.();
+    }
+  };
+
   return (
     <div
       ref={mountRef}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
       style={{
         width: "100%",
         height: "100%",
         minHeight: "600px",
         minWidth: "600px",
         position: "relative",
-        backgroundColor: "#050505" // 保证背景是暗色，AdditiveBlending 才明显
+        backgroundColor: "transparent", // 改为完全透明
+        cursor: "pointer" // 提示用户可点击
       }}
     />
   );
