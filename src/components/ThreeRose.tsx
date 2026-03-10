@@ -67,9 +67,30 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
   const mountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isOpen || !mountRef.current) return;
+
+    // 等待容器渲染完成
+    const initTimeout = setTimeout(() => {
+      if (!mountRef.current) return;
+      const W = mountRef.current.clientWidth || 600;
+      const H = mountRef.current.clientHeight || 600;
+
+      console.log("[ThreeRose] Container size:", W, "x", H);
+      if (W === 0 || H === 0) {
+        console.warn("[ThreeRose] Container has zero size!");
+        return;
+      }
+
+      startThreeScene(W, H);
+    }, 100);
+
+    return () => {
+      clearTimeout(initTimeout);
+    };
+  }, [isOpen]);
+
+  const startThreeScene = (W: number, H: number) => {
     if (!mountRef.current) return;
-    const W = mountRef.current.clientWidth || 600;
-    const H = mountRef.current.clientHeight || 600;
 
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x1b4a42, 10, 22);
@@ -385,7 +406,7 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     };
     window.addEventListener("resize", onResize);
 
-    return () => {
+    const cleanup = () => {
       cancelled = true;
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
@@ -394,12 +415,20 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
         mountRef.current.removeChild(renderer.domElement);
       }
     };
-  }, [isOpen]);
+
+    return cleanup;
+  };
 
   return (
     <div
       ref={mountRef}
-      style={{ width: "100%", height: "100%", minHeight: "500px" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        minHeight: "600px",
+        minWidth: "600px",
+        position: "relative"
+      }}
     />
   );
 }
