@@ -312,7 +312,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   <span className="flex-shrink-0">
     {progress >= 100
       ? "ENTER"
-      : isPressing
+      : (isPressing || progress > 0)
       ? `ENGINE STARTING ${progress}%`
       : (modelLoading ? "CALIBRATING..." : "HOLD TO START")}
   </span>
