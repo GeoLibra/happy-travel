@@ -1,39 +1,32 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import localforage from "localforage";
 
-// ═══════════════════════════════════════════════════════════════
-// localforage 配置（与 model-loader.ts 保持一致）
-// ═══════════════════════════════════════════════════════════════
 localforage.config({
   name: "happy-travel-3d-cache",
   storeName: "models",
 });
 
-const MODEL_URL = "/models/red_rose3.obj";
+const MODEL_URL = "/models/rose.glb";
 
-// ═══════════════════════════════════════════════════════════════
-// OBJ 带缓存加载（复用 model-loader.ts 的流式读取 + 缓存策略）
-// OBJ 是纯文本，缓存为 string；GLTF 是二进制，缓存为 ArrayBuffer
-// ═══════════════════════════════════════════════════════════════
-async function loadObjWithCache(
+async function loadGltfWithCache(
   url: string,
   onProgress?: (p: number) => void
-): Promise<THREE.Group> {
-  const loader = new OBJLoader();
+): Promise<any> {
+  const loader = new GLTFLoader();
 
-  // 尝试从缓存读取
-  const cached = await localforage.getItem<string>(url);
+  const cached = await localforage.getItem<ArrayBuffer>(url);
   if (cached) {
-    console.log("[ThreeRose] OBJ loaded from cache");
+    console.log("[ThreeRose] GLB loaded from cache");
     onProgress?.(100);
-    return loader.parse(cached);
+    return new Promise((resolve, reject) => {
+      loader.parse(cached, "", resolve, reject);
+    });
   }
 
-  // 缓存未命中，流式 fetch
-  console.log("[ThreeRose] Fetching OBJ from server");
+  console.log("[ThreeRose] Fetching GLB from server");
   const response = await fetch(url);
   if (!response.body) throw new Error("Response body is null");
 
@@ -52,49 +45,24 @@ async function loadObjWithCache(
     if (total > 0) onProgress?.(Math.round((loaded / total) * 100));
   }
 
-  // 合并 chunks → 文本
   const merged = new Uint8Array(loaded);
   let offset = 0;
   for (const chunk of chunks) {
     merged.set(chunk, offset);
     offset += chunk.length;
   }
-  const text = new TextDecoder().decode(merged);
+  const buffer = merged.buffer;
 
-  // 写入缓存
-  await localforage.setItem(url, text);
-
-  return loader.parse(text);
+  await localforage.setItem(url, buffer);
+  return new Promise((resolve, reject) => {
+    loader.parse(buffer, "", resolve, reject);
+  });
 }
 
-// ═══════════════════════════════════════════════════════════════
-// 纹理（茎用，花头由 OBJ 材质接管）
-// ═══════════════════════════════════════════════════════════════
-function createStemTexture(): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = 64;
-  c.height = 64;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createLinearGradient(0, 0, 64, 0);
-  g.addColorStop(0, "#183818");
-  g.addColorStop(0.4, "#2d6b2d");
-  g.addColorStop(0.6, "#347a34");
-  g.addColorStop(1, "#183818");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 类型定义
-// ═══════════════════════════════════════════════════════════════
 interface ThreeRoseProps {
   isOpen: boolean;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// 主组件
-// ═══════════════════════════════════════════════════════════════
 export default function ThreeRose({ isOpen }: ThreeRoseProps) {
   const mountRef = useRef<HTMLDivElement>(null);
 
@@ -103,13 +71,13 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     const W = mountRef.current.clientWidth || 600;
     const H = mountRef.current.clientHeight || 600;
 
-    // ── 场景 ─────────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x1b4a42, 10, 22);
 
-    const camera = new THREE.PerspectiveCamera(40, W / H, 0.01, 50);
-    camera.position.set(0, 3.0, 5.2);
-    camera.lookAt(0, 1.6, 0);
+    const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
+    camera.position.set(0, 0, 5);
+    camera.lookAt(0, 0, 0);
+    console.log("[ThreeRose] Camera at origin level, looking at center");
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -117,264 +85,296 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.25;
     mountRef.current.appendChild(renderer.domElement);
 
-    // ── 灯光 ─────────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0xffe8d0, 1.1));
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2));
 
-    const key = new THREE.DirectionalLight(0xfff0e0, 3.0);
-    key.position.set(2.5, 7, 4);
+    const key = new THREE.DirectionalLight(0xfff0e0, 2.5);
+    key.position.set(5, 10, 5);
     key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
-    key.shadow.camera.near = 0.5;
-    key.shadow.camera.far = 15;
-    key.shadow.camera.left = -2.5;
-    key.shadow.camera.right = 2.5;
-    key.shadow.camera.top = 2.5;
-    key.shadow.camera.bottom = -2.5;
+    key.shadow.mapSize.set(1024, 1024);
     scene.add(key);
 
-    const fill = new THREE.PointLight(0xff2244, 1.5, 10);
-    fill.position.set(-2.5, 3.5, 1.5);
-    scene.add(fill);
-
-    const rim = new THREE.DirectionalLight(0xaaffee, 0.5);
-    rim.position.set(0, 2, -5);
+    const rim = new THREE.DirectionalLight(0xaaffee, 0.6);
+    rim.position.set(-5, 5, -5);
     scene.add(rim);
 
-    // ── 轨道控制 ─────────────────────────────────────────
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 1.6, 0);
+    controls.target.set(0, 0, 0);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.07;
+    controls.dampingFactor = 0.05;
     controls.minDistance = 2;
     controls.maxDistance = 10;
     controls.update();
 
-    // ── 材质（茎/叶/萼片用） ─────────────────────────────
-    const greenMat = new THREE.MeshStandardMaterial({
-      color: 0x1a331a, // Darker green
-      side: THREE.DoubleSide,
-      roughness: 0.9,
-    });
-
-    // ── 花茎 ─────────────────────────────────────────────
-    // 基于用户提供的有机曲线映射至场景比例 (0 -> 2.42)
-    const stemCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0.01, 0, 0.01),
-      new THREE.Vector3(0, 0.6, 0),
-      new THREE.Vector3(-0.01, 1.4, -0.01),
-      new THREE.Vector3(0.02, 2.0, 0.01),
-      new THREE.Vector3(0, 2.4, 0),
-    ]);
-    const stemMesh = new THREE.Mesh(
-      new THREE.TubeGeometry(stemCurve, 64, 0.022, 12, false),
-      greenMat
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 20),
+      new THREE.ShadowMaterial({ opacity: 0.15 })
     );
-    stemMesh.castShadow = true;
-    scene.add(stemMesh);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
 
-    // ── 叶片 (Bezier Shape) ─────────────────────────────
-    const leafShape = new THREE.Shape();
-    leafShape.moveTo(0, 0);
-    leafShape.bezierCurveTo(0.04, 0.08, 0.16, 0.12, 0.24, 0);
-    leafShape.bezierCurveTo(0.16, -0.12, 0.04, -0.08, 0, 0);
-    const leafGeo = new THREE.ShapeGeometry(leafShape);
+    // 粒子系统
+    const particleCount = 3000;
+    const particleGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const originalPositions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const sizes = new Float32Array(particleCount);
 
-    const leafGroup = new THREE.Group();
-    scene.add(leafGroup);
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      positions[i3] = 0;
+      positions[i3 + 1] = 1.5;
+      positions[i3 + 2] = 0;
 
-    // 叶片位置 (t 沿曲线)
-    const leafPositions = [
-      { t: 0.35, side: 1 },
-      { t: 0.55, side: -1 },
-      { t: 0.75, side: 1 },
-    ];
-
-    leafPositions.forEach((pos) => {
-      const p = stemCurve.getPoint(pos.t);
-      const tangent = stemCurve.getTangent(pos.t);
-
-      const g = new THREE.Group();
-      g.position.copy(p);
-
-      // 叶柄 (Petiole)
-      const petiole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.005, 0.005, 0.12, 8),
-        greenMat
-      );
-      petiole.rotation.z = pos.side * Math.PI / 3;
-      petiole.position.x = pos.side * 0.05;
-      g.add(petiole);
-
-      // 叶片主瓣
-      const leaf = new THREE.Mesh(leafGeo, greenMat);
-      leaf.position.set(pos.side * 0.15, pos.side * 0.05, 0);
-      leaf.rotation.set(Math.PI / 2, pos.side * Math.PI / 2, 0);
-      leaf.scale.setScalar(0.8);
-      leaf.castShadow = true;
-      g.add(leaf);
-
-      leafGroup.add(g);
-    });
-
-    // ── 刺 (Thorns) ───────────────────────────────────────
-    const thornGeo = new THREE.ConeGeometry(0.008, 0.05, 4);
-    const thornGroup = new THREE.Group();
-    scene.add(thornGroup);
-
-    for (let i = 0; i < 15; i++) {
-        const t = 0.1 + (i * 0.06);
-        const p = stemCurve.getPoint(t);
-        const angle = i * Math.PI * 0.75;
-        const mesh = new THREE.Mesh(thornGeo, greenMat);
-        mesh.position.set(
-            p.x + Math.cos(angle) * 0.02,
-            p.y,
-            p.z + Math.sin(angle) * 0.02
-        );
-        mesh.rotation.set(Math.PI / 2, 0, angle);
-        mesh.castShadow = true;
-        thornGroup.add(mesh);
+      const colorMix = Math.random();
+      colors[i3] = 0.8 + colorMix * 0.2;
+      colors[i3 + 1] = 0.1 + colorMix * 0.3;
+      colors[i3 + 2] = 0.2 + colorMix * 0.3;
+      sizes[i] = 0.08 + Math.random() * 0.12;
     }
 
-    // ── 花托 & 萼片 (Calyx) ───────────────────────────────
-    const receptacle = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2),
-      greenMat
-    );
-    receptacle.position.set(0, 2.4, 0);
-    scene.add(receptacle);
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
-    for (let i = 0; i < 5; i++) {
-      const ang = (i / 5) * Math.PI * 2;
-      const ss = new THREE.Shape();
-      ss.moveTo(0, 0);
-      ss.bezierCurveTo(0.07, 0.02, 0.1, 0.22, 0.04, 0.42);
-      ss.bezierCurveTo(0.02, 0.52, -0.02, 0.52, -0.04, 0.42);
-      ss.bezierCurveTo(-0.1, 0.22, -0.07, 0.02, 0, 0);
-      const sm = new THREE.Mesh(
-        new THREE.ShapeGeometry(ss, 10),
-        greenMat
-      );
-      sm.position.set(Math.cos(ang) * 0.08, 2.41, Math.sin(ang) * 0.08);
-      sm.rotation.set(0.6, ang + Math.PI, 0, "YXZ");
-      sm.scale.setScalar(0.2); // 萼片较小
-      scene.add(sm);
-    }
+    const particleMaterial = new THREE.PointsMaterial({
+      size: 0.15,
+      vertexColors: true,
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
 
-    const headGroup = new THREE.Group();
-    // 花头挂载点位于花茎顶端
-    headGroup.position.set(0, 2.4, 0);
-    // 初始缩放为 0
-    headGroup.scale.setScalar(0);
-    scene.add(headGroup);
+    const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+    particleSystem.visible = false; // 先隐藏粒子，调试模型位置
+    scene.add(particleSystem);
 
-    const components = {
-        stem: stemMesh,
-        leaves: leafGroup,
-        thorns: thornGroup,
-        head: headGroup
-    };
+    const modelGroup = new THREE.Group();
+    modelGroup.visible = true; // 始终显示模型
+    scene.add(modelGroup);
 
+    let modelLoaded = false;
     let cancelled = false;
 
-    loadObjWithCache(MODEL_URL, (p) => {
-      console.log(`[ThreeRose] OBJ progress: ${p}%`);
-    })
-      .then((obj) => {
+    loadGltfWithCache(MODEL_URL)
+      .then((gltf) => {
         if (cancelled) return;
+        const model = gltf.scene;
 
-        // 应用材质
-        obj.traverse((child) => {
-          if (!(child as THREE.Mesh).isMesh) return;
-          const mesh = child as THREE.Mesh;
-          const mat = new THREE.MeshStandardMaterial({
-            metalness: 0,
-            roughness: 0.65,
-            side: THREE.DoubleSide,
-          });
-          if (mesh.name === "rose" || mesh.name === "") {
-            mat.color.set("#b22222");
-          } else if (
-            mesh.name === "calyx" ||
-            mesh.name === "leaf1" ||
-            mesh.name === "leaf2"
-          ) {
-            mat.color.set("#1a4a1a");
-          } else {
-            mat.color.set("#b22222");
-          }
-          mesh.material = mat;
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-        });
-
-        // 居中：原点对齐模型底部中心，与花茎顶端无缝衔接
-        const box = new THREE.Box3().setFromObject(obj);
-        const center = new THREE.Vector3();
-        box.getCenter(center);
-        obj.position.x = -center.x;
-        obj.position.z = -center.z;
-        obj.position.y = -box.min.y - 1.5;
-
-        // 旋转对齐（根据模型朝向调整）
-        obj.rotation.y = Math.PI / 1.7;
-
-        // 根据模型实际尺寸自动缩放到合适大小
+        const box = new THREE.Box3().setFromObject(model);
         const size = new THREE.Vector3();
         box.getSize(size);
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const targetSize = 1.2; // 花头目标直径
-        obj.scale.setScalar(targetSize / maxDim);
 
-        headGroup.add(obj);
-        console.log("[ThreeRose] OBJ model added to scene");
+        console.log("[ThreeRose] ===== ORIGINAL MODEL =====");
+        console.log("[ThreeRose] Original size:", size.toArray());
+        console.log("[ThreeRose] Original box min:", box.min.toArray());
+        console.log("[ThreeRose] Original box max:", box.max.toArray());
+
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        const sc = 2.5 / maxDim;
+        console.log("[ThreeRose] Scale factor:", sc);
+
+        model.scale.setScalar(sc);
+        model.updateMatrixWorld(true);
+
+        const scaledBox = new THREE.Box3().setFromObject(model);
+        const scaledCenter = new THREE.Vector3();
+        scaledBox.getCenter(scaledCenter);
+        const scaledSize = new THREE.Vector3();
+        scaledBox.getSize(scaledSize);
+
+        console.log("[ThreeRose] ===== SCALED MODEL =====");
+        console.log("[ThreeRose] Scaled size:", scaledSize.toArray());
+        console.log("[ThreeRose] Scaled box min:", scaledBox.min.toArray());
+        console.log("[ThreeRose] Scaled box max:", scaledBox.max.toArray());
+        console.log("[ThreeRose] Scaled center:", scaledCenter.toArray());
+
+        // 把模型中心放在原点 (0, 0, 0)
+        model.position.set(
+          -scaledCenter.x,
+          -scaledCenter.y,
+          -scaledCenter.z
+        );
+
+        // 更新后重新计算
+        model.updateMatrixWorld(true);
+        const finalBox = new THREE.Box3().setFromObject(model);
+        const finalCenter = new THREE.Vector3();
+        finalBox.getCenter(finalCenter);
+
+        console.log("[ThreeRose] ===== AFTER FIRST POSITIONING =====");
+        console.log("[ThreeRose] Model position:", model.position.toArray());
+        console.log("[ThreeRose] Final center:", finalCenter.toArray());
+
+        // 如果中心不在原点，再次调整
+        if (Math.abs(finalCenter.x) > 0.01 || Math.abs(finalCenter.y) > 0.01 || Math.abs(finalCenter.z) > 0.01) {
+          model.position.x -= finalCenter.x;
+          model.position.y -= finalCenter.y;
+          model.position.z -= finalCenter.z;
+          console.log("[ThreeRose] Corrected position:", model.position.toArray());
+        }
+
+        model.traverse((child: any) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) {
+              child.material.side = THREE.DoubleSide;
+              if (child.material.color) {
+                child.material.color.multiplyScalar(1.1);
+              }
+            }
+          }
+        });
+
+        modelGroup.add(model);
+        model.updateMatrixWorld(true);
+
+        // 从模型采样粒子位置
+        const meshes: THREE.Mesh[] = [];
+        model.traverse((child: any) => {
+          if (child.isMesh) meshes.push(child);
+        });
+
+        if (meshes.length > 0) {
+          const posAttr = particleGeometry.attributes.position;
+
+          for (let i = 0; i < particleCount; i++) {
+            const mesh = meshes[Math.floor(Math.random() * meshes.length)];
+            const geometry = mesh.geometry;
+
+            if (geometry.attributes.position) {
+              const geoPos = geometry.attributes.position;
+              const idx = Math.floor(Math.random() * geoPos.count);
+              const localPos = new THREE.Vector3(
+                geoPos.getX(idx),
+                geoPos.getY(idx),
+                geoPos.getZ(idx)
+              );
+
+              mesh.localToWorld(localPos);
+
+              const offset = 0.08;
+              localPos.x += (Math.random() - 0.5) * offset;
+              localPos.y += (Math.random() - 0.5) * offset;
+              localPos.z += (Math.random() - 0.5) * offset;
+
+              const i3 = i * 3;
+              originalPositions[i3] = localPos.x;
+              originalPositions[i3 + 1] = localPos.y;
+              originalPositions[i3 + 2] = localPos.z;
+
+              posAttr.setXYZ(i, localPos.x, localPos.y, localPos.z);
+            }
+          }
+          posAttr.needsUpdate = true;
+
+          console.log("[ThreeRose] ===== PARTICLES =====");
+          console.log("[ThreeRose] Particle 0:", [originalPositions[0], originalPositions[1], originalPositions[2]]);
+          console.log("[ThreeRose] Particle 100:", [originalPositions[300], originalPositions[301], originalPositions[302]]);
+        }
+
+        modelLoaded = true;
+        console.log("[ThreeRose] Model loaded and particles sampled");
       })
       .catch((err) => {
-        console.error("[ThreeRose] Failed to load OBJ:", err);
+        console.error("[ThreeRose] Failed to load GLB:", err);
       });
 
-    // ── 绽放动画 ──────────────────────────────────────────
-    const TOTAL_DUR = 3200;
+    // 动画
+    const PARTICLE_PHASE = 1500;
+    const TRANSITION_DUR = 2500;
     let t0: number | null = null;
 
-    const easeOutBack = (t: number, overshoot = 1.2): number => {
-      const c1 = overshoot;
-      const c3 = c1 + 1;
-      return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    const easeInOutCubic = (t: number): number => {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     };
 
     let raf: number;
     const animate = (ts: number) => {
       raf = requestAnimationFrame(animate);
+
+      if (!modelLoaded) {
+        controls.update();
+        renderer.render(scene, camera);
+        return;
+      }
+
       if (!t0) t0 = ts;
-      const gT = Math.min((ts - t0) / TOTAL_DUR, 1.0);
+      const elapsed = ts - t0;
 
-      // 1. 花茎先生长 (0.0 -> 0.5)
-      const stemProg = Math.min(1, gT / 0.5);
-      components.stem.scale.set(1, stemProg, 1);
+      // 阶段1: 粒子形态
+      if (elapsed < PARTICLE_PHASE) {
+        particleSystem.visible = true;
+        modelGroup.visible = false;
+        particleMaterial.opacity = 1.0;
 
-      // 2. 叶片和刺在生长过程中出现 (0.2 -> 0.6)
-      const detailProg = Math.max(0, Math.min(1, (gT - 0.2) / 0.4));
-      components.leaves.scale.setScalar(detailProg);
-      components.thorns.scale.setScalar(detailProg);
+        const posAttr = particleGeometry.attributes.position;
+        for (let i = 0; i < particleCount; i++) {
+          const i3 = i * 3;
+          const floatOffset = Math.sin(elapsed * 0.002 + i * 0.05) * 0.015;
+          posAttr.setY(i, originalPositions[i3 + 1] + floatOffset);
+        }
+        posAttr.needsUpdate = true;
+      }
+      // 阶段2: 过渡
+      else if (elapsed < PARTICLE_PHASE + TRANSITION_DUR) {
+        const progress = (elapsed - PARTICLE_PHASE) / TRANSITION_DUR;
+        const ease = easeInOutCubic(progress);
 
-      // 3. 花头绽放 (0.4 -> 1.0)
-      const headRaw = Math.max(0, Math.min(1, (gT - 0.4) / 0.6));
-      const headScale = easeOutBack(headRaw);
-      components.head.scale.setScalar(headScale);
+        particleMaterial.opacity = 1.0 - ease;
+        particleSystem.visible = particleMaterial.opacity > 0.01;
 
-      // 花头缓慢自转
-      components.head.rotation.y = ts * 0.00018 + headRaw * 0.4;
+        modelGroup.visible = true;
+        modelGroup.traverse((child: any) => {
+          if (child.isMesh && child.material) {
+            child.material.transparent = true;
+            child.material.opacity = ease;
+          }
+        });
+
+        const posAttr = particleGeometry.attributes.position;
+        for (let i = 0; i < particleCount; i++) {
+          const i3 = i * 3;
+          const shrink = 1 - ease * 0.2;
+          posAttr.setXYZ(
+            i,
+            originalPositions[i3] * shrink,
+            originalPositions[i3 + 1],
+            originalPositions[i3 + 2] * shrink
+          );
+        }
+        posAttr.needsUpdate = true;
+      }
+      // 阶段3: 模型
+      else {
+        particleSystem.visible = false;
+        modelGroup.visible = true;
+
+        modelGroup.traverse((child: any) => {
+          if (child.isMesh && child.material) {
+            // 保留 transparent=true 以确保材质正确渲染
+          }
+        });
+      }
+
+      if (elapsed > PARTICLE_PHASE) {
+        const rotTime = elapsed - PARTICLE_PHASE;
+        modelGroup.rotation.y = rotTime * 0.0003;
+        particleSystem.rotation.y = rotTime * 0.0003;
+      }
 
       controls.update();
       renderer.render(scene, camera);
     };
     animate(0);
 
-    // ── 响应式 ───────────────────────────────────────────
     const onResize = () => {
       if (!mountRef.current) return;
       const w = mountRef.current.clientWidth;

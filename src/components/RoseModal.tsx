@@ -43,6 +43,8 @@ export default function RoseModal({ isOpen, onClose }: RoseModalProps) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.88 }}
             transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+            // 阻止 3D 交互点击冒泡到背景层，否则无法进行 OrbitControls 操作
+            onClick={(e) => e.stopPropagation()}
             className="relative w-full h-full max-w-4xl max-h-[80vh] flex items-center justify-center cursor-default"
           >
             <ThreeRose isOpen={isOpen} />

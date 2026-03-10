@@ -436,8 +436,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       }
 
       // ── Update F1 Car & Effects ──
-      // Show car as soon as user starts pressing (0%+) or if fully loaded
-      if ((s.isPressing || s.progress >= 100) && f1CarGroup) {
+      // Show car as soon as user starts pressing (0%+) or if progress >= 30% (auto-loading) or fully loaded
+      if ((s.isPressing || s.progress >= 30) && f1CarGroup) {
         if (!f1CarGroup.visible) {
            f1CarGroup.visible = true;
            console.log("[DEBUG] Car visible and approaching");

@@ -26,7 +26,7 @@ import {
   Flag,
   Utensils,
   Music,
-  Flower2
+  Sparkles
 } from 'lucide-react';
 import { ITINERARY_DATA, Location, TYPE_COLORS } from './constants';
 import MapComponent from './components/MapComponent';
@@ -52,7 +52,7 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
     case 'park': return <MapPin className={className} />;
     case 'restaurant': return <Utensils className={className} />;
     case 'citywalk': return <MapIcon className={className} />;
-    case 'spa': return <Flower2 className={className} />;
+    case 'spa': return <Sparkles className={className} />;
     default: return <MapPin className={className} />;
   }
 };
@@ -549,20 +549,11 @@ export default function App() {
           />
         </div>
       </main>
-
-      {/* MV1 Floating Button */}
-      <motion.button
-        initial={{ scale: 0, rotate: -180 }}
-        animate={{ scale: showWelcome ? 0 : 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 1 }}
-        onClick={() => setShowMV1Card(!showMV1Card)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 bg-gradient-to-br from-[#001A30] to-[#E10600] rounded-full shadow-2xl flex items-center justify-center text-[#FFB800] hover:scale-110 active:scale-95 transition-transform border-2 border-[#FFB800]/30 group"
-      >
-        <Trophy size={24} className="group-hover:rotate-12 transition-transform" />
-        <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#E10600] rounded-full flex items-center justify-center text-white text-[10px] font-black border-2 border-white">
-          #1
-        </div>
-      </motion.button>
+{/* MV1 Floating Button - temporarily disabled */}
+{/*
+<motion.button disabled />
+*/}
+      {/* </motion.button> */}
 
       {/* MV1 Info Card Overlay */}
       <AnimatePresence>
