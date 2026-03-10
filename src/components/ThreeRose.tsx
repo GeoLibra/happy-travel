@@ -137,8 +137,8 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // 粒子系统
-    const particleCount = 3000;
+    // 粒子系统 - 优化为点云效果
+    const particleCount = 5000;
     const particleGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const originalPositions = new Float32Array(particleCount * 3);
@@ -151,11 +151,27 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
       positions[i3 + 1] = 1.5;
       positions[i3 + 2] = 0;
 
+      // 更丰富的颜色变化 - 从深红到粉红到金色
       const colorMix = Math.random();
-      colors[i3] = 0.8 + colorMix * 0.2;
-      colors[i3 + 1] = 0.1 + colorMix * 0.3;
-      colors[i3 + 2] = 0.2 + colorMix * 0.3;
-      sizes[i] = 0.08 + Math.random() * 0.12;
+      if (colorMix < 0.6) {
+        // 深红色粒子 (60%)
+        colors[i3] = 0.6 + Math.random() * 0.3;
+        colors[i3 + 1] = 0.05 + Math.random() * 0.1;
+        colors[i3 + 2] = 0.1 + Math.random() * 0.15;
+      } else if (colorMix < 0.85) {
+        // 粉红色粒子 (25%)
+        colors[i3] = 0.9 + Math.random() * 0.1;
+        colors[i3 + 1] = 0.3 + Math.random() * 0.2;
+        colors[i3 + 2] = 0.4 + Math.random() * 0.2;
+      } else {
+        // 金色/橙色粒子 (15%)
+        colors[i3] = 0.95 + Math.random() * 0.05;
+        colors[i3 + 1] = 0.5 + Math.random() * 0.3;
+        colors[i3 + 2] = 0.2 + Math.random() * 0.2;
+      }
+
+      // 更多样化的粒子大小
+      sizes[i] = 0.02 + Math.random() * 0.08;
     }
 
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -163,17 +179,18 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
     particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
     const particleMaterial = new THREE.PointsMaterial({
-      size: 0.15,
+      size: 0.05,
       vertexColors: true,
       transparent: true,
-      opacity: 1.0,
-      blending: THREE.AdditiveBlending,
+      opacity: 0.85,
+      blending: THREE.NormalBlending, // 改为正常混合，避免过度发光
       depthWrite: false,
+      depthTest: true, // 启用深度测试，增加空间感
       sizeAttenuation: true
     });
 
     const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-    particleSystem.visible = false; // 先隐藏粒子，调试模型位置
+    particleSystem.visible = true;
     scene.add(particleSystem);
 
     const modelGroup = new THREE.Group();
@@ -281,7 +298,8 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
 
               mesh.localToWorld(localPos);
 
-              const offset = 0.08;
+              // 增加随机偏移，让粒子更分散，形成点云效果
+              const offset = 0.15 + Math.random() * 0.1;
               localPos.x += (Math.random() - 0.5) * offset;
               localPos.y += (Math.random() - 0.5) * offset;
               localPos.z += (Math.random() - 0.5) * offset;
@@ -334,15 +352,32 @@ export default function ThreeRose({ isOpen }: ThreeRoseProps) {
       if (elapsed < PARTICLE_PHASE) {
         particleSystem.visible = true;
         modelGroup.visible = false;
-        particleMaterial.opacity = 1.0;
+        particleMaterial.opacity = 0.85;
 
         const posAttr = particleGeometry.attributes.position;
+        const sizeAttr = particleGeometry.attributes.size;
+
         for (let i = 0; i < particleCount; i++) {
           const i3 = i * 3;
-          const floatOffset = Math.sin(elapsed * 0.002 + i * 0.05) * 0.015;
-          posAttr.setY(i, originalPositions[i3 + 1] + floatOffset);
+          // 更自然的浮动效果
+          const floatOffset = Math.sin(elapsed * 0.001 + i * 0.1) * 0.02;
+          const driftX = Math.cos(elapsed * 0.0008 + i * 0.15) * 0.01;
+          const driftZ = Math.sin(elapsed * 0.0007 + i * 0.12) * 0.01;
+
+          posAttr.setXYZ(
+            i,
+            originalPositions[i3] + driftX,
+            originalPositions[i3 + 1] + floatOffset,
+            originalPositions[i3 + 2] + driftZ
+          );
+
+          // 粒子大小微妙变化
+          const baseSz = sizeAttr.getX(i);
+          const pulse = 1 + Math.sin(elapsed * 0.003 + i * 0.2) * 0.15;
+          sizeAttr.setX(i, baseSz * pulse);
         }
         posAttr.needsUpdate = true;
+        sizeAttr.needsUpdate = true;
       }
       // 阶段2: 过渡
       else if (elapsed < PARTICLE_PHASE + TRANSITION_DUR) {
