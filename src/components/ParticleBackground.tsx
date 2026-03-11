@@ -22,7 +22,7 @@ const COLORS = {
 };
 
 const SPEED_LINE_COUNT = 100;
-const CPU_PARTICLE_COUNT = 3000;
+const CPU_PARTICLE_COUNT = 1000;
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel, onCarClick }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -89,7 +89,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     const pixelRatio = Math.min(window.devicePixelRatio, 2);
     renderer.setPixelRatio(pixelRatio);
     stateRef.current.baseUniforms.uPixelRatio.value = pixelRatio;
-    
+
     // We will render bgScene first, then scene on top without clearing
     renderer.autoClear = false;
 
@@ -125,12 +125,12 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         const i3 = i * 3;
         pPositions[i3] = (Math.random() - 0.5) * 200;
         pPositions[i3 + 1] = (Math.random() - 0.5) * 150;
-        pPositions[i3 + 2] = (Math.random() - 0.5) * 150;
+        pPositions[i3 + 2] = (Math.random() - 0.5) * 160;
 
         const c = colorOptions[Math.floor(Math.random() * colorOptions.length)];
         pColors[i3] = c.r; pColors[i3 + 1] = c.g; pColors[i3 + 2] = c.b;
 
-        pSizes[i] = Math.random() * 3.5 + 1.0;
+        pSizes[i] = Math.random() * 2.5 + 0.5;
         particlePhases[i] = Math.random() * Math.PI * 2;
       }
 
@@ -154,8 +154,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             vColor = color;
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
             float dist = length(mvPosition.xyz);
-            vAlpha = smoothstep(250.0, 30.0, dist) * 0.9;
-            gl_PointSize = size * uPixelRatio * (150.0 / dist);
+          vAlpha = smoothstep(80.0, 20.0, dist) * 0.8;
+            gl_PointSize = size * uPixelRatio * (50.0 / -mvPosition.z);
             gl_Position = projectionMatrix * mvPosition;
           }
         `,
@@ -165,7 +165,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
           void main() {
             float d = length(gl_PointCoord - vec2(0.5));
             if (d > 0.5) discard;
-            gl_FragColor = vec4(vColor, vec3(pow(1.0 - smoothstep(0.0, 0.5, d), 1.2)) * vAlpha * 1.5);
+            gl_FragColor = vec4(vColor, vec3(pow(1.0 - smoothstep(0.0, 0.5, d), 1.5)) * vAlpha);
           }
         `,
         transparent: true,
@@ -286,11 +286,11 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     const HAIRLINE_COUNT = 3000; // Extremely dense to form a solid road
     const SIDE_LINE_COUNT = 400; // Vertical lines on the edges
     const TOTAL_LINES = HAIRLINE_COUNT + SIDE_LINE_COUNT;
-    
+
     // Base geometry: simple thin plane. We will scale it in instanceMatrix.
     const hairGeo = new THREE.PlaneGeometry(1, 1);
     // Move pivot to front edge so they scale from camera outwards nicely
-    hairGeo.translate(0, 0, -0.5); 
+    hairGeo.translate(0, 0, -0.5);
 
     const hairMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
@@ -302,16 +302,16 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     });
 
     const hairMesh = new THREE.InstancedMesh(hairGeo, hairMat, TOTAL_LINES);
-    
+
     // The road needs to stay locked to the car's bottom, no matter the progress
-    hairMesh.position.y = -10.05; 
-    
+    hairMesh.position.y = -10.05;
+
     const hairData: { x: number, y: number, z: number, speedMultiplier: number, length: number, width: number, isVertical: boolean }[] = [];
     const dummyHair = new THREE.Object3D();
 
     for (let i = 0; i < TOTAL_LINES; i++) {
         const isVertical = i >= HAIRLINE_COUNT;
-        
+
         let x, y, z;
         let c: THREE.Color;
         const rng = Math.random();
@@ -322,7 +322,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             const xDist = (Math.pow(Math.random(), 3.0) * 45);
             x = Math.random() < 0.5 ? xDist : -xDist;
             y = 0; // Flat on the road
-            
+
             // Strict color matching based on the reference image
             if (Math.abs(x) < 4) {
                  // Center track: Bright exhaust lines. Mostly fine white, some bright blue/purple hues
@@ -344,8 +344,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             x = Math.random() < 0.5 ? wallCurveX : -wallCurveX;
             // Curve up into the sky. The further out (X), the higher (Y)
             const curveFactor = Math.abs(x) - 30; // 0 to 25
-            y = Math.pow(Math.random(), 2.0) * (curveFactor * 8); 
-            
+            y = Math.pow(Math.random(), 2.0) * (curveFactor * 8);
+
             if (x < 0) {
                  // Left wall: deep blue
                  c = new THREE.Color().lerpColors(new THREE.Color('#0055ff'), new THREE.Color('#001155'), y/200);
@@ -360,7 +360,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         // Variance
         // Very long lines to create continuous feel without gaps
         const length = 100 + Math.random() * 300;
-        
+
         // Fine hairlines: mostly very thin, rarely thick
         let width;
         if (!isVertical && Math.abs(x) < 3 && rng > 0.98) {
@@ -368,15 +368,15 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         } else {
              width = 0.05 + Math.random() * 0.4;
         }
-        
+
         const speedMultiplier = 0.5 + Math.random() * 0.8;
 
         // Apply
         dummyHair.position.set(x, y, z);
-        
+
         // ALL lines point straight forward along the Z axis (parallel to the ground)!
         dummyHair.rotation.set(-Math.PI / 2, 0, 0);
-        
+
         // If it's a wall line, we tilt its face towards the camera (rotating around its roll axis, which is now World Z)
         if (isVertical) {
              const faceAngle = Math.atan2(y + 10, Math.abs(x));
@@ -500,7 +500,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         if (!controls.enabled) {
           controls.enabled = true;
           // Set target to the fixed ground zero instead of the car group, which drifts
-          controls.target.set(0, 0, 0); 
+          controls.target.set(0, 0, 0);
         }
         controls.update();
       } else {
@@ -531,24 +531,24 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
           } else {
             // 默认漂浮状态 (0% 和 100%)
-            dx = Math.sin(time * 0.3 + particlePhases[i]) * 0.02;
-            dy = Math.cos(time * 0.2 + particlePhases[i] * 1.3) * 0.015;
-            dz = 0.3;
+            dx = Math.sin(time * 0.3 + particlePhases[i]) * 0.04;
+            dy = Math.cos(time * 0.2 + particlePhases[i] * 1.3) * 0.03;
+            dz = 0.5;
           }
 
           pArr[i3] += dx; pArr[i3 + 1] += dy; pArr[i3 + 2] += dz;
 
-          // 边界重置（只在正常漂浮状态下，修复之前 100% 不重置导致消失的 bug）
-          if (s.progress === 0 || s.progress >= 100) {
-            if (pArr[i3] < -100) pArr[i3] = 100;
-            if (pArr[i3] > 100) pArr[i3] = -100;
-            if (pArr[i3 + 1] < -75) pArr[i3 + 1] = 75;
-            if (pArr[i3 + 1] > 75) pArr[i3 + 1] = -75;
-            if (pArr[i3 + 2] > 100) {
-              pArr[i3 + 2] = -250;
-              pArr[i3] = (Math.random() - 0.5) * 300;
-              pArr[i3 + 1] = (Math.random() - 0.5) * 200;
-            }
+          // 边界重置：始终活跃，保证无论是在吸入中心还是漂浮时都不消失
+          if (pArr[i3] < -200) pArr[i3] = 200;
+          if (pArr[i3] > 200) pArr[i3] = -200;
+          if (pArr[i3 + 1] < -150) pArr[i3 + 1] = 150;
+          if (pArr[i3 + 1] > 150) pArr[i3 + 1] = -150;
+
+          // Z轴动态循环：确保粒子永远在可见范围内循环
+          if (pArr[i3 + 2] > 100) {
+            pArr[i3 + 2] = -300;
+          } else if (pArr[i3 + 2] < -300) {
+            pArr[i3 + 2] = 100;
           }
         }
         cpuParticles.geometry.attributes.position.needsUpdate = true;
@@ -571,7 +571,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         const targetZ = -150 + (progressFactor * 150);
         f1CarGroup.position.z += (targetZ - f1CarGroup.position.z) * 0.1;
         f1CarGroup.position.x = 0; // Stay centered
-        // Keep car strictly planted on the road at y = -10 at all times, 
+        // Keep car strictly planted on the road at y = -10 at all times,
         // with just a tiny engine vibration vibration. No progressive lifting!
         f1CarGroup.position.y = -10 + Math.sin(time * 15) * 0.05;
 
@@ -604,7 +604,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       }
 
       // ── Update Hairline Road & Speed Lines Fading ──
-      
+
       // Calculate smooth fade in/out based on progress
       // Fade in quickly from 0 to 5. Fade out smoothly from 80 to 100.
       let trackOpacity = 0;
@@ -615,14 +615,14 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       } else if (s.progress > 80 && s.progress <= 100) {
           trackOpacity = 1.0 - ((s.progress - 80) / 20); // 1 to 0
       }
-      
+
       // We no longer toggle visibility, we use smooth opacity so they fade out naturally
       hairMat.opacity = trackOpacity * 0.9; // 0.9 is the base max opacity
       lineMaterial.uniforms.uOpacity.value = trackOpacity;
 
       // Accelerate rapidly if pressing OR if progress is auto-completing (s.progress >= 30)
       const isTunnelMovingInward = s.isPressing || (s.progress >= 30 && s.progress < 100);
-      
+
       const baseSpeed = 4.0;
 
       // Only update positions if they are actually visible (optimization)
@@ -634,7 +634,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
                 // Accelerating inwards!
                 const accel = 1.0 + Math.pow(s.progress / 100, 2) * 12.0;
                 data.z -= baseSpeed * data.speedMultiplier * accel * 3.0;
-                
+
                 if (data.z < -600) {
                     data.z = 150 + Math.random() * 100; // spawn in front
                 }
@@ -648,13 +648,13 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             }
 
             dummyHair.position.set(data.x, data.y, data.z);
-            
+
             dummyHair.rotation.set(-Math.PI / 2, 0, 0);
             if (data.isVertical) {
                const faceAngle = Math.atan2(data.y + 10, Math.abs(data.x));
                dummyHair.rotateY(data.x < 0 ? -faceAngle : faceAngle);
             }
-            
+
             dummyHair.scale.set(data.width, data.length, 1);
             dummyHair.updateMatrix();
             hairMesh.setMatrixAt(i, dummyHair.matrix);
