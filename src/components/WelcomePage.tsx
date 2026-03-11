@@ -57,12 +57,27 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   useEffect(() => {
     setMounted(true);
 
-    loadModelWithCache('/models/red_bull_f1.glb', (p) => {
-      setModelProgress(p);
-    }).then((gltf) => {
-      setLoadedModel(gltf.scene);
+    let carProg = 0;
+    let roseProg = 0;
+
+    const updateCombinedProgress = () => {
+      setModelProgress(Math.round((carProg + roseProg) / 2));
+    };
+
+    Promise.all([
+      loadModelWithCache('/models/red_bull_f1.glb', (p) => {
+        carProg = p;
+        updateCombinedProgress();
+      }),
+      loadModelWithCache('/models/rose.glb', (p) => {
+        roseProg = p;
+        updateCombinedProgress();
+      })
+    ]).then(([carGltf]) => {
+      setLoadedModel(carGltf.scene);
       setTimeout(() => setModelLoading(false), 500);
-    }).catch(() => {
+    }).catch((err) => {
+      console.error("[WelcomePage] Model preloading failed:", err);
       setModelLoading(false);
     });
 

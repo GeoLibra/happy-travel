@@ -1,63 +1,11 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
-import localforage from "localforage";
-
-localforage.config({
-  name: "happy-travel",
-  storeName: "models",
-});
+import { loadModelWithCache } from "../lib/model-loader";
 
 const MODEL_URL = "/models/rose.glb";
 
-async function loadGltfWithCache(
-  url: string,
-  onProgress?: (p: number) => void
-): Promise<any> {
-  const loader = new GLTFLoader();
 
-  const cached = await localforage.getItem<ArrayBuffer>(url);
-  if (cached) {
-    console.log("[ThreeRose] GLB loaded from cache");
-    onProgress?.(100);
-    return new Promise((resolve, reject) => {
-      loader.parse(cached, "", resolve, reject);
-    });
-  }
-
-  console.log("[ThreeRose] Fetching GLB from server");
-  const response = await fetch(url);
-  if (!response.body) throw new Error("Response body is null");
-
-  const contentLength = response.headers.get("Content-Length");
-  const total = contentLength ? parseInt(contentLength, 10) : 0;
-  let loaded = 0;
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    loaded += value.length;
-    if (total > 0) onProgress?.(Math.round((loaded / total) * 100));
-  }
-
-  const merged = new Uint8Array(loaded);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.length;
-  }
-  const buffer = merged.buffer;
-
-  await localforage.setItem(url, buffer);
-  return new Promise((resolve, reject) => {
-    loader.parse(buffer, "", resolve, reject);
-  });
-}
 
 // 用 Canvas 动态生成一个发光圆点贴图
 const createGlowTexture = () => {
@@ -194,7 +142,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
     let modelLoaded = false;
     let cancelled = false;
 
-    loadGltfWithCache(MODEL_URL).then((gltf) => {
+    loadModelWithCache(MODEL_URL).then((gltf) => {
       if (cancelled) return;
       const model = gltf.scene;
 
