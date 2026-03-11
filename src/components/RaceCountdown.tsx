@@ -90,7 +90,7 @@ const RaceCountdown: React.FC = () => {
             context.arc(
               x + j * CELL + RADIUS_L,
               y + i * CELL + RADIUS_L,
-              RADIUS,
+              curRadius,
               0,
               2 * Math.PI
             );
@@ -129,10 +129,9 @@ const RaceCountdown: React.FC = () => {
     // Enhanced 1D height map for better stacking collision
     const columnHeights = new Map<number, number>();
 
-    const updateParticles = () => {
+    const updateParticles = (FLOOR: number) => {
       const pArr = particlesRef.current;
       columnHeights.clear();
-      const FLOOR = window.innerHeight;
 
       // First pass: Build the height map of already settled particles
       // Use finer column resolution for better stacking
@@ -189,7 +188,7 @@ const RaceCountdown: React.FC = () => {
       // Remove particles off-screen
       let cnt = 0;
       for (let i = 0; i < pArr.length; i++) {
-        if (pArr[i].x + curRadius > 0 && pArr[i].x - curRadius < window.innerWidth) {
+        if (pArr[i].x + curRadius > 0 && pArr[i].x - curRadius < window.innerWidth && pArr[i].y < FLOOR + 200) {
           pArr[cnt++] = pArr[i];
         }
       }
@@ -284,22 +283,19 @@ const RaceCountdown: React.FC = () => {
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
       const rect = wrapper.getBoundingClientRect();
-      const isLandscape = window.innerWidth > window.innerHeight;
-      // Simpler positioning - just based on wrapper position
-      const MARGIN_TOP = rect.top + 5;
       const CANVAS_W = rect.width;
 
       const time = getRemainingTime();
       const hasDays = time.d > 0;
       const dDigits = time.d >= 100 ? 3 : 2;
 
-      // Make responsive to container width
+      // Make responsive to container width accurately
       const availableWidth = CANVAS_W - 20;
       const baseTotalWidth = hasDays ? (dDigits === 3 ? 368 : 336) : 244;
       const scale = availableWidth / (baseTotalWidth * 1.25);
 
       if (scale < 1) {
-         curRadius = Math.max(0.2, (5 * scale / 2) - 1);
+         curRadius = Math.max(0.7, (5 * scale / 2) - 1.0);
       } else {
          curRadius = RADIUS;
       }
@@ -310,6 +306,17 @@ const RaceCountdown: React.FC = () => {
       COLON_W = 4 * CELL;
       DIGIT_GAP = 1 * CELL;
       UNIT_GAP = 2 * CELL;
+      
+      const digitHeight = 10 * CELL;
+      const PADDING_TOP = 15;
+      const MARGIN_TOP = rect.top + PADDING_TOP;
+      const FLOOR = window.innerHeight; 
+      
+      const expectedHeight = digitHeight + PADDING_TOP + 35; // 35 allows space for labels at the bottom
+      const newHeightStr = `${Math.round(expectedHeight)}px`;
+      if (wrapper.style.height !== newHeightStr) {
+         wrapper.style.height = newHeightStr;
+      }
 
       // Calculate dynamic left offset to center the text
       const daysWidth = hasDays ? (dDigits * DIGIT_W + (dDigits - 1) * DIGIT_GAP) : 0;
@@ -320,7 +327,7 @@ const RaceCountdown: React.FC = () => {
       const numDigitPairs = 3; // Hrs, Mins, Secs
 
       const totalWidth = daysWidth + (hasDays ? blockGap : 0) + (numBlocksGap * blockGap) + (numDigitPairs * twoDigitWidth) - blockGap;
-      const dynamicMarginLeft = isLandscape ? rect.left + Math.max(0, Math.round((rect.width - totalWidth) / 2)) : Math.max(0, Math.round((window.innerWidth - totalWidth) / 2));
+      const dynamicMarginLeft = rect.left + Math.max(0, Math.round((rect.width - totalWidth) / 2));
 
       // Initial check skip hook
       if (currentSecondsRef.current !== -1) {
@@ -374,15 +381,15 @@ const RaceCountdown: React.FC = () => {
       curX += DIGIT_W + DIGIT_GAP;
       renderDigit(curX, MARGIN_TOP, time.s % 10, ctx);
 
-      updateParticles();
+      updateParticles(FLOOR);
       renderParticles(ctx);
 
       // Draw Labels below digits
       ctx.fillStyle = "#94a3b8";
-      ctx.font = "800 13px 'Inter', sans-serif";
+      ctx.font = "800 11px 'Inter', sans-serif";
       ctx.textAlign = "center";
 
-      const labelY = MARGIN_TOP + 65;
+      const labelY = MARGIN_TOP + digitHeight + 15;
 
       let cx = dynamicMarginLeft;
       if (hasDays) {
@@ -430,7 +437,8 @@ const RaceCountdown: React.FC = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="w-full h-[100px] flex justify-center -mt-2 -mb-2 relative"
+      style={{ minHeight: '60px' }}
+      className="w-full flex justify-center relative touch-none"
     >
       <canvas
          ref={canvasRef}
