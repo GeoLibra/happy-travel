@@ -5,7 +5,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import localforage from "localforage";
 
 localforage.config({
-  name: "happy-travel-3d-cache",
+  name: "happy-travel",
   storeName: "models",
 });
 

@@ -4,7 +4,7 @@ import localforage from 'localforage';
 
 // Configure localforage
 localforage.config({
-  name: 'happy-travel-3d-cache',
+  name: 'happy-travel',
   storeName: 'models'
 });
 
