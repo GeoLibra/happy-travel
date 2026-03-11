@@ -308,11 +308,13 @@ const RaceCountdown: React.FC = () => {
       UNIT_GAP = 2 * CELL;
       
       const digitHeight = 10 * CELL;
-      const PADDING_TOP = 12;
-      const MARGIN_TOP = rect.top + PADDING_TOP;
-      const FLOOR = window.innerHeight; 
       
-      const expectedHeight = digitHeight + PADDING_TOP + 25; // 25 allows space for labels at the bottom
+      const contentHeight = digitHeight + 25; // 25 for labels at the bottom
+      const expectedHeight = contentHeight + 40; // Total 40px natural vertical slack room
+
+      // Dynamically perfect vertical center
+      const MARGIN_TOP = rect.top + Math.max(10, (expectedHeight - contentHeight) / 2);
+      const FLOOR = window.innerHeight; 
       const newHeightStr = `${Math.round(expectedHeight)}px`;
       if (wrapper.style.height !== newHeightStr) {
          wrapper.style.height = newHeightStr;
