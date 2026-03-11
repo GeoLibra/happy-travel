@@ -22,7 +22,7 @@ const COLORS = {
 };
 
 const SPEED_LINE_COUNT = 100;
-const CPU_PARTICLE_COUNT = 3000;
+const CPU_PARTICLE_COUNT = 500;
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel, onCarClick }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -130,7 +130,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         const c = colorOptions[Math.floor(Math.random() * colorOptions.length)];
         pColors[i3] = c.r; pColors[i3 + 1] = c.g; pColors[i3 + 2] = c.b;
 
-        pSizes[i] = Math.random() * 3.5 + 1.0;
+        pSizes[i] = Math.random() * 2.5 + 0.5;
         particlePhases[i] = Math.random() * Math.PI * 2;
       }
 
@@ -154,8 +154,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             vColor = color;
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
             float dist = length(mvPosition.xyz);
-            vAlpha = smoothstep(250.0, 30.0, dist) * 0.9;
-            gl_PointSize = size * uPixelRatio * (150.0 / dist);
+            vAlpha = smoothstep(80.0, 20.0, dist) * 0.8;
+            gl_PointSize = size * uPixelRatio * (50.0 / -mvPosition.z);
             gl_Position = projectionMatrix * mvPosition;
           }
         `,
@@ -165,7 +165,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
           void main() {
             float d = length(gl_PointCoord - vec2(0.5));
             if (d > 0.5) discard;
-            gl_FragColor = vec4(vColor, vec3(pow(1.0 - smoothstep(0.0, 0.5, d), 1.2)) * vAlpha * 1.5);
+            gl_FragColor = vec4(vColor, vec3(pow(1.0 - smoothstep(0.0, 0.5, d), 1.5)) * vAlpha);
           }
         `,
         transparent: true,
@@ -533,7 +533,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             // 默认漂浮状态 (0% 和 100%)
             dx = Math.sin(time * 0.3 + particlePhases[i]) * 0.02;
             dy = Math.cos(time * 0.2 + particlePhases[i] * 1.3) * 0.015;
-            dz = 0.3;
+            dz = 0.5;
           }
 
           pArr[i3] += dx; pArr[i3 + 1] += dy; pArr[i3 + 2] += dz;
@@ -544,10 +544,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             if (pArr[i3] > 100) pArr[i3] = -100;
             if (pArr[i3 + 1] < -75) pArr[i3 + 1] = 75;
             if (pArr[i3 + 1] > 75) pArr[i3 + 1] = -75;
-            if (pArr[i3 + 2] > 100) {
-              pArr[i3 + 2] = -250;
-              pArr[i3] = (Math.random() - 0.5) * 300;
-              pArr[i3 + 1] = (Math.random() - 0.5) * 200;
+            if (pArr[i3 + 2] > 80) {
+              pArr[i3 + 2] = -80;
+              pArr[i3] = (Math.random() - 0.5) * 200;
+              pArr[i3 + 1] = (Math.random() - 0.5) * 150;
             }
           }
         }
