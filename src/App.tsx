@@ -307,7 +307,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 h-[calc(100vh-88px)]">
         {/* Left Column: Itinerary */}
         <div className={cn(
-          "md:col-span-5 lg:col-span-4 flex flex-col gap-6 overflow-y-scroll overflow-x-hidden custom-scrollbar pr-4 pb-4 relative z-10 overscroll-none touch-pan-y",
+          "md:col-span-5 lg:col-span-4 flex flex-col gap-6 overflow-y-scroll overflow-x-hidden custom-scrollbar pr-4 pb-24 md:pb-12 relative z-10 overscroll-none touch-pan-y",
           viewMode === 'map' && "hidden md:flex"
         )}>
           {/* Prominent Image Highlight */}
@@ -327,8 +327,7 @@ export default function App() {
 
           {!showWelcome && <RaceCountdown />}
 
-          {/* Spacer for countdown */}
-          <div className="h-[10px] shrink-0" />
+          {/* Day Selector with Swipe Support */}
           {/* Day Selector with Swipe Support */}
           <motion.div
             drag="x"

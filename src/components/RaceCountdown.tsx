@@ -308,11 +308,11 @@ const RaceCountdown: React.FC = () => {
       UNIT_GAP = 2 * CELL;
       
       const digitHeight = 10 * CELL;
-      const PADDING_TOP = 15;
+      const PADDING_TOP = 12;
       const MARGIN_TOP = rect.top + PADDING_TOP;
       const FLOOR = window.innerHeight; 
       
-      const expectedHeight = digitHeight + PADDING_TOP + 35; // 35 allows space for labels at the bottom
+      const expectedHeight = digitHeight + PADDING_TOP + 25; // 25 allows space for labels at the bottom
       const newHeightStr = `${Math.round(expectedHeight)}px`;
       if (wrapper.style.height !== newHeightStr) {
          wrapper.style.height = newHeightStr;
@@ -389,7 +389,7 @@ const RaceCountdown: React.FC = () => {
       ctx.font = "800 11px 'Inter', sans-serif";
       ctx.textAlign = "center";
 
-      const labelY = MARGIN_TOP + digitHeight + 15;
+      const labelY = MARGIN_TOP + digitHeight + 12;
 
       let cx = dynamicMarginLeft;
       if (hasDays) {
