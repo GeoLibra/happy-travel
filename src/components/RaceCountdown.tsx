@@ -6,7 +6,7 @@ import { digit } from './digit';
 const TARGET_DATE = new Date('2026-03-15T15:00:00+08:00').getTime();
 const RADIUS = 2.0; // Particle radius (increased for better stacking visibility)
 const COLORS = ["#33B5E5", "#0099CC", "#AA66CC", "#9933CC", "#99CC00", "#669900", "#FFBB33", "#FF8800", "#FF4444", "#CC0000"];
-const MAX_PARTICLES = 2000; // Cap to prevent lag from floor accumulation
+const MAX_PARTICLES = 12000; // Massively increased from 2000 to allow infinite floor accumulation without disappearing
 
 interface Particle {
   x: number;
