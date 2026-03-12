@@ -5,6 +5,7 @@ import { GodRays } from './effects/godRays';
 import { AudioVisualizer } from './effects/audioVisualizer';
 import { DEFAULT_FORCE_FIELD_PARAMS } from './effects/forceField';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { HologramShaderUniforms, applyHologramMaterial, revertHologramMaterial } from './hologram/HologramEffect';
 
 interface ParticleBackgroundProps {
   isPressing: boolean;
@@ -191,6 +192,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
     // ── F1 Car 3D Model Integration ──
     let f1CarGroup: THREE.Group | null = null;
+    let isCarMaterialReplaced = false;
 
     // We'll check for modelRef.current dynamically in the animate loop to support late arrivals
     const checkModelInjection = () => {
@@ -201,19 +203,9 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         f1CarGroup.position.set(0, -10, -150); // Start deep in the screen
         f1CarGroup.visible = false;
 
-
-
-        f1CarGroup.traverse((child) => {
-          if ((child as THREE.Mesh).isMesh) {
-            const mesh = child as THREE.Mesh;
-            const mat = mesh.material as THREE.MeshStandardMaterial;
-            if (mat) {
-              mat.metalness = 0.8;
-              mat.roughness = 0.2;
-              mat.envMapIntensity = 1.0;
-            }
-          }
-        });
+        if (!isCarMaterialReplaced) {
+            isCarMaterialReplaced = applyHologramMaterial(f1CarGroup);
+        }
 
         scene.add(f1CarGroup);
 
@@ -221,8 +213,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         if (renderer && scene && camera) {
           renderer.compile(scene, camera);
         }
-
-
       }
     };
 
@@ -489,6 +479,40 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       s.baseUniforms.uIsPressing.value = s.isPressing;
       s.baseUniforms.uProgress.value = s.progress;
       s.baseUniforms.uExplosionForce.value = 0;
+      
+      // Update Hologram/Progress Uniforms
+      // Only animate hologram if progress is 100 (car is fully stopped).
+      // Calculate a local progress from 0 to 1 over a few seconds starting when s.progress hit 100
+      let hologramProgress = 0;
+      if (s.progress >= 100) {
+          // If we just hit 100, record the start time
+          if (s.explosionTime < 0) {
+              s.explosionTime = time;
+          }
+          
+          // Animate hologram covering the car over 4.5 seconds (slower)
+          const animationDuration = 4.5; 
+          hologramProgress = Math.min(1.0, (time - s.explosionTime) / animationDuration);
+          
+          // Revert to original material when fully enveloped
+          if (hologramProgress >= 1.0 && isCarMaterialReplaced && f1CarGroup) {
+              if (revertHologramMaterial(f1CarGroup)) {
+                  isCarMaterialReplaced = false; // Prevents calling it every frame
+              }
+          }
+      } else {
+          s.explosionTime = -1; 
+          // If user lets go before 100%, re-apply the hologram effect next time it shows
+          if (!isCarMaterialReplaced && f1CarGroup) {
+              isCarMaterialReplaced = applyHologramMaterial(f1CarGroup);
+          }
+      }
+      
+      HologramShaderUniforms.uHologramProgress.value = hologramProgress;
+      HologramShaderUniforms.uTime.value = time;
+      if (f1CarGroup) {
+          HologramShaderUniforms.uGroupMatrixInverse.value.copy(f1CarGroup.matrixWorld).invert();
+      }
 
       // ── Camera Mouse Sway or OrbitControls ──
       // The bgCamera (background lines) only responds to mouse sway, NEVER OrbitControls
