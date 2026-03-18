@@ -291,14 +291,11 @@ const RaceCountdown: React.FC = () => {
 
       // Make responsive to container width accurately
       const availableWidth = CANVAS_W - 20;
-      const baseTotalWidth = hasDays ? (dDigits === 3 ? 368 : 336) : 244;
-      const scale = availableWidth / (baseTotalWidth * 1.25);
-
-      if (scale < 1) {
-         curRadius = Math.max(0.7, (5 * scale / 2) - 1.0);
-      } else {
-         curRadius = RADIUS;
-      }
+      const totalCells = hasDays ? (dDigits === 3 ? 92 : 84) : 61;
+      const maxCell = availableWidth / (totalCells * 1.25);
+      const currentCell = Math.min(6.0, maxCell); // 6.0 corresponds to TARGET_RADIUS = 2.0
+      
+      curRadius = Math.max(0.7, (currentCell / 2) - 1.0);
 
       RADIUS_L = curRadius + 1;
       CELL = 2 * RADIUS_L;
@@ -325,10 +322,7 @@ const RaceCountdown: React.FC = () => {
       const twoDigitWidth = 2 * DIGIT_W + DIGIT_GAP;
       const blockGap = UNIT_GAP + COLON_W + UNIT_GAP;
 
-      const numBlocksGap = hasDays ? 3 : 2;
-      const numDigitPairs = 3; // Hrs, Mins, Secs
-
-      const totalWidth = daysWidth + (hasDays ? blockGap : 0) + (numBlocksGap * blockGap) + (numDigitPairs * twoDigitWidth) - blockGap;
+      const totalWidth = totalCells * CELL;
       const dynamicMarginLeft = rect.left + Math.max(0, Math.round((rect.width - totalWidth) / 2));
 
       // Initial check skip hook
