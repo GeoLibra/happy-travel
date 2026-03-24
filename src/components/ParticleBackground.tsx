@@ -283,12 +283,12 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     hairGeo.translate(0, 0, -0.5);
 
     const hairMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.9,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
     });
 
     const hairMesh = new THREE.InstancedMesh(hairGeo, hairMat, TOTAL_LINES);
@@ -443,6 +443,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     });
 
     const speedLines = new THREE.Points(lineGeometry, lineMaterial);
+    speedLines.visible = false; // Hidden initially
     bgScene.add(speedLines);
 
 
@@ -511,6 +512,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       HologramShaderUniforms.uHologramProgress.value = hologramProgress;
       HologramShaderUniforms.uTime.value = time;
       if (f1CarGroup) {
+          f1CarGroup.updateMatrixWorld(); 
           HologramShaderUniforms.uGroupMatrixInverse.value.copy(f1CarGroup.matrixWorld).invert();
       }
 
@@ -641,7 +643,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       }
 
       // We no longer toggle visibility, we use smooth opacity so they fade out naturally
-      hairMat.opacity = trackOpacity * 0.9; // 0.9 is the base max opacity
+      // Update shader uniforms for hairMat
+        
+        
+        hairMat.opacity = trackOpacity * 0.9; // 0.9 is the base max opacity
       lineMaterial.uniforms.uOpacity.value = trackOpacity;
 
       // Accelerate rapidly if pressing OR if progress is auto-completing (s.progress >= 30)
