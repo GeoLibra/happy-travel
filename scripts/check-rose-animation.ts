@@ -16,6 +16,7 @@ import {
   ROSE_PRESENTATION_END_MS,
   ROSE_PRESENTATION_START_MS,
   ROSE_HANDOFF_MS,
+  ROSE_HANDOFF_END_MS,
   ROSE_FINAL_PITCH,
   ROSE_FINAL_SCALE,
   ROSE_INITIAL_YAW,
@@ -29,10 +30,13 @@ const closeTo = (actual: number, expected: number, tolerance = 1e-6) => {
 assert.equal(ROSE_MODEL_URL, "/models/rose.glb?v=1ba2e7a");
 assert.equal(ROSE_ASSEMBLY_MS, 3_000);
 assert.equal(ROSE_HANDOFF_MS, 600);
-assert.equal(ROSE_PRESENTATION_START_MS, 3_600);
+assert.equal(ROSE_HANDOFF_END_MS, 3_600);
+assert.equal(ROSE_PRESENTATION_START_MS, 2_500);
 assert.equal(ROSE_PRESENTATION_END_MS, 5_100);
 assert.equal(ROSE_BLOOM_START_MS, 4_600);
 assert.equal(ROSE_BLOOM_END_MS, 9_600);
+assert.equal(ROSE_ASSEMBLY_MS - ROSE_PRESENTATION_START_MS, 500);
+assert.equal(ROSE_PRESENTATION_END_MS - ROSE_BLOOM_START_MS, 500);
 
 assert.equal(getRoseAssemblyProgress(-10, 0, 0), 0);
 assert.equal(getRoseAssemblyProgress(0, 0, 0), 0);
@@ -49,7 +53,7 @@ assert(getRoseHandoffProgress(3_300) > 0 && getRoseHandoffProgress(3_300) < 1);
 assert.equal(getRoseHandoffProgress(3_600), 1);
 
 closeTo(getRosePresentationYaw(0), ROSE_INITIAL_YAW);
-closeTo(getRosePresentationYaw(3_600), ROSE_INITIAL_YAW);
+closeTo(getRosePresentationYaw(2_500), ROSE_INITIAL_YAW);
 assert(getRosePresentationYaw(4_350) < ROSE_INITIAL_YAW);
 closeTo(getRosePresentationYaw(5_100), 0);
 closeTo(getRosePresentationYaw(9_600), 0);
