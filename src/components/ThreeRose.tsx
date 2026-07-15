@@ -8,8 +8,11 @@ import {
   getRoseArcStrength,
   getRoseAssemblyProgress,
   getRoseBloomDelta,
+  getRoseHandoffProgress,
+  getRosePresentationYaw,
+  ROSE_ASSEMBLY_MS,
+  ROSE_BLOOM_START_MS,
   ROSE_MODEL_URL,
-  ROSE_PARTICLE_PHASE_MS,
 } from "../lib/rose-animation";
 
 
@@ -148,9 +151,10 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
     particleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
     // 使用 AdditiveBlending 和贴图实现发光点云
+    const glowTexture = createGlowTexture();
     const particleMaterial = new THREE.PointsMaterial({
       size: 0.04,
-      map: createGlowTexture(),
+      map: glowTexture,
       vertexColors: true,
       transparent: true,
       opacity: 0.8,
@@ -161,16 +165,22 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
     });
 
     const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-    scene.add(particleSystem);
-
     const modelGroup = new THREE.Group();
     modelGroup.visible = true;
-    scene.add(modelGroup);
+    const presentationGroup = new THREE.Group();
+    scene.add(presentationGroup);
+    presentationGroup.add(particleSystem);
+    presentationGroup.add(modelGroup);
 
     let modelLoaded = false;
     let cancelled = false;
     let model: THREE.Object3D | null = null;
     let roseAnimation: ReturnType<typeof createRoseBloomAction> = null;
+    const materialStates: Array<{
+      material: THREE.Material;
+      opacity: number;
+      transparent: boolean;
+    }> = [];
 
     loadModelWithCache(ROSE_MODEL_URL).then((gltf) => {
       if (cancelled) return;
@@ -202,12 +212,21 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
         model.position.z -= finalCenter.z;
       }
 
-      model.traverse((child: any) => {
-        if (child.isMesh) {
-          if (child.material) {
-            child.material.side = THREE.DoubleSide;
+      const capturedMaterials = new Set<THREE.Material>();
+      model.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((material) => {
+          if (!capturedMaterials.has(material)) {
+            capturedMaterials.add(material);
+            materialStates.push({
+              material,
+              opacity: material.opacity,
+              transparent: material.transparent,
+            });
           }
-        }
+          material.side = THREE.DoubleSide;
+        });
       });
 
       modelGroup.add(model);
@@ -267,14 +286,9 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
       modelLoaded = true;
     });
 
-    const PARTICLE_PHASE = ROSE_PARTICLE_PHASE_MS;
-    const TRANSITION_DUR = 2500;
     let t0: number | null = null;
     let previousFrameTimestamp: number | null = null;
-
-    const easeInOutCubic = (t: number) => {
-      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    };
+    let positionsSnappedToTarget = false;
 
     let raf: number;
     const animate = (ts: number) => {
@@ -297,12 +311,13 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
         roseAnimation.mixer.update(bloomDelta);
       }
 
-      if (elapsed >= PARTICLE_PHASE) {
+      if (elapsed >= ROSE_ASSEMBLY_MS && !positionsSnappedToTarget) {
         positions.set(targetPositions);
         particleGeometry.attributes.position.needsUpdate = true;
+        positionsSnappedToTarget = true;
       }
 
-      if (elapsed < PARTICLE_PHASE) {
+      if (elapsed < ROSE_ASSEMBLY_MS) {
         particleSystem.visible = true;
         modelGroup.visible = false;
         particleMaterial.opacity = 0.8;
@@ -333,28 +348,25 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
         posAttr.needsUpdate = true;
         sizeAttr.needsUpdate = true;
 
-      } else if (elapsed < PARTICLE_PHASE + TRANSITION_DUR) {
-        const progress = (elapsed - PARTICLE_PHASE) / TRANSITION_DUR;
-        const ease = easeInOutCubic(progress);
-
-        particleMaterial.opacity = 0.8 * (1.0 - ease);
-        particleSystem.visible = particleMaterial.opacity > 0.01;
-
+      } else if (elapsed < ROSE_BLOOM_START_MS) {
+        const handoff = getRoseHandoffProgress(elapsed);
+        particleSystem.visible = handoff < 0.99;
+        particleMaterial.opacity = 0.8 * (1 - handoff);
         modelGroup.visible = true;
-        modelGroup.traverse((child: any) => {
-          if (child.isMesh && child.material) {
-            child.material.transparent = true;
-            child.material.opacity = ease;
-          }
+        materialStates.forEach(({ material, opacity }) => {
+          material.transparent = true;
+          material.opacity = opacity * handoff;
         });
-
       } else {
         particleSystem.visible = false;
         modelGroup.visible = true;
+        materialStates.forEach(({ material, opacity, transparent }) => {
+          material.opacity = opacity;
+          material.transparent = transparent;
+        });
       }
 
-      modelGroup.rotation.y = elapsed * 0.0002;
-      particleSystem.rotation.y = elapsed * 0.0002;
+      presentationGroup.rotation.y = getRosePresentationYaw(elapsed);
 
       controls.update();
       renderer.render(scene, camera);
@@ -375,8 +387,16 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
       cancelled = true;
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      controls.dispose();
+      particleGeometry.dispose();
+      particleMaterial.dispose();
+      glowTexture.dispose();
       roseAnimation?.action.stop();
       if (model) roseAnimation?.mixer.uncacheRoot(model);
+      materialStates.forEach(({ material, opacity, transparent }) => {
+        material.opacity = opacity;
+        material.transparent = transparent;
+      });
       renderer.dispose();
       if (mountRef.current?.contains(renderer.domElement)) {
         mountRef.current.removeChild(renderer.domElement);

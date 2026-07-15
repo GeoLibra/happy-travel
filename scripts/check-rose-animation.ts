@@ -72,6 +72,12 @@ assert.match(threeRoseSource, /MeshSurfaceSampler/);
 assert.match(threeRoseSource, /startPositions/);
 assert.match(threeRoseSource, /targetPositions/);
 assert.match(threeRoseSource, /getRoseAssemblyProgress/);
+assert.match(threeRoseSource, /presentationGroup/);
+assert.match(threeRoseSource, /getRoseHandoffProgress/);
+assert.match(threeRoseSource, /getRosePresentationYaw/);
+assert.match(threeRoseSource, /positionsSnappedToTarget/);
+assert.doesNotMatch(threeRoseSource, /ROSE_PARTICLE_PHASE_MS/);
+assert.doesNotMatch(threeRoseSource, /elapsed \* 0\.0002/);
 assert.doesNotMatch(threeRoseSource, /allVertices/);
 
 console.log("PASS: rose assembly, handoff, bloom, and presentation timing verified");

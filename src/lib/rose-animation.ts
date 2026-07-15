@@ -2,8 +2,6 @@ import * as THREE from "three";
 
 export const ROSE_MODEL_URL = "/models/rose.glb?v=1ba2e7a";
 export const ROSE_ASSEMBLY_MS = 3_000;
-// Temporary compatibility for ThreeRose until its timeline migration in Tasks 2–3.
-export const ROSE_PARTICLE_PHASE_MS = ROSE_ASSEMBLY_MS;
 export const ROSE_HANDOFF_MS = 600;
 export const ROSE_BLOOM_DURATION_MS = 4_500;
 export const ROSE_BLOOM_START_MS = ROSE_ASSEMBLY_MS + ROSE_HANDOFF_MS;
