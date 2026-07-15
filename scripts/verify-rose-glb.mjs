@@ -57,13 +57,47 @@ function readScalarAccessor(json, bin, accessorIndex) {
 
   const bufferView = json.bufferViews?.[accessor.bufferView];
   assert(bufferView, `Buffer view ${accessor.bufferView} is missing`);
-  const start = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+  const bufferViewOffset = bufferView.byteOffset ?? 0;
+  const accessorOffset = accessor.byteOffset ?? 0;
+  const bufferViewLength = bufferView.byteLength;
+  const count = accessor.count;
   const stride = bufferView.byteStride ?? Float32Array.BYTES_PER_ELEMENT;
+
+  for (const [label, value] of [
+    ['buffer view byteOffset', bufferViewOffset],
+    ['accessor byteOffset', accessorOffset],
+    ['accessor count', count],
+    ['buffer view byteLength', bufferViewLength],
+  ]) {
+    assert(
+      Number.isSafeInteger(value) && value >= 0,
+      `Accessor ${accessorIndex} ${label} must be a finite nonnegative integer`,
+    );
+  }
+  assert(
+    Number.isSafeInteger(stride) && stride >= Float32Array.BYTES_PER_ELEMENT,
+    `Accessor ${accessorIndex} byte stride must be at least 4`,
+  );
+  assert.equal(
+    stride % Float32Array.BYTES_PER_ELEMENT,
+    0,
+    `Accessor ${accessorIndex} byte stride must be divisible by 4`,
+  );
+
+  const start = bufferViewOffset + accessorOffset;
+  const bufferViewEnd = bufferViewOffset + bufferViewLength;
+  const accessorEnd = count === 0
+    ? start
+    : start + (count - 1) * stride + Float32Array.BYTES_PER_ELEMENT;
+  assert(
+    Number.isSafeInteger(accessorEnd) && accessorEnd <= bufferViewEnd,
+    `Accessor ${accessorIndex} exceeds its buffer view`,
+  );
+  assert(accessorEnd <= bin.length, `Accessor ${accessorIndex} exceeds the BIN chunk`);
   const values = [];
 
-  for (let index = 0; index < accessor.count; index += 1) {
+  for (let index = 0; index < count; index += 1) {
     const valueOffset = start + index * stride;
-    assert(valueOffset + 4 <= bin.length, `Accessor ${accessorIndex} exceeds the BIN chunk`);
     values.push(bin.readFloatLE(valueOffset));
   }
 
@@ -72,8 +106,9 @@ function readScalarAccessor(json, bin, accessorIndex) {
 
 function verifyRoseBloom(filePath) {
   const { json, bin } = readGlb(filePath);
-  const animation = json.animations?.find(({ name }) => name === 'RoseBloom');
-  assert(animation, 'RoseBloom animation is missing');
+  assert.equal(json.animations?.length, 1, 'GLB must contain exactly one animation');
+  const [animation] = json.animations;
+  assert.equal(animation.name, 'RoseBloom', 'The animation must be named RoseBloom');
 
   const targets = animation.channels.map((channel) => ({
     node: json.nodes[channel.target.node]?.name ?? '',

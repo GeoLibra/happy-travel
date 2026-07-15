@@ -7,6 +7,7 @@ import bgImage from '../img/IMG_9596.jpg';
 import f1EngineSound from '../audio/f1-engine.mp3';
 import ParticleBackground from './ParticleBackground';
 import { loadModelWithCache } from '../lib/model-loader';
+import { ROSE_MODEL_URL } from '../lib/rose-animation';
 
 const StartLights = ({ progress, isPressing }: { progress: number, isPressing: boolean }) => {
   if (!isPressing && progress === 0) return null;
@@ -69,7 +70,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
         carProg = p;
         updateCombinedProgress();
       }),
-      loadModelWithCache('/models/rose.glb', (p) => {
+      loadModelWithCache(ROSE_MODEL_URL, (p) => {
         roseProg = p;
         updateCombinedProgress();
       })

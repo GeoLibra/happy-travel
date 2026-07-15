@@ -2,9 +2,12 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { loadModelWithCache } from "../lib/model-loader";
-import { createRoseBloomAction } from "../lib/rose-animation";
-
-const MODEL_URL = "/models/rose.glb";
+import {
+  createRoseBloomAction,
+  getRoseBloomDelta,
+  ROSE_MODEL_URL,
+  ROSE_PARTICLE_PHASE_MS,
+} from "../lib/rose-animation";
 
 
 
@@ -60,7 +63,6 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
     if (!mountRef.current) return;
 
     const scene = new THREE.Scene();
-    const clock = new THREE.Clock();
     // 移除 Fog 以保证背景彻底透明
     // scene.fog = new THREE.Fog(0x000000, 5, 25);
 
@@ -150,7 +152,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
     let model: THREE.Object3D | null = null;
     let roseAnimation: ReturnType<typeof createRoseBloomAction> = null;
 
-    loadModelWithCache(MODEL_URL).then((gltf) => {
+    loadModelWithCache(ROSE_MODEL_URL).then((gltf) => {
       if (cancelled) return;
       model = gltf.scene;
 
@@ -235,9 +237,10 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
       modelLoaded = true;
     });
 
-    const PARTICLE_PHASE = 2500;
+    const PARTICLE_PHASE = ROSE_PARTICLE_PHASE_MS;
     const TRANSITION_DUR = 2500;
     let t0: number | null = null;
+    let previousFrameTimestamp: number | null = null;
 
     const easeInOutCubic = (t: number) => {
       return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -246,8 +249,10 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
     let raf: number;
     const animate = (ts: number) => {
       raf = requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), 0.1);
-      roseAnimation?.mixer.update(delta);
+      const frameDelta = previousFrameTimestamp === null
+        ? 0
+        : Math.min(Math.max((ts - previousFrameTimestamp) / 1_000, 0), 0.1);
+      previousFrameTimestamp = ts;
 
       if (!modelLoaded) {
         controls.update();
@@ -255,8 +260,12 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
         return;
       }
 
-      if (!t0) t0 = ts;
+      if (t0 === null) t0 = ts;
       const elapsed = ts - t0;
+      const bloomDelta = getRoseBloomDelta(elapsed, frameDelta);
+      if (roseAnimation && bloomDelta > 0) {
+        roseAnimation.mixer.update(bloomDelta);
+      }
 
       if (elapsed < PARTICLE_PHASE) {
         particleSystem.visible = true;
@@ -312,7 +321,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
       controls.update();
       renderer.render(scene, camera);
     };
-    animate(0);
+    raf = requestAnimationFrame(animate);
 
     const onResize = () => {
       if (!mountRef.current) return;
