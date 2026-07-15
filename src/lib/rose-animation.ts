@@ -7,6 +7,7 @@ export const ROSE_BLOOM_DURATION_MS = 4_500;
 export const ROSE_BLOOM_START_MS = ROSE_ASSEMBLY_MS + ROSE_HANDOFF_MS;
 export const ROSE_BLOOM_END_MS = ROSE_BLOOM_START_MS + ROSE_BLOOM_DURATION_MS;
 export const ROSE_INITIAL_YAW = THREE.MathUtils.degToRad(35);
+export const ROSE_FINAL_PITCH = THREE.MathUtils.degToRad(32);
 export const ROSE_SLOW_SPIN_RADIANS_PER_MS = 0.00005;
 
 const clamp01 = (value: number) => Math.min(Math.max(value, 0), 1);
@@ -44,6 +45,17 @@ export function getRosePresentationYaw(elapsedMs: number): number {
     return ROSE_INITIAL_YAW * (1 - progress);
   }
   return (elapsedMs - ROSE_BLOOM_END_MS) * ROSE_SLOW_SPIN_RADIANS_PER_MS;
+}
+
+export function getRosePresentationPitch(elapsedMs: number): number {
+  if (elapsedMs <= ROSE_BLOOM_START_MS) return 0;
+  if (elapsedMs < ROSE_BLOOM_END_MS) {
+    const progress = easeInOutCubic(
+      (elapsedMs - ROSE_BLOOM_START_MS) / ROSE_BLOOM_DURATION_MS,
+    );
+    return ROSE_FINAL_PITCH * progress;
+  }
+  return ROSE_FINAL_PITCH;
 }
 
 export function getRoseBloomDelta(

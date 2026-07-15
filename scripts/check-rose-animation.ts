@@ -7,11 +7,13 @@ import {
   getRoseAssemblyProgress,
   getRoseBloomDelta,
   getRoseHandoffProgress,
+  getRosePresentationPitch,
   getRosePresentationYaw,
   ROSE_ASSEMBLY_MS,
   ROSE_BLOOM_END_MS,
   ROSE_BLOOM_START_MS,
   ROSE_HANDOFF_MS,
+  ROSE_FINAL_PITCH,
   ROSE_INITIAL_YAW,
   ROSE_MODEL_URL,
 } from "../src/lib/rose-animation";
@@ -45,6 +47,13 @@ closeTo(getRosePresentationYaw(3_600), ROSE_INITIAL_YAW);
 assert(getRosePresentationYaw(5_850) < ROSE_INITIAL_YAW);
 closeTo(getRosePresentationYaw(8_100), 0);
 closeTo(getRosePresentationYaw(9_100), 0.05);
+
+closeTo(getRosePresentationPitch(0), 0);
+closeTo(getRosePresentationPitch(ROSE_BLOOM_START_MS), 0);
+assert(getRosePresentationPitch(5_850) > 0);
+assert(getRosePresentationPitch(5_850) < ROSE_FINAL_PITCH);
+closeTo(getRosePresentationPitch(ROSE_BLOOM_END_MS), ROSE_FINAL_PITCH);
+closeTo(getRosePresentationPitch(9_100), ROSE_FINAL_PITCH);
 
 assert.equal(getRoseBloomDelta(3_599, 0.016), 0);
 closeTo(getRoseBloomDelta(3_608, 0.016), 0.008);
@@ -89,6 +98,7 @@ assert.match(threeRoseSource, /getRoseAssemblyProgress/);
 assert.match(threeRoseSource, /presentationGroup/);
 assert.match(threeRoseSource, /getRoseHandoffProgress/);
 assert.match(threeRoseSource, /getRosePresentationYaw/);
+assert.match(threeRoseSource, /presentationGroup\.rotation\.x = getRosePresentationPitch\(elapsed\)/);
 assert.match(threeRoseSource, /positionsSnappedToTarget/);
 assert.doesNotMatch(threeRoseSource, /ROSE_PARTICLE_PHASE_MS/);
 assert.doesNotMatch(threeRoseSource, /elapsed \* 0\.0002/);
