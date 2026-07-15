@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { loadModelWithCache } from "../lib/model-loader";
+import { createRoseBloomAction } from "../lib/rose-animation";
 
 const MODEL_URL = "/models/rose.glb";
 
@@ -38,6 +39,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
   useEffect(() => {
     if (!isOpen || !mountRef.current) return;
 
+    let cleanupScene: (() => void) | undefined;
     const initTimeout = setTimeout(() => {
       if (!mountRef.current) return;
       const W = mountRef.current.clientWidth || 600;
@@ -45,16 +47,20 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
 
       if (W === 0 || H === 0) return;
 
-      startThreeScene(W, H);
+      cleanupScene = startThreeScene(W, H);
     }, 100);
 
-    return () => clearTimeout(initTimeout);
+    return () => {
+      clearTimeout(initTimeout);
+      cleanupScene?.();
+    };
   }, [isOpen]);
 
   const startThreeScene = (W: number, H: number) => {
     if (!mountRef.current) return;
 
     const scene = new THREE.Scene();
+    const clock = new THREE.Clock();
     // 移除 Fog 以保证背景彻底透明
     // scene.fog = new THREE.Fog(0x000000, 5, 25);
 
@@ -141,10 +147,12 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
 
     let modelLoaded = false;
     let cancelled = false;
+    let model: THREE.Object3D | null = null;
+    let roseAnimation: ReturnType<typeof createRoseBloomAction> = null;
 
     loadModelWithCache(MODEL_URL).then((gltf) => {
       if (cancelled) return;
-      const model = gltf.scene;
+      model = gltf.scene;
 
       const box = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3();
@@ -181,6 +189,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
       });
 
       modelGroup.add(model);
+      roseAnimation = createRoseBloomAction(model, gltf.animations);
       model.updateMatrixWorld(true);
 
       const meshes: THREE.Mesh[] = [];
@@ -237,6 +246,8 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
     let raf: number;
     const animate = (ts: number) => {
       raf = requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.1);
+      roseAnimation?.mixer.update(delta);
 
       if (!modelLoaded) {
         controls.update();
@@ -317,6 +328,8 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
       cancelled = true;
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      roseAnimation?.action.stop();
+      if (model) roseAnimation?.mixer.uncacheRoot(model);
       renderer.dispose();
       if (mountRef.current?.contains(renderer.domElement)) {
         mountRef.current.removeChild(renderer.domElement);

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "check:rose-glb": "node scripts/verify-rose-glb.mjs public/models/rose.glb"
+    "check:rose-glb": "node scripts/verify-rose-glb.mjs public/models/rose.glb",
+    "check:rose-animation": "tsx scripts/check-rose-animation.ts"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
