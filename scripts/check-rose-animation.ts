@@ -51,6 +51,20 @@ closeTo(getRoseBloomDelta(3_608, 0.016), 0.008);
 closeTo(getRoseBloomDelta(4_000, 0.1), 0.1);
 closeTo(getRoseBloomDelta(8_108, 0.016), 0.008);
 assert.equal(getRoseBloomDelta(8_200, 0.016), 0);
+const stalledBloomFrames = [
+  [3_500, 0.1],
+  [3_700, 0.2],
+  [4_500, 0.8],
+  [6_000, 1.5],
+  [8_200, 2.2],
+] as const;
+closeTo(
+  stalledBloomFrames.reduce(
+    (total, [elapsed, frameDelta]) => total + getRoseBloomDelta(elapsed, frameDelta),
+    0,
+  ),
+  4.5,
+);
 
 const root = new THREE.Group();
 const clip = new THREE.AnimationClip("RoseBloom", 4.5, []);
@@ -78,6 +92,7 @@ assert.match(threeRoseSource, /getRosePresentationYaw/);
 assert.match(threeRoseSource, /positionsSnappedToTarget/);
 assert.doesNotMatch(threeRoseSource, /ROSE_PARTICLE_PHASE_MS/);
 assert.doesNotMatch(threeRoseSource, /elapsed \* 0\.0002/);
+assert.doesNotMatch(threeRoseSource, /Math\.min\(Math\.max\(\(ts - previousFrameTimestamp\)/);
 assert.doesNotMatch(threeRoseSource, /allVertices/);
 
 console.log("PASS: rose assembly, handoff, bloom, and presentation timing verified");

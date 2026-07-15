@@ -295,7 +295,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
       raf = requestAnimationFrame(animate);
       const frameDelta = previousFrameTimestamp === null
         ? 0
-        : Math.min(Math.max((ts - previousFrameTimestamp) / 1_000, 0), 0.1);
+        : Math.max((ts - previousFrameTimestamp) / 1_000, 0);
       previousFrameTimestamp = ts;
 
       if (!modelLoaded) {
