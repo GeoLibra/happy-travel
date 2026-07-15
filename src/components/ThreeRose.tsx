@@ -10,6 +10,7 @@ import {
   getRoseBloomDelta,
   getRoseHandoffProgress,
   getRosePresentationPitch,
+  getRosePresentationScale,
   getRosePresentationYaw,
   ROSE_ASSEMBLY_MS,
   ROSE_BLOOM_START_MS,
@@ -369,6 +370,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
 
       presentationGroup.rotation.y = getRosePresentationYaw(elapsed);
       presentationGroup.rotation.x = getRosePresentationPitch(elapsed);
+      presentationGroup.scale.setScalar(getRosePresentationScale(elapsed));
 
       controls.update();
       renderer.render(scene, camera);

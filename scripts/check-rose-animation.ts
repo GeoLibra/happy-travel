@@ -8,12 +8,14 @@ import {
   getRoseBloomDelta,
   getRoseHandoffProgress,
   getRosePresentationPitch,
+  getRosePresentationScale,
   getRosePresentationYaw,
   ROSE_ASSEMBLY_MS,
   ROSE_BLOOM_END_MS,
   ROSE_BLOOM_START_MS,
   ROSE_HANDOFF_MS,
   ROSE_FINAL_PITCH,
+  ROSE_FINAL_SCALE,
   ROSE_INITIAL_YAW,
   ROSE_MODEL_URL,
 } from "../src/lib/rose-animation";
@@ -54,6 +56,20 @@ assert(getRosePresentationPitch(5_850) > 0);
 assert(getRosePresentationPitch(5_850) < ROSE_FINAL_PITCH);
 closeTo(getRosePresentationPitch(ROSE_BLOOM_END_MS), ROSE_FINAL_PITCH);
 closeTo(getRosePresentationPitch(9_100), ROSE_FINAL_PITCH);
+closeTo(ROSE_FINAL_PITCH, THREE.MathUtils.degToRad(70));
+closeTo(ROSE_FINAL_SCALE, 1.5);
+closeTo(getRosePresentationScale(0), 1);
+closeTo(getRosePresentationScale(ROSE_BLOOM_START_MS), 1);
+assert(getRosePresentationScale(5_850) > 1);
+assert(getRosePresentationScale(5_850) < ROSE_FINAL_SCALE);
+closeTo(getRosePresentationScale(ROSE_BLOOM_END_MS), ROSE_FINAL_SCALE);
+closeTo(getRosePresentationScale(9_100), ROSE_FINAL_SCALE);
+
+const finalPlantAxis = new THREE.Vector3(0, 1, 0).applyAxisAngle(
+  new THREE.Vector3(1, 0, 0),
+  ROSE_FINAL_PITCH,
+);
+assert(finalPlantAxis.z > 0.9, "the flower end of the plant must turn toward the +Z camera");
 
 assert.equal(getRoseBloomDelta(3_599, 0.016), 0);
 closeTo(getRoseBloomDelta(3_608, 0.016), 0.008);
@@ -99,6 +115,10 @@ assert.match(threeRoseSource, /presentationGroup/);
 assert.match(threeRoseSource, /getRoseHandoffProgress/);
 assert.match(threeRoseSource, /getRosePresentationYaw/);
 assert.match(threeRoseSource, /presentationGroup\.rotation\.x = getRosePresentationPitch\(elapsed\)/);
+assert.match(
+  threeRoseSource,
+  /presentationGroup\.scale\.setScalar\(getRosePresentationScale\(elapsed\)\)/,
+);
 assert.match(threeRoseSource, /positionsSnappedToTarget/);
 assert.doesNotMatch(threeRoseSource, /ROSE_PARTICLE_PHASE_MS/);
 assert.doesNotMatch(threeRoseSource, /elapsed \* 0\.0002/);
