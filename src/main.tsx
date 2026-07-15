@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { Analytics } from '@vercel/analytics/react';
 import './index.css';
+import { I18nProvider } from './i18n';
 
 // Suppress canvas 2d readback warning from external libraries (like AMap)
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
@@ -18,7 +19,9 @@ HTMLCanvasElement.prototype.getContext = function (
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Analytics />
-    <App />
+    <I18nProvider>
+      <Analytics />
+      <App />
+    </I18nProvider>
   </StrictMode>
 );

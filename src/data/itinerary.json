@@ -5,72 +5,90 @@
       {
         "id": "1-1",
         "name": "全季上海安亭地铁站酒店",
+        "nameEn": "JI Hotel Shanghai Anting Metro Station",
         "address": "嘉定区安亭镇曹安公路5598号财富广场1楼",
+        "addressEn": "1F, Fortune Plaza, 5598 Cao’an Road, Anting, Jiading District",
         "type": "hotel",
         "coordinates": [
           121.161808,
           31.289831
         ],
-        "description": "入住休息"
+        "description": "入住休息",
+        "descriptionEn": "Hotel check-in and rest"
       },
       {
         "id": "1-2",
         "name": "LANN I 蘭·泰式古法按摩 (安亭嘉亭荟店)",
+        "nameEn": "LANN I Traditional Thai Massage (Ating Life Hub)",
         "address": "嘉定区墨玉南路989号嘉亭荟中里3层1314室",
+        "addressEn": "Room 1314, 3F, Life Hub Central, 989 Moyu South Road, Jiading District",
         "type": "spa",
         "coordinates": [
           121.162,
           31.288
         ],
         "description": "泰式古法按摩",
+        "descriptionEn": "Traditional Thai massage",
         "url": "https://m.dianping.com/shop/k7juCZ6EwfVMECxR"
       },
       {
         "id": "1-3",
         "name": "大森の深夜食堂(曼度泛乐城店)",
+        "nameEn": "Omori Late-Night Diner (Mandufanle City)",
         "address": "嘉定区墨玉南路1080号三德广场1楼（嘉亭荟对面曼度一楼）",
+        "addressEn": "1F, Sande Plaza, 1080 Moyu South Road, Jiading District (opposite Life Hub)",
         "type": "restaurant",
         "coordinates": [
           121.164456,
           31.287975
         ],
         "description": "日本料理",
+        "descriptionEn": "Japanese cuisine",
         "url": "https://m.dianping.com/shopinfo/k5x9cwtE8H4GdvXc"
       },
       {
         "id": "1-4",
         "name": "六扇门·江西小炒大排档(安亭财富广场店)",
+        "nameEn": "Liushanmen Jiangxi Stir-fry (Anting Fortune Plaza)",
         "address": "嘉定区安亭财富广场二楼",
+        "addressEn": "2F, Anting Fortune Plaza, Jiading District",
         "type": "restaurant",
         "coordinates": [
           121.161608,
           31.28961
         ],
         "description": "江西菜",
+        "descriptionEn": "Jiangxi cuisine",
         "url": "https://m.dianping.com/shopinfo/G8HlI1oZhiIdP75n"
       },
       {
         "id": "1-5",
         "name": "源鑫圜齐齐哈尔烤肉(安亭店)",
+        "nameEn": "Yuanxinyuan Qiqihar BBQ (Anting)",
         "address": "嘉定区泽普路与新源路交叉口西20米路南",
+        "addressEn": "20 m west of Zepu Road and Xinyuan Road, south side, Jiading District",
         "type": "restaurant",
         "coordinates": [
           121.158432,
           31.291224
         ],
         "description": "融合烤肉",
+        "descriptionEn": "Fusion barbecue",
         "url": "https://m.dianping.com/shopinfo/H2ij7ouNIOanmOkU"
       },
       {
         "id": "1-6",
         "name": "好鲜生·象山小海鲜·经典农家菜",
+        "nameEn": "Fresh Seafood & Classic Farmhouse Cuisine",
         "address": "嘉定区安礼路258弄21号102室",
+        "addressEn": "Room 102, No. 21, Lane 258 Anli Road, Jiading District",
         "type": "restaurant",
         "coordinates": [
           121.170287,
           31.269576
         ],
         "description": "海鲜",
+        "descriptionEn": "Seafood",
         "url": "https://m.dianping.com/shopinfo/G33qzAgIQBIYdolp"
       }
     ]
@@ -81,46 +99,58 @@
       {
         "id": "2-1",
         "name": "上海国际赛车场",
+        "nameEn": "Shanghai International Circuit",
         "address": "嘉定区伊宁路2000号",
+        "addressEn": "2000 Yining Road, Jiading District",
         "type": "sports",
         "coordinates": [
           121.223521,
           31.340101
         ],
-        "description": "F1中国大奖赛举办地"
+        "description": "F1中国大奖赛举办地",
+        "descriptionEn": "Home of the Formula 1 Chinese Grand Prix"
       },
       {
         "id": "2-2",
         "name": "上海体育场",
+        "nameEn": "Shanghai Stadium",
         "address": "徐汇区天钥桥路666号",
+        "addressEn": "666 Tianyaoqiao Road, Xuhui District",
         "type": "sports",
         "coordinates": [
           121.443309,
           31.181485
         ],
-        "description": "【上海】2026 Imagine Dragons LOOM World Tour"
+        "description": "【上海】2026 Imagine Dragons LOOM World Tour",
+        "descriptionEn": "Shanghai — 2026 Imagine Dragons LOOM World Tour"
       },
       {
         "id": "2-3",
         "name": "全季酒店(上海徐家汇店)",
+        "nameEn": "JI Hotel (Shanghai Xujiahui)",
         "address": "徐汇区宜山路",
+        "addressEn": "Yishan Road, Xuhui District",
         "type": "hotel",
         "coordinates": [
           121.441985,
           31.194595
         ],
-        "description": "入住休息"
+        "description": "入住休息",
+        "descriptionEn": "Hotel check-in and rest"
       },
       {
         "id": "2-4",
         "name": "天平小区",
+        "nameEn": "Tianping Community",
         "address": "徐汇区天平路",
+        "addressEn": "Tianping Road, Xuhui District",
         "type": "hotel",
         "coordinates": [
           121.438238,
           31.1987
         ],
-        "description": "社区位置"
+        "description": "社区位置",
+        "descriptionEn": "Neighborhood location"
       }
     ]
   },
@@ -130,65 +160,83 @@
       {
         "id": "3-1",
         "name": "上海辰山植物园",
+        "nameEn": "Shanghai Chenshan Botanical Garden",
         "address": "松江区辰花路3888号",
+        "addressEn": "3888 Chenhua Road, Songjiang District",
         "type": "park",
         "coordinates": [
           121.18,
           31.08
         ],
-        "description": "亚洲最大的植物园之一"
+        "description": "亚洲最大的植物园之一",
+        "descriptionEn": "One of Asia’s largest botanical gardens"
       },
       {
         "id": "3-2",
         "name": "顾村公园",
+        "nameEn": "Gucun Park",
         "address": "宝山区沪太路4788号",
+        "addressEn": "4788 Hutai Road, Baoshan District",
         "type": "park",
         "coordinates": [
           121.37,
           31.34
         ],
-        "description": "上海著名的赏樱胜地"
+        "description": "上海著名的赏樱胜地",
+        "descriptionEn": "A renowned Shanghai cherry blossom destination"
       },
       {
         "id": "3-3",
         "name": "上海共青森林公园",
+        "nameEn": "Shanghai Gongqing Forest Park",
         "address": "杨浦区军工路2000号",
+        "addressEn": "2000 Jungong Road, Yangpu District",
         "type": "park",
         "coordinates": [
           121.55,
           31.32
         ],
-        "description": "森林景观特色公园"
+        "description": "森林景观特色公园",
+        "descriptionEn": "A park known for its forest landscape"
       },
       {
         "id": "3-4",
         "name": "上海植物园",
+        "nameEn": "Shanghai Botanical Garden",
         "address": "徐汇区龙吴路1111号",
+        "addressEn": "1111 Longwu Road, Xuhui District",
         "type": "park",
         "coordinates": [
           121.444271,
           31.147478
         ],
-        "description": "国内最大的市属综合性植物园之一，汇聚海派盆景与四季花卉"
+        "description": "国内最大的市属综合性植物园之一，汇聚海派盆景与四季花卉",
+        "descriptionEn": "One of China’s largest municipal botanical gardens, featuring Shanghai-style bonsai and seasonal flowers"
       },
       {
         "id": "3-5",
         "name": "新江湾城公园",
+        "nameEn": "Xinjiangwancheng Park",
         "address": "上海市杨浦区政和路与国秀路交叉口西北角",
+        "addressEn": "Northwest corner of Zhenghe Road and Guoxiu Road, Yangpu District, Shanghai",
         "type": "park",
         "coordinates": [
           121.513818,
           31.333772
         ],
         "description": "赏樱去处",
+        "descriptionEn": "Cherry blossom viewing spot",
         "url": "https://xhslink.com/m/8WeoyK6ZBRn"
       },
       {
         "id": "3-6",
         "name": "上海大宁公园",
+        "nameEn": "Shanghai Daning Park",
         "address": "上海市静安区广中西路288号",
+        "addressEn": "288 Guangzhong West Road, Jing’an District, Shanghai",
         "type": "park",
         "description": "浦西中心城区最大城市公园，68万平方米山水园林，拥有白沙滩、欧式风车、万亩郁金香花海和四季生态景观",
+        "descriptionEn": "A 680,000 m² urban park with landscaped lakes, a white-sand beach, European windmill, vast tulip fields, and year-round scenery",
         "url": "https://xhslink.com/m/9r1xvWOsRvb",
         "coordinates": [
           121.443097,
@@ -198,7 +246,9 @@
       {
         "id": "3-7",
         "name": "浦东美术馆 (非常毕加索)",
+        "nameEn": "Museum of Art Pudong (Picasso: A Rebel in Paris)",
         "address": "浦东新区滨江大道2777号",
+        "addressEn": "2777 Binjiang Avenue, Pudong New Area",
         "type": "museum",
         "time": "10:00-22:00",
         "coordinates": [
@@ -206,110 +256,138 @@
           31.238041
         ],
         "description": "非常毕加索展览",
+        "descriptionEn": "Picasso: A Rebel in Paris exhibition",
         "url": "https://xhslink.com/m/7ChBx08CvcA?xhsshare=CopyLink&appuid=591070efa9b2ed7ef939ebf8&apptime=1772849356&share_id=23c20d4f56cb4ada90829b01696411bb"
       },
       {
         "id": "3-8",
         "name": "保利上海城市剧院 (谋杀启事)",
+        "nameEn": "Poly Shanghai City Theatre (A Murder Is Announced)",
         "address": "闵行区都市路4889号",
+        "addressEn": "4889 Dushi Road, Minhang District",
         "type": "theatre",
         "time": "14:30",
         "coordinates": [
           121.389681,
           31.105119
         ],
-        "description": "阿加莎悬疑推理巨作《谋杀启事》"
+        "description": "阿加莎悬疑推理巨作《谋杀启事》",
+        "descriptionEn": "Agatha Christie mystery A Murder Is Announced"
       },
       {
         "id": "3-9",
         "name": "Manner Coffee(国客滨江店)",
+        "nameEn": "Manner Coffee (International Cruise Terminal Riverside)",
         "address": "虹口区东大名路500号",
+        "addressEn": "500 Dongdaming Road, Hongkou District",
         "type": "cafe",
         "coordinates": [
           121.496265,
           31.245559
         ],
         "description": "滨江美景咖啡",
+        "descriptionEn": "Coffee with a riverside view",
         "url": "https://xhslink.com/m/3NMuQxtXShk"
       },
       {
         "id": "3-10",
         "name": "GALANGAL Thai Bistro 泰式小酒馆",
+        "nameEn": "GALANGAL Thai Bistro",
         "address": "徐汇区吴兴路277号吴界F1层",
+        "addressEn": "1F, Wujie, 277 Wuxing Road, Xuhui District",
         "type": "restaurant",
         "coordinates": [
           121.445968,
           31.199627
         ],
         "description": "泰国风味料理",
+        "descriptionEn": "Thai cuisine",
         "url": "https://xhslink.com/m/8VDDOTtmu2F?xhsshare=CopyLink&appuid=591070efa9b2ed7ef939ebf8&apptime=1772848888&share_id=08f0041abebd4971a83502f23adaae8e"
       },
       {
         "id": "3-11",
         "name": "苗岭人家(天目中路店)",
+        "nameEn": "Miaoling Renjia (Tianmu Middle Road)",
         "address": "静安区天目中路383号海文大楼F1层",
+        "addressEn": "1F, Haiwen Building, 383 Tianmu Middle Road, Jing’an District",
         "type": "restaurant",
         "coordinates": [
           121.445968,
           31.199627
         ],
         "description": "贵州菜",
+        "descriptionEn": "Guizhou cuisine",
         "url": "https://xhslink.com/m/6CoNluugtGm?xhsshare=CopyLink&appuid=591070efa9b2ed7ef939ebf8&apptime=1772849305&share_id=dd332943c9fb4bf2973a8ed8afa1c96a"
       },
       {
         "id": "3-12",
         "name": "胡恰",
+        "nameEn": "Huqia",
         "address": "上海淮海中路333号新天地广场6楼01-02号",
+        "addressEn": "Rooms 01–02, 6F, Xintiandi Plaza, 333 Huaihai Middle Road, Shanghai",
         "type": "restaurant",
         "coordinates": [
           121.474123,
           31.222482
         ],
         "description": "江西景德镇菜",
+        "descriptionEn": "Jingdezhen cuisine from Jiangxi",
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304C47334438354842"
       },
       {
         "id": "3-13",
         "name": "冰城老于家(盛世年华花园店)",
+        "nameEn": "Bingcheng Lao Yujia (Shengshi Nianhua Garden)",
         "address": "上海市羽山路2-4双号1层-2,2层",
+        "addressEn": "1F–2F, Nos. 2–4 Yushan Road, Shanghai",
         "type": "restaurant",
         "coordinates": [
           121.53664,
           31.228822
         ],
         "description": "东北菜",
+        "descriptionEn": "Northeastern Chinese cuisine",
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/4230494231434558534F"
       },
       {
         "id": "3-14",
         "name": "马厂老火锅(上海嘉定新城店)",
+        "nameEn": "Machang Traditional Hotpot (Shanghai Jiading New Town)",
         "address": "上海市洪德路334号",
+        "addressEn": "334 Hongde Road, Shanghai",
         "type": "restaurant",
         "coordinates": [
           121.257658,
           31.35663
         ],
         "description": "重庆火锅",
+        "descriptionEn": "Chongqing hotpot",
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304B36485542394C57"
       },
       {
         "id": "3-15",
         "name": "ANOTHER ROOM 别屋(上海首店)",
+        "nameEn": "ANOTHER ROOM (Shanghai Flagship)",
         "address": "上海市淮海中路333号新天地广场3层09及10室",
+        "addressEn": "Rooms 09–10, 3F, Xintiandi Plaza, 333 Huaihai Middle Road, Shanghai",
         "type": "restaurant",
         "coordinates": [
           121.474465,
           31.220484
         ],
         "description": "创意菜",
+        "descriptionEn": "Creative cuisine",
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304C4B5953335A474A"
       },
       {
         "id": "3-16",
         "name": "岚·山野云南菜(上海首店)",
+        "nameEn": "Lan Mountain Yunnan Cuisine (Shanghai Flagship)",
         "address": "上海市愚园路68号CP静安L6-10",
+        "addressEn": "L6-10, CP Jing’an, 68 Yuyuan Road, Shanghai",
         "type": "restaurant",
         "description": "云贵菜",
+        "descriptionEn": "Yunnan and Guizhou cuisine",
         "url": "https://xhslink.com/m/Aw8KD4CRZWn",
         "coordinates": [
           121.4464,
@@ -319,9 +397,12 @@
       {
         "id": "3-17",
         "name": "甬潮·宁波小市",
+        "nameEn": "Yongchao Ningbo Market",
         "address": "上海市淮海中路755号新华联大厦东楼4F（近瑞金二路）",
+        "addressEn": "4F East Tower, Xin Hua Lian Building, 755 Huaihai Middle Road, Shanghai (near Ruijin 2nd Road)",
         "type": "restaurant",
         "description": "宁波菜",
+        "descriptionEn": "Ningbo cuisine",
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304D424E585635454B",
         "coordinates": [
           121.4644,
@@ -331,9 +412,12 @@
       {
         "id": "3-18",
         "name": "潘小烧·云南烧烤(外滩店)",
+        "nameEn": "Pan Xiaoshao Yunnan BBQ (The Bund)",
         "address": "上海市九江路168号一楼(靠近江西中路)",
+        "addressEn": "1F, 168 Jiujiang Road, Shanghai (near Jiangxi Middle Road)",
         "type": "restaurant",
         "description": "烧烤",
+        "descriptionEn": "Barbecue",
         "url": "https://xhslink.com/m/68NUO9eENcU",
         "coordinates": [
           121.4866,
@@ -343,9 +427,12 @@
       {
         "id": "3-19",
         "name": "安徽沪办招待所",
+        "nameEn": "Anhui Provincial Guesthouse in Shanghai",
         "address": "上海市新华路185弄5号",
+        "addressEn": "No. 5, Lane 185 Xinhua Road, Shanghai",
         "type": "restaurant",
         "description": "徽菜",
+        "descriptionEn": "Anhui cuisine",
         "url": "https://xhslink.com/m/I8CyHtUCYi",
         "coordinates": [
           121.435,
@@ -355,9 +442,12 @@
       {
         "id": "3-20",
         "name": "甬间里(上海首店)",
+        "nameEn": "Yongjianli (Shanghai Flagship)",
         "address": "上海市长寿路150号",
+        "addressEn": "150 Changshou Road, Shanghai",
         "type": "restaurant",
         "description": "本帮江浙菜",
+        "descriptionEn": "Shanghai, Jiangsu, and Zhejiang cuisine",
         "url": "https://xhslink.com/m/2tzoKrKtS6W",
         "coordinates": [
           121.4521,
@@ -367,9 +457,12 @@
       {
         "id": "3-21",
         "name": "Flambe Bistro·维也纳烤肋排(湖滨道店)",
+        "nameEn": "Flambe Bistro (Hubin Dao)",
         "address": "上海市湖滨道购物中心一楼",
+        "addressEn": "1F, Hubin Dao Shopping Mall, Shanghai",
         "type": "restaurant",
         "description": "西餐",
+        "descriptionEn": "Western cuisine",
         "url": "https://xhslink.com/m/bEw7uVVNZS",
         "coordinates": [
           121.473,
@@ -379,9 +472,12 @@
       {
         "id": "3-22",
         "name": "潇湘阁(吴江路湟普汇店)",
+        "nameEn": "Xiaoxiang Pavilion (Wujiang Road)",
         "address": "上海市吴江路269号湟普汇商场3层",
+        "addressEn": "3F, Huangpuhui Mall, 269 Wujiang Road, Shanghai",
         "type": "restaurant",
         "description": "湘菜",
+        "descriptionEn": "Hunan cuisine",
         "url": "https://xhslink.com/m/ArWVSdVah8H",
         "coordinates": [
           121.4593,
@@ -391,9 +487,12 @@
       {
         "id": "3-23",
         "name": "巴硒客地道土家菜(华漕店)",
+        "nameEn": "Baxike Authentic Tujia Cuisine (Huacao)",
         "address": "上海市华漕融信绿地国际二期4幢1-7",
+        "addressEn": "Building 4, Greenland International Phase II, Huacao, Shanghai",
         "type": "restaurant",
         "description": "农家菜",
+        "descriptionEn": "Farmhouse cuisine",
         "url": "https://xhslink.com/m/9cdP5J2ALYU",
         "coordinates": [
           121.2808,
@@ -403,9 +502,12 @@
       {
         "id": "3-24",
         "name": "inkool创意韩餐",
+        "nameEn": "inkool Creative Korean Cuisine",
         "address": "上海市长宁路来福士广场东区3号门外1楼46号",
+        "addressEn": "Unit 46, 1F outside East Gate 3, Raffles City Changning, Shanghai",
         "type": "restaurant",
         "description": "韩式料理",
+        "descriptionEn": "Korean cuisine",
         "url": "https://xhslink.com/m/RQuZuEn5VO",
         "coordinates": [
           121.4144,
@@ -415,25 +517,31 @@
       {
         "id": "3-25",
         "name": "Gate M西岸梦中心",
+        "nameEn": "Gate M West Bund Dream Center",
         "address": "上海市龙腾大道2266号",
+        "addressEn": "2266 Longteng Avenue, Shanghai",
         "type": "citywalk",
         "coordinates": [
           121.464089,
           31.161916
         ],
         "description": "F1快闪活动",
+        "descriptionEn": "F1 pop-up event",
         "url": "https://xhslink.com/m/5zgvvJTRh50"
       },
       {
         "id": "3-26",
         "name": "九间泰·正宗泰式古法按摩SPA (徐汇日月光中心店)",
+        "nameEn": "Jiujian Thai Traditional Massage SPA (Xuhui ASE Mall)",
         "address": "上海市徐汇区漕宝路33号徐汇日月光中心L4层",
+        "addressEn": "L4, Xuhui ASE Mall, 33 Caobao Road, Xuhui District, Shanghai",
         "type": "spa",
         "coordinates": [
           121.432906,
           31.169006
         ],
         "description": "泰式按摩SPA",
+        "descriptionEn": "Thai massage and SPA",
         "url": "https://www.xiaohongshu.com/apps/sns-poi/detail/42304A44435952493243"
       }
     ]
@@ -444,13 +552,16 @@
       {
         "id": "4-1",
         "name": "虹桥火车站",
+        "nameEn": "Shanghai Hongqiao Railway Station",
         "address": "闵行区新虹街道申贵路1500号",
+        "addressEn": "1500 Shengui Road, Xinhong Subdistrict, Minhang District",
         "type": "sports",
         "coordinates": [
           121.32,
           31.19
         ],
-        "description": "满载周末回忆，踏上归家旅途"
+        "description": "满载周末回忆，踏上归家旅途",
+        "descriptionEn": "Head home with a weekend full of memories"
       }
     ]
   }

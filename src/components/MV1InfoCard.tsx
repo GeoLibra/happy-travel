@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trophy, Flag, X, Award, TrendingUp } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 interface MV1InfoCardProps {
   onClose?: () => void;
 }
 
 const MV1InfoCard: React.FC<MV1InfoCardProps> = ({ onClose }) => {
+  const { t } = useI18n();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const achievements = [
-    { year: '2021', title: '首个世界冠军', icon: Trophy },
-    { year: '2022', title: '卫冕成功', icon: Award },
-    { year: '2023', title: '统治赛季 (19胜)', icon: TrendingUp },
-    { year: '2024', title: '四冠王', icon: Trophy },
+    { year: '2021', title: t('driver.achievement.2021'), icon: Trophy },
+    { year: '2022', title: t('driver.achievement.2022'), icon: Award },
+    { year: '2023', title: t('driver.achievement.2023'), icon: TrendingUp },
+    { year: '2024', title: t('driver.achievement.2024'), icon: Trophy },
   ];
 
   return (
@@ -54,7 +56,7 @@ const MV1InfoCard: React.FC<MV1InfoCardProps> = ({ onClose }) => {
                 MAX VERSTAPPEN
               </div>
               <div className="text-white/60 text-xs font-medium">
-                荷兰 • 1997.09.30
+                {t('driver.country')} • 1997.09.30
               </div>
             </div>
           </div>
@@ -72,15 +74,15 @@ const MV1InfoCard: React.FC<MV1InfoCardProps> = ({ onClose }) => {
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center border border-white/10">
             <div className="text-2xl font-black text-[#FFB800]">4</div>
-            <div className="text-[10px] text-white/60 uppercase tracking-wider">冠军</div>
+            <div className="text-[10px] text-white/60 uppercase tracking-wider">{t('driver.championships')}</div>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center border border-white/10">
             <div className="text-2xl font-black text-[#E10600]">71</div>
-            <div className="text-[10px] text-white/60 uppercase tracking-wider">胜场</div>
+            <div className="text-[10px] text-white/60 uppercase tracking-wider">{t('driver.wins')}</div>
           </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 text-center border border-white/10">
             <div className="text-2xl font-black text-white">48</div>
-            <div className="text-[10px] text-white/60 uppercase tracking-wider">杆位</div>
+            <div className="text-[10px] text-white/60 uppercase tracking-wider">{t('driver.poles')}</div>
           </div>
         </div>
 
@@ -89,7 +91,7 @@ const MV1InfoCard: React.FC<MV1InfoCardProps> = ({ onClose }) => {
           onClick={() => setIsExpanded(!isExpanded)}
           className="w-full text-left text-white/80 text-sm font-bold mb-2 flex items-center justify-between hover:text-white transition-colors"
         >
-          <span>职业生涯亮点</span>
+          <span>{t('driver.highlights')}</span>
           <motion.div
             animate={{ rotate: isExpanded ? 180 : 0 }}
             transition={{ duration: 0.3 }}
