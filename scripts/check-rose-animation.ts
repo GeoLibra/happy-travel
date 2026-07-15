@@ -13,6 +13,8 @@ import {
   ROSE_ASSEMBLY_MS,
   ROSE_BLOOM_END_MS,
   ROSE_BLOOM_START_MS,
+  ROSE_PRESENTATION_END_MS,
+  ROSE_PRESENTATION_START_MS,
   ROSE_HANDOFF_MS,
   ROSE_FINAL_PITCH,
   ROSE_FINAL_SCALE,
@@ -27,8 +29,10 @@ const closeTo = (actual: number, expected: number, tolerance = 1e-6) => {
 assert.equal(ROSE_MODEL_URL, "/models/rose.glb?v=1ba2e7a");
 assert.equal(ROSE_ASSEMBLY_MS, 3_000);
 assert.equal(ROSE_HANDOFF_MS, 600);
-assert.equal(ROSE_BLOOM_START_MS, 3_600);
-assert.equal(ROSE_BLOOM_END_MS, 8_100);
+assert.equal(ROSE_PRESENTATION_START_MS, 3_600);
+assert.equal(ROSE_PRESENTATION_END_MS, 5_100);
+assert.equal(ROSE_BLOOM_START_MS, 4_600);
+assert.equal(ROSE_BLOOM_END_MS, 9_600);
 
 assert.equal(getRoseAssemblyProgress(-10, 0, 0), 0);
 assert.equal(getRoseAssemblyProgress(0, 0, 0), 0);
@@ -46,24 +50,25 @@ assert.equal(getRoseHandoffProgress(3_600), 1);
 
 closeTo(getRosePresentationYaw(0), ROSE_INITIAL_YAW);
 closeTo(getRosePresentationYaw(3_600), ROSE_INITIAL_YAW);
-assert(getRosePresentationYaw(5_850) < ROSE_INITIAL_YAW);
-closeTo(getRosePresentationYaw(8_100), 0);
-closeTo(getRosePresentationYaw(9_100), 0.05);
+assert(getRosePresentationYaw(4_350) < ROSE_INITIAL_YAW);
+closeTo(getRosePresentationYaw(5_100), 0);
+closeTo(getRosePresentationYaw(9_600), 0);
+closeTo(getRosePresentationYaw(10_600), 0.05);
 
 closeTo(getRosePresentationPitch(0), 0);
-closeTo(getRosePresentationPitch(ROSE_BLOOM_START_MS), 0);
-assert(getRosePresentationPitch(5_850) > 0);
-assert(getRosePresentationPitch(5_850) < ROSE_FINAL_PITCH);
-closeTo(getRosePresentationPitch(ROSE_BLOOM_END_MS), ROSE_FINAL_PITCH);
-closeTo(getRosePresentationPitch(9_100), ROSE_FINAL_PITCH);
+closeTo(getRosePresentationPitch(ROSE_PRESENTATION_START_MS), 0);
+assert(getRosePresentationPitch(4_350) > 0);
+assert(getRosePresentationPitch(4_350) < ROSE_FINAL_PITCH);
+closeTo(getRosePresentationPitch(ROSE_PRESENTATION_END_MS), ROSE_FINAL_PITCH);
+closeTo(getRosePresentationPitch(9_600), ROSE_FINAL_PITCH);
 closeTo(ROSE_FINAL_PITCH, THREE.MathUtils.degToRad(70));
 closeTo(ROSE_FINAL_SCALE, 1.5);
 closeTo(getRosePresentationScale(0), 1);
-closeTo(getRosePresentationScale(ROSE_BLOOM_START_MS), 1);
-assert(getRosePresentationScale(5_850) > 1);
-assert(getRosePresentationScale(5_850) < ROSE_FINAL_SCALE);
-closeTo(getRosePresentationScale(ROSE_BLOOM_END_MS), ROSE_FINAL_SCALE);
-closeTo(getRosePresentationScale(9_100), ROSE_FINAL_SCALE);
+closeTo(getRosePresentationScale(ROSE_PRESENTATION_START_MS), 1);
+assert(getRosePresentationScale(4_350) > 1);
+assert(getRosePresentationScale(4_350) < ROSE_FINAL_SCALE);
+closeTo(getRosePresentationScale(ROSE_PRESENTATION_END_MS), ROSE_FINAL_SCALE);
+closeTo(getRosePresentationScale(9_600), ROSE_FINAL_SCALE);
 
 const finalPlantAxis = new THREE.Vector3(0, 1, 0).applyAxisAngle(
   new THREE.Vector3(1, 0, 0),
@@ -71,17 +76,17 @@ const finalPlantAxis = new THREE.Vector3(0, 1, 0).applyAxisAngle(
 );
 assert(finalPlantAxis.z > 0.9, "the flower end of the plant must turn toward the +Z camera");
 
-assert.equal(getRoseBloomDelta(3_599, 0.016), 0);
-closeTo(getRoseBloomDelta(3_608, 0.016), 0.008);
-closeTo(getRoseBloomDelta(4_000, 0.1), 0.1);
-closeTo(getRoseBloomDelta(8_108, 0.016), 0.008);
-assert.equal(getRoseBloomDelta(8_200, 0.016), 0);
+assert.equal(getRoseBloomDelta(4_599, 0.016), 0);
+closeTo(getRoseBloomDelta(4_608, 0.016), 0.0072);
+closeTo(getRoseBloomDelta(5_000, 0.1), 0.09);
+closeTo(getRoseBloomDelta(9_608, 0.016), 0.0072);
+assert.equal(getRoseBloomDelta(9_700, 0.016), 0);
 const stalledBloomFrames = [
-  [3_500, 0.1],
-  [3_700, 0.2],
-  [4_500, 0.8],
-  [6_000, 1.5],
-  [8_200, 2.2],
+  [4_500, 0.1],
+  [4_700, 0.2],
+  [5_500, 0.8],
+  [7_000, 1.5],
+  [9_700, 2.7],
 ] as const;
 closeTo(
   stalledBloomFrames.reduce(

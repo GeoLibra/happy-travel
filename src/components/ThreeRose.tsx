@@ -13,8 +13,8 @@ import {
   getRosePresentationScale,
   getRosePresentationYaw,
   ROSE_ASSEMBLY_MS,
-  ROSE_BLOOM_START_MS,
   ROSE_MODEL_URL,
+  ROSE_PRESENTATION_START_MS,
 } from "../lib/rose-animation";
 
 
@@ -350,7 +350,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
         posAttr.needsUpdate = true;
         sizeAttr.needsUpdate = true;
 
-      } else if (elapsed < ROSE_BLOOM_START_MS) {
+      } else if (elapsed < ROSE_PRESENTATION_START_MS) {
         const handoff = getRoseHandoffProgress(elapsed);
         particleSystem.visible = handoff < 0.99;
         particleMaterial.opacity = 0.8 * (1 - handoff);

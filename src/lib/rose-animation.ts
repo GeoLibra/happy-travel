@@ -3,8 +3,12 @@ import * as THREE from "three";
 export const ROSE_MODEL_URL = "/models/rose.glb?v=1ba2e7a";
 export const ROSE_ASSEMBLY_MS = 3_000;
 export const ROSE_HANDOFF_MS = 600;
-export const ROSE_BLOOM_DURATION_MS = 4_500;
-export const ROSE_BLOOM_START_MS = ROSE_ASSEMBLY_MS + ROSE_HANDOFF_MS;
+export const ROSE_PRESENTATION_START_MS = ROSE_ASSEMBLY_MS + ROSE_HANDOFF_MS;
+export const ROSE_PRESENTATION_DURATION_MS = 1_500;
+export const ROSE_PRESENTATION_END_MS = ROSE_PRESENTATION_START_MS + ROSE_PRESENTATION_DURATION_MS;
+export const ROSE_BLOOM_CLIP_DURATION_MS = 4_500;
+export const ROSE_BLOOM_DURATION_MS = 5_000;
+export const ROSE_BLOOM_START_MS = ROSE_PRESENTATION_END_MS - 500;
 export const ROSE_BLOOM_END_MS = ROSE_BLOOM_START_MS + ROSE_BLOOM_DURATION_MS;
 export const ROSE_INITIAL_YAW = THREE.MathUtils.degToRad(35);
 export const ROSE_FINAL_PITCH = THREE.MathUtils.degToRad(70);
@@ -38,21 +42,22 @@ export function getRoseHandoffProgress(elapsedMs: number): number {
 }
 
 export function getRosePresentationYaw(elapsedMs: number): number {
-  if (elapsedMs <= ROSE_BLOOM_START_MS) return ROSE_INITIAL_YAW;
-  if (elapsedMs < ROSE_BLOOM_END_MS) {
+  if (elapsedMs <= ROSE_PRESENTATION_START_MS) return ROSE_INITIAL_YAW;
+  if (elapsedMs < ROSE_PRESENTATION_END_MS) {
     const progress = easeInOutCubic(
-      (elapsedMs - ROSE_BLOOM_START_MS) / ROSE_BLOOM_DURATION_MS,
+      (elapsedMs - ROSE_PRESENTATION_START_MS) / ROSE_PRESENTATION_DURATION_MS,
     );
     return ROSE_INITIAL_YAW * (1 - progress);
   }
+  if (elapsedMs <= ROSE_BLOOM_END_MS) return 0;
   return (elapsedMs - ROSE_BLOOM_END_MS) * ROSE_SLOW_SPIN_RADIANS_PER_MS;
 }
 
 export function getRosePresentationPitch(elapsedMs: number): number {
-  if (elapsedMs <= ROSE_BLOOM_START_MS) return 0;
-  if (elapsedMs < ROSE_BLOOM_END_MS) {
+  if (elapsedMs <= ROSE_PRESENTATION_START_MS) return 0;
+  if (elapsedMs < ROSE_PRESENTATION_END_MS) {
     const progress = easeInOutCubic(
-      (elapsedMs - ROSE_BLOOM_START_MS) / ROSE_BLOOM_DURATION_MS,
+      (elapsedMs - ROSE_PRESENTATION_START_MS) / ROSE_PRESENTATION_DURATION_MS,
     );
     return ROSE_FINAL_PITCH * progress;
   }
@@ -60,10 +65,10 @@ export function getRosePresentationPitch(elapsedMs: number): number {
 }
 
 export function getRosePresentationScale(elapsedMs: number): number {
-  if (elapsedMs <= ROSE_BLOOM_START_MS) return 1;
-  if (elapsedMs < ROSE_BLOOM_END_MS) {
+  if (elapsedMs <= ROSE_PRESENTATION_START_MS) return 1;
+  if (elapsedMs < ROSE_PRESENTATION_END_MS) {
     const progress = easeInOutCubic(
-      (elapsedMs - ROSE_BLOOM_START_MS) / ROSE_BLOOM_DURATION_MS,
+      (elapsedMs - ROSE_PRESENTATION_START_MS) / ROSE_PRESENTATION_DURATION_MS,
     );
     return 1 + (ROSE_FINAL_SCALE - 1) * progress;
   }
@@ -78,7 +83,8 @@ export function getRoseBloomDelta(
   const previous = Math.max(current - Math.max(frameDeltaSeconds, 0) * 1_000, 0);
   const activeStart = Math.max(previous, ROSE_BLOOM_START_MS);
   const activeEnd = Math.min(current, ROSE_BLOOM_END_MS);
-  return Math.max(activeEnd - activeStart, 0) / 1_000;
+  const playbackRate = ROSE_BLOOM_CLIP_DURATION_MS / ROSE_BLOOM_DURATION_MS;
+  return (Math.max(activeEnd - activeStart, 0) / 1_000) * playbackRate;
 }
 
 export function createRoseBloomAction(
