@@ -8,6 +8,7 @@ import f1EngineSound from '../audio/f1-engine.mp3';
 import ParticleBackground from './ParticleBackground';
 import { loadModelWithCache } from '../lib/model-loader';
 import { ROSE_MODEL_URL } from '../lib/rose-animation';
+import { useI18n } from '../i18n';
 
 const StartLights = ({ progress, isPressing }: { progress: number, isPressing: boolean }) => {
   if (!isPressing && progress === 0) return null;
@@ -39,6 +40,7 @@ interface WelcomeProps {
 }
 
 const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
+  const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -273,18 +275,18 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
             >
 
               <h2 className="text-xl sm:text-2xl md:text-3xl landscape:text-xl font-bold text-white tracking-wide uppercase">
-                欢迎开启上海狂欢周末
+                {t('welcome.heading')}
               </h2>
 
               {/* 这里是优化后的部分 */}
               <div className="text-[#A0AAB4] text-sm sm:text-base md:text-lg landscape:text-sm font-medium tracking-wide mt-2 landscape:mt-1 px-4 flex flex-col items-start gap-1 landscape:gap-0.5">
 
                 <p className="pl-0">
-                  引擎轰鸣碰撞摇滚风暴
+                  {t('welcome.line1')}
                 </p>
 
                 <p className="pl-8 sm:pl-12">
-                  一场魔都竞速与梦龙狂欢的探索之旅
+                  {t('welcome.line2')}
                 </p>
 
               </div>

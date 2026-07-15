@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Existing Chinese i18n — PR Summary</title>
+  <style>
+    :root { color-scheme: light; font: 16px/1.55 system-ui, sans-serif; color: #172033; background: #f4f6fa; }
+    body { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+    header, section { background: white; border: 1px solid #dfe4ec; border-radius: 16px; padding: 24px; margin-bottom: 16px; }
+    h1, h2 { margin-top: 0; } h1 { font-size: 2rem; } h2 { font-size: 1.15rem; }
+    .verdict { display: inline-block; background: #e9f8ef; color: #176b3a; border-radius: 999px; padding: 6px 12px; font-weight: 700; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+    .card { padding: 16px; border-radius: 12px; background: #f7f9fc; }
+    code { background: #eef1f6; padding: 2px 5px; border-radius: 4px; }
+    summary { cursor: pointer; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="verdict">PASS WITH NOTES</span>
+    <h1>Chinese / English internationalization</h1>
+    <p>Adds bilingual presentation for existing Chinese content while preserving copy that was already English.</p>
+    <div class="grid">
+      <div class="card"><strong>37</strong><br>itinerary locations covered</div>
+      <div class="card"><strong>2</strong><br>supported locales</div>
+      <div class="card"><strong>0</strong><br>Han characters in English itinerary output</div>
+    </div>
+  </header>
+  <section>
+    <h2>What changed</h2>
+    <ul>
+      <li>Typed, dependency-free locale provider and translation catalog.</li>
+      <li>Chinese and English itinerary fields colocated in each location record.</li>
+      <li>Browser-language default, persisted user override, and header language switch.</li>
+      <li>Localized welcome text, itinerary content, map legend, accessibility labels, and driver card.</li>
+      <li>Dynamic document <code>lang</code> and title.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Validation</h2>
+    <p><code>npm run check:i18n</code>, <code>npm run lint</code>, <code>npm run build</code>, <code>git diff --check</code>, and real-browser switching/persistence checks passed.</p>
+    <p>Local browser review noted the pre-existing missing AMap development key and favicon; neither affects the i18n implementation.</p>
+  </section>
+  <section>
+    <details><summary>Architecture and review detail</summary>
+      <p>Each itinerary location stores Chinese and English display fields together. The locale layer selects the matching fields, while F1-specific styling uses the stable ID so behavior is locale-independent.</p>
+    </details>
+  </section>
+</body>
+</html>

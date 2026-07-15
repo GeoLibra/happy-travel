@@ -41,6 +41,7 @@ import RaceCountdown from './components/RaceCountdown';
 import RoseModal from './components/RoseModal';
 import f1EngineShiftSound from './audio/f1-engine-2.mp3';
 import successSound from './audio/success.mp3';
+import { localizeItinerary, useI18n } from './i18n';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -58,6 +59,7 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
 };
 
 export default function App() {
+  const { locale, t, toggleLocale } = useI18n();
   const [showWelcome, setShowWelcome] = useState(true);
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
   const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>();
@@ -78,8 +80,9 @@ export default function App() {
     isModalOpenRef.current = showRoseModal;
   }, [showRoseModal]);
 
-  const allLocations = useMemo(() => ITINERARY_DATA.flatMap(d => d.locations), []);
-  const currentDay = ITINERARY_DATA[selectedDayIdx];
+  const localizedItinerary = useMemo(() => localizeItinerary(ITINERARY_DATA, locale), [locale]);
+  const allLocations = useMemo(() => localizedItinerary.flatMap(d => d.locations), [localizedItinerary]);
+  const currentDay = localizedItinerary[selectedDayIdx];
   const shiftAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -267,7 +270,7 @@ export default function App() {
               </div>
             </div>
             <div onClick={handleSecretClick} className="cursor-pointer active:scale-95 transition-transform">
-              <h1 className="text-xl font-bold tracking-tight">上海周末行程</h1>
+              <h1 className="text-xl font-bold tracking-tight">{t('app.title')}</h1>
               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider flex items-center gap-2">
                 2026.03.13 - 03.15
                 <span className="inline-flex items-center text-[9px] font-black bg-[#E10600] text-white px-1.5 py-0.5 rounded-sm italic transform -skew-x-12 tracking-widest">
@@ -281,6 +284,15 @@ export default function App() {
           </div>
 
           {/* Mobile Toggle */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleLocale}
+              aria-label={t('language.label')}
+              className="h-9 min-w-14 rounded-lg border border-slate-200 bg-white/80 px-3 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-[#E10600]/40 hover:text-[#E10600]"
+            >
+              {t('language.switchLabel')}
+            </button>
           <div className="md:hidden flex bg-slate-100 p-1 rounded-lg">
             <button
               onClick={() => setViewMode('list')}
@@ -300,6 +312,7 @@ export default function App() {
             >
               <MapIcon size={20} />
             </button>
+          </div>
           </div>
         </div>
       </header>
@@ -345,7 +358,7 @@ export default function App() {
             }}
             className="flex gap-2 p-1 bg-white/80 backdrop-blur-md rounded-xl shrink-0 sticky top-0 z-20 shadow-sm border border-slate-200/50 overflow-hidden touch-pan-y"
           >
-            {ITINERARY_DATA.map((day, idx) => (
+            {localizedItinerary.map((day, idx) => (
               <button
                 key={day.date}
                 onClick={(e) => {
@@ -400,7 +413,7 @@ export default function App() {
                 className="space-y-4 touch-pan-y"
               >
                 {currentDay.locations.map((loc, idx) => {
-                  const isF1Circuit = loc.name.includes('赛车场') || loc.name.includes('F1');
+                  const isF1Circuit = loc.id === '2-1' || loc.name.includes('F1');
                   const isImagineDragons = loc.description?.includes('Imagine Dragons');
                   return (
                   <motion.div
@@ -505,7 +518,7 @@ export default function App() {
                             window.open(loc.url, '_blank', 'noopener,noreferrer');
                           }}
                           className="flex items-center text-slate-300 hover:text-[#E10600] transition-colors"
-                          aria-label="打开链接"
+                          aria-label={t('app.openLink')}
                         >
                           <ChevronRight size={20} />
                         </button>

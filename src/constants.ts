@@ -3,10 +3,13 @@ import itineraryData from './data/itinerary.json';
 export interface Location {
   id: string;
   name: string;
+  nameEn: string;
   address: string;
+  addressEn: string;
   type: 'sports' | 'hotel' | 'museum' | 'theatre' | 'cafe' | 'park' | 'restaurant' | 'citywalk' | 'spa';
   time?: string;
   description?: string;
+  descriptionEn?: string;
   coordinates: [number, number]; // [lng, lat]
   url?: string;
 }

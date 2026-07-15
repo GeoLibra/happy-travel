@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import AMapLoader from '@amap/amap-jsapi-loader';
 import { Location, TYPE_COLORS } from '../constants';
 import { cn } from '../lib/utils';
+import { useI18n, type MessageKey } from '../i18n';
 
 interface MapProps {
   locations: Location[];
@@ -12,7 +13,7 @@ interface MapProps {
 }
 
 const getLabelContent = (loc: Location, state: 'normal' | 'hovered' | 'selected') => {
-  const isF1Circuit = loc.name.includes('赛车场') || loc.name.includes('F1');
+  const isF1Circuit = loc.id === '2-1' || loc.name.includes('F1');
   const isImagineDragons = loc.description?.includes('Imagine Dragons');
   let size = 12;
   let border = 2;
@@ -125,6 +126,7 @@ const MapComponent: React.FC<MapProps> = ({
   onHoverType,
   hoveredType
 }) => {
+  const { t } = useI18n();
   const mapRef = useRef<HTMLDivElement>(null);
   const amapInstance = useRef<any>(null);
   const amapConstructor = useRef<any>(null);
@@ -316,9 +318,9 @@ const MapComponent: React.FC<MapProps> = ({
       <div ref={mapRef} className="w-full h-full" />
       <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-slate-200 text-xs z-10 min-w-[110px]">
         <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-          <span className="font-bold text-slate-800 text-sm">图例</span>
+          <span className="font-bold text-slate-800 text-sm">{t('map.legend')}</span>
           <label className="flex items-center cursor-pointer opacity-70 hover:opacity-100 transition-opacity ml-2">
-            <span className="mr-1.5 text-slate-500 font-medium text-[10px]">地点</span>
+            <span className="mr-1.5 text-slate-500 font-medium text-[10px]">{t('map.poi')}</span>
             <div className={`relative inline-block w-6 h-[14px] transition-colors duration-200 ease-in-out rounded-full ${showPOI ? 'bg-blue-400' : 'bg-slate-300'}`}>
               <div
                 className={`absolute left-[2px] top-[2px] w-2.5 h-2.5 bg-white rounded-full transition-transform duration-200 ease-in-out transform ${showPOI ? 'translate-x-2.5' : 'translate-x-0'}`}
@@ -354,7 +356,7 @@ const MapComponent: React.FC<MapProps> = ({
               "capitalize transition-colors",
               hoveredType === type ? "font-bold text-slate-900" : "text-slate-600"
             )}>
-              {type === 'sports' ? '体育/场馆' : type === 'hotel' ? '酒店' : type === 'museum' ? '美术馆' : type === 'theatre' ? '剧院' : type === 'park' ? '公园' : type === 'cafe' ? '咖啡' : type === 'restaurant' ? '餐厅' : type === 'spa' ? 'SPA' : 'Citywalk'}
+              {t(`type.${type}` as MessageKey)}
             </span>
           </div>
         ))}
