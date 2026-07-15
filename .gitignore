@@ -7,3 +7,13 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local browser/test artifacts
+.playwright-cli/
+output/
+docs/
+
+# One-off asset/UI verification scripts
+scripts/prepare_f1_wheels.py
+scripts/verify-f1-glb.mjs
+scripts/check_f1_ui.mjs

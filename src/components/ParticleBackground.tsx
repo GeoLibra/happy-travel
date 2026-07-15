@@ -6,6 +6,8 @@ import { AudioVisualizer } from './effects/audioVisualizer';
 import { DEFAULT_FORCE_FIELD_PARAMS } from './effects/forceField';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { HologramShaderUniforms, applyHologramMaterial, revertHologramMaterial } from './hologram/HologramEffect';
+import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '../lib/f1-motion';
+import { resolveF1WheelNodes } from '../lib/f1-model';
 
 interface ParticleBackgroundProps {
   isPressing: boolean;
@@ -192,15 +194,18 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
     // ── F1 Car 3D Model Integration ──
     let f1CarGroup: THREE.Group | null = null;
+    let f1Wheels: THREE.Object3D[] = [];
     let isCarMaterialReplaced = false;
+    const f1Motion: F1MotionState = { speed: 0, wheelAngle: 0 };
 
     // We'll check for modelRef.current dynamically in the animate loop to support late arrivals
     const checkModelInjection = () => {
       if (!f1CarGroup && modelRef.current) {
         f1CarGroup = modelRef.current;
-        f1CarGroup.scale.set(16, 16, 16);
+        f1Wheels = resolveF1WheelNodes(f1CarGroup);
+        f1CarGroup.scale.set(8, 8, 8);
         f1CarGroup.rotation.y = 0; // Face the camera directly
-        f1CarGroup.position.set(0, -10, -150); // Start deep in the screen
+        f1CarGroup.position.set(0, -10, getF1Depth(0));
         f1CarGroup.visible = false;
 
         if (!isCarMaterialReplaced) {
@@ -460,6 +465,13 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       const delta = Math.min(timer.getDelta(), 0.1);
 
       const s = stateRef.current;
+      const targetRacingSpeed = getTargetSpeed(s.progress, s.isPressing);
+      stepF1Motion(f1Motion, targetRacingSpeed, delta);
+      const racingSpeed = f1Motion.speed;
+
+      for (const wheel of f1Wheels) {
+        wheel.rotation.x = f1Motion.wheelAngle;
+      }
 
       // Connect audio on first press
       /*
@@ -479,6 +491,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       s.baseUniforms.uDelta.value = delta;
       s.baseUniforms.uIsPressing.value = s.isPressing;
       s.baseUniforms.uProgress.value = s.progress;
+      s.baseUniforms.uFieldSpeed.value = DEFAULT_FORCE_FIELD_PARAMS.speed + racingSpeed * 1.5;
       s.baseUniforms.uExplosionForce.value = 0;
       
       // Update Hologram/Progress Uniforms
@@ -546,14 +559,14 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
           let dx, dy, dz;
 
           // 只要进度>0且<100，就向中心反向加速聚集
-          if (s.progress > 0 && s.progress < 100) {
+          if (racingSpeed > 0.001) {
             const dirX = 0 - pArr[i3];
             const dirY = -25 - pArr[i3 + 1];
             const dist = Math.sqrt(dirX*dirX + dirY*dirY) || 1;
-            const revForce = 2.0 + Math.pow(s.progress / 100, 2) * 12.0;
+            const revForce = 2.0 + racingSpeed * racingSpeed * 12.0;
             dx = (dirX / dist) * revForce;
             dy = (dirY / dist) * revForce;
-            dz = -revForce * 1.5;
+            dz = revForce * 1.5;
 
           } else {
             // 默认漂浮状态 (0% 和 100%)
@@ -593,13 +606,14 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         // 0-100% Progress mapping
         const progressFactor = s.progress / 100;
 
-        // Position: Move from deep screen (-150) to hero position (0)
-        const targetZ = -150 + (progressFactor * 150);
+        // Restore the original long-distance reveal while keeping the newer
+        // wheel and environment motion.
+        const targetZ = getF1Depth(s.progress);
         f1CarGroup.position.z += (targetZ - f1CarGroup.position.z) * 0.1;
         f1CarGroup.position.x = 0; // Stay centered
-        // Keep car strictly planted on the road at y = -10 at all times,
-        // with just a tiny engine vibration vibration. No progressive lifting!
-        f1CarGroup.position.y = -10 + Math.sin(time * 15) * 0.05;
+        const engineVibration =
+          (Math.sin(time * 42) * 0.035 + Math.sin(time * 19) * 0.02) * racingSpeed;
+        f1CarGroup.position.y = -10 + engineVibration;
 
         // Scale: Grow to a balanced size
         const targetScale = 8 + (progressFactor * 4); // Final scale 12
@@ -607,7 +621,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
         // Rotation: Background Match turn without tilting the car into the floor
         if (s.progress < 100) {
-            const turnFactor = Math.min(1, Math.max(0, (s.progress - 80) / 20));
+            const turnFactor = Math.min(1, progressFactor * 1.25);
 
             // Y-axis: From 0 to 135 degrees (3/4 rear-to-side view)
             const targetRotY = turnFactor * (Math.PI * 0.25);
@@ -617,7 +631,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             f1CarGroup.rotation.x += (0 - f1CarGroup.rotation.x) * 0.1;
 
             // Z-axis: Subtle dynamic lean
-            const targetRotZ = turnFactor * 0.05 + Math.sin(time * 2) * 0.01;
+            const targetRotZ =
+              turnFactor * 0.05 +
+              Math.sin(time * 10) * 0.008 * racingSpeed +
+              Math.sin(time * 26) * 0.004 * racingSpeed;
             f1CarGroup.rotation.z += (targetRotZ - f1CarGroup.rotation.z) * 0.05;
         }
         // When progress >= 100, we just keep the final rotation values intact so it doesn't snap!
@@ -631,28 +648,20 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
       // ── Update Hairline Road & Speed Lines Fading ──
 
-      // Calculate smooth fade in/out based on progress
-      // Fade in quickly from 0 to 5. Fade out smoothly from 80 to 100.
-      let trackOpacity = 0;
-      if (s.progress > 0 && s.progress <= 5) {
-          trackOpacity = s.progress / 5; // 0 to 1
-      } else if (s.progress > 5 && s.progress <= 80) {
-          trackOpacity = 1.0;
-      } else if (s.progress > 80 && s.progress <= 100) {
-          trackOpacity = 1.0 - ((s.progress - 80) / 20); // 1 to 0
-      }
+      // The environment fades with the same damped speed as the wheels, so
+      // completion settles instead of snapping at 100%.
+      const trackOpacity = Math.min(1, racingSpeed * 1.2);
 
       // We no longer toggle visibility, we use smooth opacity so they fade out naturally
       // Update shader uniforms for hairMat
         
         
-        hairMat.opacity = trackOpacity * 0.9; // 0.9 is the base max opacity
-      lineMaterial.uniforms.uOpacity.value = trackOpacity;
+        hairMat.opacity = trackOpacity * 0.18;
+      lineMaterial.uniforms.uOpacity.value = trackOpacity * 0.55;
 
       // Accelerate rapidly if pressing OR if progress is auto-completing (s.progress >= 30)
-      const isTunnelMovingInward = s.isPressing || (s.progress >= 30 && s.progress < 100);
-
-      const baseSpeed = 4.0;
+      const isTunnelMovingInward = racingSpeed > 0.001;
+      const roadSpeed = 18 + Math.pow(racingSpeed, 1.35) * 1100;
 
       // Only update positions if they are actually visible (optimization)
       if (trackOpacity > 0) {
@@ -660,16 +669,15 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             const data = hairData[i];
 
             if (isTunnelMovingInward) {
-                // Accelerating inwards!
-                const accel = 1.0 + Math.pow(s.progress / 100, 2) * 12.0;
-                data.z -= baseSpeed * data.speedMultiplier * accel * 3.0;
+                // Rush the road toward the viewer while the car stays framed.
+                data.z += roadSpeed * data.speedMultiplier * delta;
 
-                if (data.z < -600) {
-                    data.z = 150 + Math.random() * 100; // spawn in front
+                if (data.z > 150) {
+                    data.z = -600 - Math.random() * 200;
                 }
             } else {
                 // Default: Normal chill driving forward, lines come AT you slowly
-                data.z += (baseSpeed * 0.2) * data.speedMultiplier;
+                data.z += 18 * data.speedMultiplier * delta;
 
                 if (data.z > 150) {
                     data.z = -600 - Math.random() * 200; // spawn far back
@@ -689,6 +697,19 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             hairMesh.setMatrixAt(i, dummyHair.matrix);
         }
         hairMesh.instanceMatrix.needsUpdate = true;
+      }
+
+      speedLines.visible = trackOpacity > 0.01;
+      if (speedLines.visible) {
+        const pointSpeed = 120 + racingSpeed * 950;
+        for (let i = 0; i < SPEED_LINE_COUNT; i++) {
+          const i3 = i * 3;
+          lPositions[i3 + 2] += pointSpeed * lSpeeds[i] * delta;
+          if (lPositions[i3 + 2] > 45) {
+            lPositions[i3 + 2] = -120 - Math.random() * 80;
+          }
+        }
+        lineGeometry.attributes.position.needsUpdate = true;
       }
 
       // ── Render Dual Pass ──
@@ -751,13 +772,31 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
     }}
     onClick={(e) => {
-
-
       // Smart event forwarding when progress >= 100
       if (progress >= 100) {
+        const target = containerRef.current;
         const canvas = containerRef.current?.querySelector('canvas');
-        if (!canvas) {
+        if (!target || !canvas) return;
 
+        // The Three.js layer sits above the welcome content so the car remains
+        // visible. Resolve a clickable element at the same screen coordinate
+        // before treating the click as a car/orbit interaction.
+        const previousPointerEvents = target.style.pointerEvents;
+        target.style.pointerEvents = 'none';
+        const underlyingElement = document.elementFromPoint(e.clientX, e.clientY);
+        target.style.pointerEvents = previousPointerEvents;
+
+        const clickableElement = underlyingElement?.closest<HTMLElement>(
+          'button, a, [role="button"], [onclick]'
+        );
+        if (clickableElement) {
+          clickableElement.dispatchEvent(new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            clientX: e.clientX,
+            clientY: e.clientY,
+          }));
+          e.stopPropagation();
           return;
         }
 
@@ -771,56 +810,12 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
 
 
-        // If click is near center (on the car), handle car click
-        if (distanceFromCenter < 0.4) {
-
-          if (onCarClick) {
-
-            onCarClick();
-            e.stopPropagation();
-          } else {
-
-          }
+        // If click is near center (on the car), handle car click.
+        if (distanceFromCenter < 0.4 && onCarClick) {
+          onCarClick();
+          e.stopPropagation();
           // Let OrbitControls handle the interaction
-        } else {
-
-          // Click is on empty space, forward to underlying element
-          const target = containerRef.current;
-          if (target) {
-            // Temporarily disable pointer events to get element below
-            target.style.pointerEvents = 'none';
-            let underlyingElement = document.elementFromPoint(e.clientX, e.clientY);
-            target.style.pointerEvents = 'auto';
-
-
-
-            // If we found a child element (like span inside button), find the closest clickable parent
-            if (underlyingElement) {
-              // Find closest button or clickable element
-              const clickableElement = underlyingElement.closest('button, a, [role="button"], [onclick]');
-              if (clickableElement) {
-
-                underlyingElement = clickableElement as HTMLElement;
-              }
-            }
-
-            // Forward click to underlying element
-            if (underlyingElement && underlyingElement !== target) {
-
-              underlyingElement.dispatchEvent(new MouseEvent('click', {
-                bubbles: true,
-                cancelable: true,
-                clientX: e.clientX,
-                clientY: e.clientY,
-              }));
-
-            } else {
-
-            }
-          }
         }
-      } else {
-
       }
     }}
   />;
