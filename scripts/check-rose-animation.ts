@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import * as THREE from "three";
 import {
   createRoseBloomAction,
@@ -62,5 +63,15 @@ assert.equal(playback.action.clampWhenFinished, true);
 assert.equal(playback.action.isRunning(), true);
 assert.equal(playback.mixer.time, 0);
 assert.equal(createRoseBloomAction(root, []), null);
+
+const threeRoseSource = fs.readFileSync(
+  new URL("../src/components/ThreeRose.tsx", import.meta.url),
+  "utf8",
+);
+assert.match(threeRoseSource, /MeshSurfaceSampler/);
+assert.match(threeRoseSource, /startPositions/);
+assert.match(threeRoseSource, /targetPositions/);
+assert.match(threeRoseSource, /getRoseAssemblyProgress/);
+assert.doesNotMatch(threeRoseSource, /allVertices/);
 
 console.log("PASS: rose assembly, handoff, bloom, and presentation timing verified");

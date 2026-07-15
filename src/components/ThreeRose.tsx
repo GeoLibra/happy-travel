@@ -1,9 +1,12 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.js";
 import { loadModelWithCache } from "../lib/model-loader";
 import {
   createRoseBloomAction,
+  getRoseArcStrength,
+  getRoseAssemblyProgress,
   getRoseBloomDelta,
   ROSE_MODEL_URL,
   ROSE_PARTICLE_PHASE_MS,
@@ -94,15 +97,31 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
     const particleCount = 40000;
     const particleGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
-    const originalPositions = new Float32Array(particleCount * 3);
+    const startPositions = new Float32Array(particleCount * 3);
+    const targetPositions = new Float32Array(particleCount * 3);
+    const arcOffsets = new Float32Array(particleCount * 3);
+    const heightRatios = new Float32Array(particleCount);
+    const delayJitters = new Float32Array(particleCount);
+    const particlePhases = new Float32Array(particleCount);
+    const baseSizes = new Float32Array(particleCount);
     const colors = new Float32Array(particleCount * 3);
     const sizes = new Float32Array(particleCount);
 
     for (let i = 0; i < particleCount; i++) {
       const i3 = i * 3;
-      positions[i3] = 0;
-      positions[i3 + 1] = 1.5;
-      positions[i3 + 2] = 0;
+      const angle = (i / particleCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.7;
+      const radius = 3.4 + Math.random() * 2.2;
+      startPositions[i3] = Math.cos(angle) * radius;
+      startPositions[i3 + 1] = Math.sin(angle) * radius * 0.72;
+      startPositions[i3 + 2] = -2.8 + Math.random() * 5.6;
+      arcOffsets[i3] = -Math.sin(angle) * (0.35 + Math.random() * 0.9);
+      arcOffsets[i3 + 1] = Math.cos(angle) * (0.2 + Math.random() * 0.65);
+      arcOffsets[i3 + 2] = (Math.random() - 0.5) * 1.3;
+      delayJitters[i] = Math.random();
+      particlePhases[i] = Math.random() * Math.PI * 2;
+      positions[i3] = startPositions[i3];
+      positions[i3 + 1] = startPositions[i3 + 1];
+      positions[i3 + 2] = startPositions[i3 + 2];
 
       // 金红/橙红配色
       const colorMix = Math.random();
@@ -120,7 +139,8 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
         colors[i3 + 2] = 0.2 + Math.random() * 0.2;
       }
 
-      sizes[i] = 0.01 + Math.random() * 0.03;
+      baseSizes[i] = 0.01 + Math.random() * 0.03;
+      sizes[i] = baseSizes[i];
     }
 
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -196,42 +216,52 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
 
       const meshes: THREE.Mesh[] = [];
       model.traverse((child: any) => {
-        if (child.isMesh) meshes.push(child);
+        if (child.isMesh && child.visible) meshes.push(child);
       });
 
-      if (meshes.length > 0) {
+      const samplerEntries = meshes.flatMap((mesh) => {
+        const sampler = new MeshSurfaceSampler(mesh).build();
+        const distribution = sampler.distribution;
+        const area = distribution?.[distribution.length - 1] ?? 0;
+        return area > 0 ? [{ mesh, sampler, area }] : [];
+      });
+      const totalArea = samplerEntries.reduce((sum, entry) => sum + entry.area, 0);
+
+      if (totalArea > 0) {
         const posAttr = particleGeometry.attributes.position;
-        const allVertices: THREE.Vector3[] = [];
-        meshes.forEach(mesh => {
-            const geoPos = mesh.geometry.attributes.position;
-            if (geoPos) {
-                for(let v = 0; v < geoPos.count; v++) {
-                    const vertex = new THREE.Vector3(geoPos.getX(v), geoPos.getY(v), geoPos.getZ(v));
-                    mesh.localToWorld(vertex);
-                    allVertices.push(vertex);
-                }
+        const samplePoint = new THREE.Vector3();
+        let minTargetY = Infinity;
+        let maxTargetY = -Infinity;
+
+        for (let i = 0; i < particleCount; i++) {
+          const selectedArea = Math.random() * totalArea;
+          let accumulatedArea = 0;
+          let selectedEntry = samplerEntries[samplerEntries.length - 1];
+          for (const entry of samplerEntries) {
+            accumulatedArea += entry.area;
+            if (selectedArea <= accumulatedArea) {
+              selectedEntry = entry;
+              break;
             }
-        });
+          }
 
-        if (allVertices.length > 0) {
-            for (let i = 0; i < particleCount; i++) {
-              const baseVertex = allVertices[Math.floor(Math.random() * allVertices.length)];
-
-              const offsetValue = 0.02 + Math.random() * 0.03;
-              const localPos = baseVertex.clone();
-              localPos.x += (Math.random() - 0.5) * offsetValue;
-              localPos.y += (Math.random() - 0.5) * offsetValue;
-              localPos.z += (Math.random() - 0.5) * offsetValue;
-
-              const i3 = i * 3;
-              originalPositions[i3] = localPos.x;
-              originalPositions[i3 + 1] = localPos.y;
-              originalPositions[i3 + 2] = localPos.z;
-
-              posAttr.setXYZ(i, localPos.x, localPos.y, localPos.z);
-            }
-            posAttr.needsUpdate = true;
+          selectedEntry.sampler.sample(samplePoint);
+          selectedEntry.mesh.localToWorld(samplePoint);
+          const i3 = i * 3;
+          targetPositions[i3] = samplePoint.x;
+          targetPositions[i3 + 1] = samplePoint.y;
+          targetPositions[i3 + 2] = samplePoint.z;
+          minTargetY = Math.min(minTargetY, samplePoint.y);
+          maxTargetY = Math.max(maxTargetY, samplePoint.y);
         }
+
+        const targetHeight = maxTargetY - minTargetY;
+        for (let i = 0; i < particleCount; i++) {
+          heightRatios[i] = targetHeight > 0
+            ? (targetPositions[i * 3 + 1] - minTargetY) / targetHeight
+            : 0;
+        }
+        posAttr.needsUpdate = true;
       }
 
       modelLoaded = true;
@@ -267,6 +297,11 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
         roseAnimation.mixer.update(bloomDelta);
       }
 
+      if (elapsed >= PARTICLE_PHASE) {
+        positions.set(targetPositions);
+        particleGeometry.attributes.position.needsUpdate = true;
+      }
+
       if (elapsed < PARTICLE_PHASE) {
         particleSystem.visible = true;
         modelGroup.visible = false;
@@ -277,20 +312,23 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
 
         for (let i = 0; i < particleCount; i++) {
           const i3 = i * 3;
-          const floatOffset = Math.sin(elapsed * 0.001 + i * 0.1) * 0.008;
-          const driftX = Math.cos(elapsed * 0.0008 + i * 0.15) * 0.004;
-          const driftZ = Math.sin(elapsed * 0.0007 + i * 0.12) * 0.004;
+          const progress = getRoseAssemblyProgress(elapsed, heightRatios[i], delayJitters[i]);
+          const inverse = 1 - progress;
+          const arcStrength = getRoseArcStrength(progress);
+          const drift = Math.sin(elapsed * 0.003 + particlePhases[i]) * inverse * 0.06;
 
-          posAttr.setXYZ(
-            i,
-            originalPositions[i3] + driftX,
-            originalPositions[i3 + 1] + floatOffset,
-            originalPositions[i3 + 2] + driftZ
-          );
-
-          const baseSz = sizeAttr.getX(i);
-          const pulse = 1 + Math.sin(elapsed * 0.002 + i * 0.2) * 0.1;
-          sizeAttr.setX(i, baseSz * pulse);
+          positions[i3] = startPositions[i3] * inverse
+            + targetPositions[i3] * progress
+            + arcOffsets[i3] * arcStrength
+            + drift;
+          positions[i3 + 1] = startPositions[i3 + 1] * inverse
+            + targetPositions[i3 + 1] * progress
+            + arcOffsets[i3 + 1] * arcStrength
+            + drift * 0.6;
+          positions[i3 + 2] = startPositions[i3 + 2] * inverse
+            + targetPositions[i3 + 2] * progress
+            + arcOffsets[i3 + 2] * arcStrength;
+          sizes[i] = baseSizes[i] * (0.9 + 0.1 * Math.sin(elapsed * 0.004 + particlePhases[i]));
         }
         posAttr.needsUpdate = true;
         sizeAttr.needsUpdate = true;
