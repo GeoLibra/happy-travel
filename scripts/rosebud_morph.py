@@ -9,6 +9,32 @@ ROOT_LOCK_END = 0.15
 EPSILON = 1e-12
 
 
+def compute_angular_guide_indices(
+    named_centroids: list[tuple[str, Vector]],
+    flower_center: Vector,
+) -> dict[str, int]:
+    if not named_centroids:
+        raise ValueError('Angular guide ranking requires petals')
+    if len(named_centroids) % 2 != 0:
+        raise ValueError('Angular guide ranking requires an even petal count')
+    if not all(math.isfinite(component) for component in flower_center):
+        raise ValueError('Flower center must be finite')
+    names = [name for name, _ in named_centroids]
+    if len(set(names)) != len(names):
+        raise ValueError('Angular guide ranking requires unique names')
+    ranked = []
+    for name, centroid in named_centroids:
+        if not all(math.isfinite(component) for component in centroid):
+            raise ValueError('Petal centroid must be finite')
+        dx = centroid.x - flower_center.x
+        dy = centroid.y - flower_center.y
+        if dx * dx + dy * dy <= EPSILON:
+            raise ValueError('Petal angular sector is degenerate')
+        ranked.append((math.atan2(dy, dx), name))
+    ranked.sort(key=lambda item: (item[0], item[1]))
+    return {name: rank for rank, (_, name) in enumerate(ranked)}
+
+
 @dataclass(frozen=True)
 class MorphSettings:
     opening_frame: int

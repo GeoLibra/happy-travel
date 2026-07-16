@@ -9,11 +9,57 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rosebud_morph import (
     ROOT_LOCK_END,
     MorphSettings,
+    compute_angular_guide_indices,
     compute_guide_point,
     compute_tip_guide_point,
     generate_bud_world_positions,
     smoothstep01,
 )
+
+circle_points = [
+    ('ne', Vector((1.0, 1.0, 0.5))),
+    ('w', Vector((-1.0, 0.0, 0.5))),
+    ('se', Vector((1.0, -1.0, 0.5))),
+    ('n', Vector((0.0, 1.0, 0.5))),
+    ('sw', Vector((-1.0, -1.0, 0.5))),
+    ('e', Vector((1.0, 0.0, 0.5))),
+    ('nw', Vector((-1.0, 1.0, 0.5))),
+    ('s', Vector((0.0, -1.0, 0.5))),
+]
+angular_indices = compute_angular_guide_indices(circle_points, Vector((0.0, 0.0, 0.5)))
+expected_order = ['sw', 's', 'se', 'e', 'ne', 'n', 'nw', 'w']
+assert [name for name, _ in sorted(angular_indices.items(), key=lambda item: item[1])] == expected_order
+assert angular_indices == compute_angular_guide_indices(
+    list(reversed(circle_points)), Vector((0.0, 0.0, 0.5))
+)
+for rank in range(len(expected_order)):
+    assert rank % 2 != ((rank + 1) % len(expected_order)) % 2
+
+invalid_rank_inputs = (
+    [],
+    [('same', Vector((1.0, 0.0, 0.0))), ('same', Vector((-1.0, 0.0, 0.0)))],
+    [('center', Vector((0.0, 0.0, 0.0))), ('e', Vector((1.0, 0.0, 0.0)))],
+    [('nan', Vector((float('nan'), 1.0, 0.0))), ('e', Vector((1.0, 0.0, 0.0)))],
+    [
+        ('a', Vector((1.0, 0.0, 0.0))),
+        ('b', Vector((0.0, 1.0, 0.0))),
+        ('c', Vector((-1.0, 0.0, 0.0))),
+    ],
+)
+for invalid in invalid_rank_inputs:
+    try:
+        compute_angular_guide_indices(invalid, Vector((0.0, 0.0, 0.0)))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('Invalid angular guide input must fail')
+
+try:
+    compute_angular_guide_indices(circle_points, Vector((float('inf'), 0.0, 0.0)))
+except ValueError:
+    pass
+else:
+    raise AssertionError('Non-finite flower center must fail')
 
 tip_local = MorphSettings(
     opening_frame=34,
