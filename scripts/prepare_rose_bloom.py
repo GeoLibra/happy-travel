@@ -39,9 +39,9 @@ MATERIAL_OBJECTS = {
     "m_thorns": "thorn",
 }
 MORPH_SETTINGS = {
-    "outer": MorphSettings(1, math.radians(3.0), 0.12, 0.015),
-    "middle": MorphSettings(18, math.radians(6.0), 0.25, 0.025),
-    "inner": MorphSettings(34, math.radians(11.0), 0.38, 0.035),
+    "outer": MorphSettings(1, math.radians(12.0), 0.55, 0.75, 0.25, math.radians(1.0)),
+    "middle": MorphSettings(18, math.radians(24.0), 0.30, 0.90, 0.45, math.radians(2.0)),
+    "inner": MorphSettings(34, math.radians(38.0), 0.12, 1.05, 0.90, math.radians(3.0)),
 }
 
 
@@ -294,6 +294,10 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
     if max_radius <= 1e-12:
         raise RuntimeError("Petal centroids have no usable radial distribution")
 
+    guide_radii = [MORPH_SETTINGS[layer].guide_radius_ratio for layer in ("outer", "middle", "inner")]
+    if not guide_radii[0] > guide_radii[1] > guide_radii[2] > 0.0:
+        raise RuntimeError(f"Guide ring radii must descend outer-to-inner, found {guide_radii}")
+
     for index, petal in enumerate(petals):
         if petal.data.shape_keys is not None:
             petal.shape_key_clear()
@@ -316,7 +320,7 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
         open_world = petal.matrix_world.copy()
         open_points = [open_world @ point.co for point in basis.data]
         closed_points, parameters = generate_bud_world_positions(
-            open_points, origin, flower_center, centers[petal], settings, index
+            open_points, origin, flower_center, centers[petal], max_radius, settings, index
         )
         inverse_world = open_world.inverted_safe()
         for vertex_index, closed_world in enumerate(closed_points):
