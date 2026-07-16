@@ -7,15 +7,6 @@ const JSON_CHUNK = 0x4e4f534a;
 const BIN_CHUNK = 0x004e4942;
 const FLOAT_COMPONENT_TYPE = 5126;
 const COMPONENTS_BY_TYPE = { SCALAR: 1, VEC3: 3, VEC4: 4 };
-const ROTATION_CAP_DEGREES = { outer: 1, middle: 4, inner: 8 };
-const radiansToDegrees = (value) => value * 180 / Math.PI;
-const quaternionAngleDegrees = (left, right) => {
-  const leftLength = Math.hypot(...left);
-  const rightLength = Math.hypot(...right);
-  assert(leftLength > 0 && rightLength > 0, 'Rotation quaternion must be nonzero');
-  const dot = left.reduce((sum, value, index) => sum + value * right[index], 0) / (leftLength * rightLength);
-  return radiansToDegrees(2 * Math.acos(Math.min(1, Math.abs(dot))));
-};
 
 function readGlb(filePath) {
   const glb = readFileSync(filePath);
@@ -89,49 +80,38 @@ function verifyRoseBloom(filePath) {
     sampler: animation.samplers[channel.sampler],
   }));
 
+  assert.equal(targets.length, 25, 'RoseBloom must contain one channel per physical petal');
+  assert(
+    targets.every(({ node, path }) => node.startsWith('Petal_') && path === 'weights'),
+    'RoseBloom may contain only Petal_* morph weight channels',
+  );
+
   const petalNodes = new Set(targets.map(({ node }) => node));
-  assert.equal(
-    petalNodes.size,
-    25,
-    'RoseBloom must animate one node per complete physical petal',
-  );
+  assert.equal(petalNodes.size, 25, 'RoseBloom must animate 25 unique physical petals');
+  const layers = new Set();
 
-  assert(targets.length >= 6, 'RoseBloom must animate multiple petals');
-  assert(
-    new Set(targets.map(({ node }) => node)).size >= 3,
-    'RoseBloom must target at least three petal nodes',
-  );
-  assert(
-    targets.every(({ node }) => node.startsWith('Petal_')),
-    'RoseBloom may animate only Petal_* nodes',
-  );
-  assert(
-    ['translation', 'scale'].every((path) => targets.some((target) => target.path === path)),
-    'RoseBloom must contain translation and scale channels',
-  );
-
-  const petalNodesArray = [...petalNodes];
-  const layers = new Set(petalNodesArray.map((nodeName) => {
+  for (const { node: nodeName, sampler } of targets) {
     const node = json.nodes.find(({ name }) => name === nodeName);
-    const layer = node?.extras?.RoseLayer;
-    assert(layer in ROTATION_CAP_DEGREES, `${nodeName} must declare a valid RoseLayer`);
-    return layer;
-  }));
-  assert.deepEqual(layers, new Set(['outer', 'middle', 'inner']));
+    assert(node, `${nodeName} node is missing`);
+    assert(['outer', 'middle', 'inner'].includes(node.extras?.RoseLayer), `${nodeName} must declare RoseLayer`);
+    layers.add(node.extras.RoseLayer);
 
-  const rotationTargets = targets.filter(({ path }) => path === 'rotation');
-  assert(rotationTargets.length > 0, 'RoseBloom must contain bounded rotation channels');
-  const rotationLayers = new Set(rotationTargets.map(({ node }) =>
-    json.nodes.find(({ name }) => name === node)?.extras?.RoseLayer,
-  ));
-  assert(rotationLayers.has('middle') && rotationLayers.has('inner'), 'Middle and inner petals must fold inward');
-  for (const { node, sampler } of rotationTargets) {
-    const layer = json.nodes.find(({ name }) => name === node)?.extras?.RoseLayer;
-    const quaternions = readFloatAccessor(json, bin, sampler.output, 'VEC4');
-    const finalQuaternion = quaternions.at(-1);
-    const maximum = Math.max(...quaternions.map((value) => quaternionAngleDegrees(value, finalQuaternion)));
-    assert(maximum <= ROTATION_CAP_DEGREES[layer] + 0.05, `${node} ${layer} rotation ${maximum.toFixed(3)}° exceeds its cap`);
+    const mesh = json.meshes?.[node.mesh];
+    assert(mesh, `${nodeName} mesh is missing`);
+    assert.deepEqual(mesh.extras?.targetNames, ['Bud'], `${nodeName} must expose one Bud target name`);
+    assert.equal(mesh.weights?.length, 1, `${nodeName} must have one default morph weight`);
+    assert.equal(mesh.primitives?.length, 1, `${nodeName} must have one mesh primitive`);
+    assert.equal(mesh.primitives[0].targets?.length, 1, `${nodeName} must have one morph target`);
+    assert(mesh.primitives[0].targets[0].POSITION !== undefined, `${nodeName} Bud target must contain positions`);
+
+    const weights = readFloatAccessor(json, bin, sampler.output, 'SCALAR').flat();
+    assert(weights.length >= 2, `${nodeName} weights sampler must contain multiple keys`);
+    assert(weights.every((value) => Number.isFinite(value) && value >= -1e-5 && value <= 1 + 1e-5), `${nodeName} weights must stay in [0, 1]`);
+    assert(Math.abs(weights[0] - 1) <= 1e-5, `${nodeName} must start at Bud weight 1`);
+    assert(Math.abs(weights.at(-1)) <= 1e-5, `${nodeName} must finish at Bud weight 0`);
   }
+
+  assert.deepEqual(layers, new Set(['outer', 'middle', 'inner']));
 
   const inputTimes = animation.samplers.flatMap((sampler) => {
     assert(sampler, 'RoseBloom channel sampler is missing');
