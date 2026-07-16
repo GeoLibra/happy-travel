@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export const ROSE_MODEL_URL = "/models/rose.glb?v=natural-bud-1";
+export const ROSE_MODEL_URL = "/models/rose.glb?v=guided-bud-1";
 export const ROSE_ASSEMBLY_MS = 3_000;
 export const ROSE_HANDOFF_MS = 600;
 export const ROSE_HANDOFF_END_MS = ROSE_ASSEMBLY_MS + ROSE_HANDOFF_MS;
