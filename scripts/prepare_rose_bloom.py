@@ -10,6 +10,7 @@ import json
 import math
 import shutil
 import struct
+from itertools import combinations
 from pathlib import Path
 
 import bpy
@@ -22,6 +23,10 @@ OUTPUT_GLB = SOURCE_GLB
 MIRROR_GLB = REPO_ROOT / "public/models/rose.glb"
 FPS = 30
 END_FRAME = 135
+EXPECTED_PETAL_COUNT = 25
+PETAL_COMPONENTS_PER_PETAL = 3
+MIN_PETAL_COMPONENT_VERTICES = 100
+MAX_PETAL_CLUSTER_COST = 0.08
 
 MATERIAL_OBJECTS = {
     "m_leafs": "leaf",
@@ -29,9 +34,10 @@ MATERIAL_OBJECTS = {
     "m_thorns": "thorn",
 }
 LAYER_SETTINGS = {
-    "outer": (1, 0.18, (0.72, 0.72, 0.94), math.radians(38.0)),
-    "middle": (18, 0.13, (0.80, 0.80, 0.97), math.radians(28.0)),
-    "inner": (34, 0.08, (0.88, 0.88, 0.99), math.radians(16.0)),
+    # opening frame, inward translation, local scale, maximum inward fold
+    "outer": (1, 0.08, (0.86, 0.86, 0.98), math.radians(1.0)),
+    "middle": (18, 0.26, (0.74, 0.74, 0.98), math.radians(4.0)),
+    "inner": (34, 0.42, (0.84, 0.84, 0.995), math.radians(8.0)),
 }
 
 
@@ -63,6 +69,72 @@ def bounds_for(objects: list[bpy.types.Object]) -> tuple[float, ...]:
 def centroid(obj: bpy.types.Object) -> Vector:
     points = world_vertices(obj)
     return sum(points, Vector()) / len(points)
+
+
+def component_bounds(obj: bpy.types.Object) -> tuple[float, ...]:
+    points = world_vertices(obj)
+    return tuple(min(point[axis] for point in points) for axis in range(3)) + tuple(
+        max(point[axis] for point in points) for axis in range(3)
+    )
+
+
+def bounds_distance(left: tuple[float, ...], right: tuple[float, ...]) -> float:
+    return math.sqrt(sum((a - b) ** 2 for a, b in zip(left, right)))
+
+
+def cluster_petal_components(components: list[bpy.types.Object]) -> list[tuple[bpy.types.Object, ...]]:
+    expected_components = EXPECTED_PETAL_COUNT * PETAL_COMPONENTS_PER_PETAL
+    if len(components) != expected_components:
+        raise RuntimeError(
+            f"Expected {expected_components} substantial petal components "
+            f"({EXPECTED_PETAL_COUNT} petals x {PETAL_COMPONENTS_PER_PETAL}), found {len(components)}"
+        )
+
+    component_bounds_by_object = {obj: component_bounds(obj) for obj in components}
+    candidates = []
+    for group in combinations(components, PETAL_COMPONENTS_PER_PETAL):
+        cost = sum(
+            bounds_distance(component_bounds_by_object[left], component_bounds_by_object[right])
+            for left, right in combinations(group, 2)
+        )
+        candidates.append((cost, tuple(sorted(group, key=lambda obj: obj.name))))
+    candidates.sort(key=lambda item: (item[0], tuple(obj.name for obj in item[1])))
+
+    assigned: set[bpy.types.Object] = set()
+    clusters = []
+    for cost, group in candidates:
+        if any(obj in assigned for obj in group):
+            continue
+        if cost > MAX_PETAL_CLUSTER_COST:
+            raise RuntimeError(
+                f"Could not identify a coherent physical petal; nearest remaining cluster cost is {cost:.6f}"
+            )
+        clusters.append(group)
+        assigned.update(group)
+        if len(assigned) == len(components):
+            break
+
+    if len(clusters) != EXPECTED_PETAL_COUNT or len(assigned) != len(components):
+        raise RuntimeError(
+            f"Expected {EXPECTED_PETAL_COUNT} complete petal clusters, "
+            f"formed {len(clusters)} from {len(assigned)} of {len(components)} components"
+        )
+    return clusters
+
+
+def join_petal_components(clusters: list[tuple[bpy.types.Object, ...]]) -> list[bpy.types.Object]:
+    petals = []
+    for index, cluster in enumerate(clusters):
+        bpy.ops.object.select_all(action="DESELECT")
+        active = cluster[0]
+        for component in cluster:
+            component.select_set(True)
+        bpy.context.view_layer.objects.active = active
+        bpy.ops.object.join()
+        active.name = f"__CompletePetal_{index:03d}"
+        active.data.name = f"__CompletePetalMesh_{index:03d}"
+        petals.append(active)
+    return petals
 
 
 def reset_and_import() -> list[bpy.types.Object]:
@@ -105,6 +177,7 @@ def find_required_meshes(objects: list[bpy.types.Object]) -> None:
 def discover_petals(objects: list[bpy.types.Object]) -> list[bpy.types.Object]:
     material_petals = [obj for obj in objects if "m_petal" in material_names(obj)]
     generated_petals = [obj for obj in material_petals if obj.name.startswith("Petal_")]
+    petals = None
 
     if len(material_petals) == 1 and not generated_petals:
         source = material_petals[0]
@@ -115,19 +188,35 @@ def discover_petals(objects: list[bpy.types.Object]) -> list[bpy.types.Object]:
         bpy.ops.mesh.select_all(action="SELECT")
         bpy.ops.mesh.separate(type="LOOSE")
         bpy.ops.object.mode_set(mode="OBJECT")
-        petals = sorted(
+        components = sorted(
             [obj for obj in bpy.context.selected_objects if obj.type == "MESH"],
             key=lambda obj: tuple(round(value, 6) for value in obj.bound_box[0]),
         )
-        if len(petals) < 3:
-            raise RuntimeError(f"Expected at least 3 petal islands, found {len(petals)}")
-    elif len(generated_petals) >= 3 and len(generated_petals) == len(material_petals):
+        if len(components) < 3:
+            raise RuntimeError(f"Expected at least 3 petal islands, found {len(components)}")
+    elif len(generated_petals) == EXPECTED_PETAL_COUNT and len(generated_petals) == len(material_petals):
         petals = generated_petals
+        components = []
+    elif len(generated_petals) >= 3 and len(generated_petals) == len(material_petals):
+        components = generated_petals
     else:
         raise RuntimeError(
             "Expected exactly one m_petal mesh or at least three generated Petal_* meshes; "
             f"found {len(material_petals)} m_petal meshes and {len(generated_petals)} Petal_* meshes"
         )
+
+    if petals is None:
+        substantial_components = [
+            component
+            for component in components
+            if len(component.data.vertices) >= MIN_PETAL_COMPONENT_VERTICES
+        ]
+        debris = [component for component in components if component not in substantial_components]
+        for component in debris:
+            bpy.data.objects.remove(component, do_unlink=True)
+
+        clusters = cluster_petal_components(substantial_components)
+        petals = join_petal_components(clusters)
 
     centers = {obj: centroid(obj) for obj in petals}
     flower_center = sum(centers.values(), Vector()) / len(centers)
@@ -174,12 +263,11 @@ def attachment_origin(obj: bpy.types.Object) -> Vector:
 
 
 def capped_rotation(source: Vector, target: Vector, maximum_angle: float) -> Quaternion:
-    if source.length_squared < 1e-16 or target.length_squared < 1e-16:
+    if source.length_squared < 1e-16 or target.length_squared < 1e-16 or maximum_angle <= 0:
         return Quaternion()
     delta = source.normalized().rotation_difference(target.normalized())
-    angle = delta.angle
-    if angle > maximum_angle and angle > 1e-12:
-        delta = Quaternion().slerp(delta, maximum_angle / angle)
+    if delta.angle > maximum_angle and delta.angle > 1e-12:
+        delta = Quaternion().slerp(delta, maximum_angle / delta.angle)
     return delta
 
 
@@ -223,6 +311,7 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
         normalized_radius = radial[petal] / max_radius
         layer = "outer" if normalized_radius >= 0.66 else "middle" if normalized_radius >= 0.33 else "inner"
         layer_frame, inward, scale_factors, max_angle = LAYER_SETTINGS[layer]
+        petal["RoseLayer"] = layer
         stagger = (index % 5) * 2
         opening_frame = layer_frame + stagger
         open_frame = opening_frame + 82
@@ -236,13 +325,7 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
         toward_axis = Vector((flower_center.x, flower_center.y, centers[petal].z)) - open_world_location
         rotation_delta = capped_rotation(growth, toward_axis, max_angle)
         closed_world_rotation = rotation_delta @ open_world_rotation
-        closed_world_scale = Vector(
-            (
-                open_world_scale.x * scale_factors[0],
-                open_world_scale.y * scale_factors[1],
-                open_world_scale.z * scale_factors[2],
-            )
-        )
+        closed_world_scale = Vector(tuple(open_world_scale[axis] * scale_factors[axis] for axis in range(3)))
         closed_world = Matrix.LocRotScale(closed_world_location, closed_world_rotation, closed_world_scale)
         closed_local = petal.parent.matrix_world.inverted_safe() @ closed_world if petal.parent else closed_world
         closed_location, closed_rotation, closed_scale = closed_local.decompose()
