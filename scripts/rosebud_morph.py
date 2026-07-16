@@ -13,8 +13,10 @@ EPSILON = 1e-12
 class MorphSettings:
     opening_frame: int
     bend_radians: float
-    radial_pull: float
-    tangential_offset: float
+    guide_radius_ratio: float
+    guide_height_ratio: float
+    guide_pull: float
+    angular_offset_radians: float
 
 
 def smoothstep01(value: float) -> float:
@@ -33,11 +35,53 @@ def _stable_bend_axis(growth: Vector, desired: Vector) -> Vector:
     return axis.normalized()
 
 
+def compute_guide_point(
+    origin: Vector,
+    flower_center: Vector,
+    centroid: Vector,
+    maximum_radius: float,
+    settings: MorphSettings,
+    petal_index: int,
+) -> Vector:
+    if not math.isfinite(maximum_radius) or maximum_radius <= EPSILON:
+        raise ValueError('Maximum petal radius is degenerate')
+    numeric_settings = (
+        settings.bend_radians,
+        settings.guide_radius_ratio,
+        settings.guide_height_ratio,
+        settings.guide_pull,
+        settings.angular_offset_radians,
+    )
+    if not all(math.isfinite(value) for value in numeric_settings):
+        raise ValueError('Guide settings must be finite')
+    if not 0.0 < settings.guide_radius_ratio <= 1.0:
+        raise ValueError('Guide radius ratio must be in (0, 1]')
+    if settings.guide_height_ratio <= 0.0:
+        raise ValueError('Guide height ratio must be positive')
+    if not 0.0 <= settings.guide_pull <= 1.0:
+        raise ValueError('Guide pull must be in [0, 1]')
+    sector = Vector((centroid.x - flower_center.x, centroid.y - flower_center.y, 0.0))
+    if sector.length_squared <= EPSILON:
+        raise ValueError('Petal sector direction is degenerate')
+    sector.normalize()
+    sign = -1.0 if petal_index % 2 else 1.0
+    sector = Quaternion(Vector((0.0, 0.0, 1.0)), settings.angular_offset_radians * sign) @ sector
+    growth_length = (centroid - origin).length
+    if growth_length <= EPSILON:
+        raise ValueError('Petal growth direction is degenerate')
+    return Vector((
+        flower_center.x + sector.x * maximum_radius * settings.guide_radius_ratio,
+        flower_center.y + sector.y * maximum_radius * settings.guide_radius_ratio,
+        origin.z + growth_length * settings.guide_height_ratio,
+    ))
+
+
 def generate_bud_world_positions(
     open_points: list[Vector],
     origin: Vector,
     flower_center: Vector,
     centroid: Vector,
+    maximum_radius: float,
     settings: MorphSettings,
     petal_index: int,
 ) -> tuple[list[Vector], list[float]]:
@@ -46,14 +90,9 @@ def generate_bud_world_positions(
     if growth_length <= EPSILON:
         raise ValueError('Petal growth direction is degenerate')
     growth_direction = growth / growth_length
-    inward = Vector((flower_center.x - origin.x, flower_center.y - origin.y, 0.0))
-    if inward.length_squared <= EPSILON:
-        raise ValueError('Petal inward direction is degenerate')
-    inward.normalize()
-    desired = (inward + Vector((0.0, 0.0, 0.65))).normalized()
+    guide = compute_guide_point(origin, flower_center, centroid, maximum_radius, settings, petal_index)
+    desired = (guide - origin).normalized()
     bend_axis = _stable_bend_axis(growth_direction, desired)
-    tangent = Vector((-inward.y, inward.x, 0.0))
-    tangent_sign = -1.0 if petal_index % 2 else 1.0
 
     closed_points = []
     parameters = []
@@ -65,9 +104,8 @@ def generate_bud_world_positions(
             continue
         weight = smoothstep01((parameter - ROOT_LOCK_END) / (1.0 - ROOT_LOCK_END))
         curved = origin + Quaternion(bend_axis, settings.bend_radians * weight) @ (point - origin)
-        axis_point = Vector((flower_center.x, flower_center.y, curved.z))
-        curved += (axis_point - curved) * (settings.radial_pull * weight)
-        curved += tangent * (growth_length * settings.tangential_offset * tangent_sign * weight)
+        guide_line_point = origin + (guide - origin) * parameter
+        curved += (guide_line_point - curved) * (settings.guide_pull * weight)
         if not all(math.isfinite(component) for component in curved):
             raise ValueError('Morph deformation produced a non-finite vertex')
         closed_points.append(curved)
