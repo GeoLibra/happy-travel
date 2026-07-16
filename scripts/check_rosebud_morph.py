@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rosebud_morph import (
     ROOT_LOCK_END,
     MorphSettings,
+    apply_angular_guide_phase,
     compute_angular_guide_indices,
     compute_guide_point,
     compute_tip_guide_point,
@@ -34,6 +35,34 @@ assert angular_indices == compute_angular_guide_indices(
 )
 for rank in range(len(expected_order)):
     assert rank % 2 != ((rank + 1) % len(expected_order)) % 2
+
+phased_indices = apply_angular_guide_phase(angular_indices, 1)
+assert apply_angular_guide_phase(angular_indices, 0) == angular_indices
+assert set(phased_indices) == set(angular_indices)
+for name, rank in angular_indices.items():
+    assert phased_indices[name] == rank + 1
+    assert phased_indices[name] % 2 != rank % 2
+assert sum(index % 2 == 0 for index in phased_indices.values()) == 4
+assert sum(index % 2 == 1 for index in phased_indices.values()) == 4
+
+ordered_names = [name for name, _ in sorted(angular_indices.items(), key=lambda item: item[1])]
+for position, name in enumerate(ordered_names):
+    next_name = ordered_names[(position + 1) % len(ordered_names)]
+    assert phased_indices[name] % 2 != phased_indices[next_name] % 2
+
+for invalid_map, invalid_phase in (
+    ({}, 1),
+    ({'a': 0, 'b': 2}, 1),
+    ({'a': 0, 'b': 1, 'c': 2}, 1),
+    ({'a': 0, 'b': 1}, -1),
+    ({'a': 0, 'b': 1}, 2),
+):
+    try:
+        apply_angular_guide_phase(invalid_map, invalid_phase)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('Invalid angular phase input must fail')
 
 invalid_rank_inputs = (
     [],

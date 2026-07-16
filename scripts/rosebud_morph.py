@@ -35,6 +35,31 @@ def compute_angular_guide_indices(
     return {name: rank for rank, (_, name) in enumerate(ranked)}
 
 
+def apply_angular_guide_phase(
+    angular_indices: dict[str, int],
+    phase: int,
+) -> dict[str, int]:
+    if phase not in (0, 1):
+        raise ValueError('Angular guide phase must be 0 or 1')
+    if not angular_indices:
+        raise ValueError('Angular guide phase requires indices')
+    ranks = sorted(angular_indices.values())
+    if ranks != list(range(len(ranks))):
+        raise ValueError('Angular guide ranks must be contiguous from zero')
+    if len(ranks) % 2 != 0:
+        raise ValueError('Angular guide phase requires an even rank count')
+    phased = {name: rank + phase for name, rank in angular_indices.items()}
+    parity_counts = [sum(index % 2 == parity for index in phased.values()) for parity in (0, 1)]
+    if parity_counts != [len(phased) // 2, len(phased) // 2]:
+        raise ValueError('Angular guide phase must split parity evenly')
+    ordered = [name for name, _ in sorted(angular_indices.items(), key=lambda item: item[1])]
+    for position, name in enumerate(ordered):
+        next_name = ordered[(position + 1) % len(ordered)]
+        if phased[name] % 2 == phased[next_name] % 2:
+            raise ValueError('Adjacent angular guides must alternate parity')
+    return phased
+
+
 @dataclass(frozen=True)
 class MorphSettings:
     opening_frame: int
