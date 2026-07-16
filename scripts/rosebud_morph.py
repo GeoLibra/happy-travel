@@ -17,6 +17,8 @@ class MorphSettings:
     guide_height_ratio: float
     guide_pull: float
     angular_offset_radians: float
+    alternate_guide_radius_ratio: float | None = None
+    alternate_guide_height_ratio: float | None = None
 
 
 def smoothstep01(value: float) -> float:
@@ -60,6 +62,23 @@ def compute_guide_point(
         raise ValueError('Guide height ratio must be positive')
     if not 0.0 <= settings.guide_pull <= 1.0:
         raise ValueError('Guide pull must be in [0, 1]')
+    alternate_values = (
+        settings.alternate_guide_radius_ratio,
+        settings.alternate_guide_height_ratio,
+    )
+    if (alternate_values[0] is None) != (alternate_values[1] is None):
+        raise ValueError('Alternate guide radius and height must be provided together')
+    if alternate_values[0] is not None:
+        if not all(math.isfinite(value) for value in alternate_values):
+            raise ValueError('Alternate guide settings must be finite')
+        if not 0.0 < alternate_values[0] <= 1.0:
+            raise ValueError('Alternate guide radius ratio must be in (0, 1]')
+        if alternate_values[1] <= 0.0:
+            raise ValueError('Alternate guide height ratio must be positive')
+
+    use_alternate = alternate_values[0] is not None and petal_index % 2 == 1
+    guide_radius_ratio = alternate_values[0] if use_alternate else settings.guide_radius_ratio
+    guide_height_ratio = alternate_values[1] if use_alternate else settings.guide_height_ratio
     sector = Vector((centroid.x - flower_center.x, centroid.y - flower_center.y, 0.0))
     if sector.length_squared <= EPSILON:
         raise ValueError('Petal sector direction is degenerate')
@@ -70,9 +89,9 @@ def compute_guide_point(
     if growth_length <= EPSILON:
         raise ValueError('Petal growth direction is degenerate')
     return Vector((
-        flower_center.x + sector.x * maximum_radius * settings.guide_radius_ratio,
-        flower_center.y + sector.y * maximum_radius * settings.guide_radius_ratio,
-        origin.z + growth_length * settings.guide_height_ratio,
+        flower_center.x + sector.x * maximum_radius * guide_radius_ratio,
+        flower_center.y + sector.y * maximum_radius * guide_radius_ratio,
+        origin.z + growth_length * guide_height_ratio,
     ))
 
 
