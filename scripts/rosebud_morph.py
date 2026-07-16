@@ -17,8 +17,11 @@ class MorphSettings:
     guide_height_ratio: float
     guide_pull: float
     angular_offset_radians: float
-    alternate_guide_radius_ratio: float | None = None
-    alternate_guide_height_ratio: float | None = None
+    tip_guide_radius_ratio: float | None = None
+    tip_guide_height_ratio: float | None = None
+    alternate_tip_guide_radius_ratio: float | None = None
+    alternate_tip_guide_height_ratio: float | None = None
+    tip_blend_start: float | None = None
 
 
 def smoothstep01(value: float) -> float:
@@ -35,6 +38,32 @@ def _stable_bend_axis(growth: Vector, desired: Vector) -> Vector:
     if axis.length_squared <= EPSILON:
         raise ValueError('Could not compute a stable bend axis')
     return axis.normalized()
+
+
+def _compute_guide_point_for_ratios(
+    origin: Vector,
+    flower_center: Vector,
+    centroid: Vector,
+    maximum_radius: float,
+    radius_ratio: float,
+    height_ratio: float,
+    angular_offset_radians: float,
+    petal_index: int,
+) -> Vector:
+    sector = Vector((centroid.x - flower_center.x, centroid.y - flower_center.y, 0.0))
+    if sector.length_squared <= EPSILON:
+        raise ValueError('Petal sector direction is degenerate')
+    sector.normalize()
+    sign = -1.0 if petal_index % 2 else 1.0
+    sector = Quaternion(Vector((0.0, 0.0, 1.0)), angular_offset_radians * sign) @ sector
+    growth_length = (centroid - origin).length
+    if growth_length <= EPSILON:
+        raise ValueError('Petal growth direction is degenerate')
+    return Vector((
+        flower_center.x + sector.x * maximum_radius * radius_ratio,
+        flower_center.y + sector.y * maximum_radius * radius_ratio,
+        origin.z + growth_length * height_ratio,
+    ))
 
 
 def compute_guide_point(
@@ -62,37 +91,59 @@ def compute_guide_point(
         raise ValueError('Guide height ratio must be positive')
     if not 0.0 <= settings.guide_pull <= 1.0:
         raise ValueError('Guide pull must be in [0, 1]')
-    alternate_values = (
-        settings.alternate_guide_radius_ratio,
-        settings.alternate_guide_height_ratio,
+    return _compute_guide_point_for_ratios(
+        origin,
+        flower_center,
+        centroid,
+        maximum_radius,
+        settings.guide_radius_ratio,
+        settings.guide_height_ratio,
+        settings.angular_offset_radians,
+        petal_index,
     )
-    if (alternate_values[0] is None) != (alternate_values[1] is None):
-        raise ValueError('Alternate guide radius and height must be provided together')
-    if alternate_values[0] is not None:
-        if not all(math.isfinite(value) for value in alternate_values):
-            raise ValueError('Alternate guide settings must be finite')
-        if not 0.0 < alternate_values[0] <= 1.0:
-            raise ValueError('Alternate guide radius ratio must be in (0, 1]')
-        if alternate_values[1] <= 0.0:
-            raise ValueError('Alternate guide height ratio must be positive')
 
-    use_alternate = alternate_values[0] is not None and petal_index % 2 == 1
-    guide_radius_ratio = alternate_values[0] if use_alternate else settings.guide_radius_ratio
-    guide_height_ratio = alternate_values[1] if use_alternate else settings.guide_height_ratio
-    sector = Vector((centroid.x - flower_center.x, centroid.y - flower_center.y, 0.0))
-    if sector.length_squared <= EPSILON:
-        raise ValueError('Petal sector direction is degenerate')
-    sector.normalize()
-    sign = -1.0 if petal_index % 2 else 1.0
-    sector = Quaternion(Vector((0.0, 0.0, 1.0)), settings.angular_offset_radians * sign) @ sector
-    growth_length = (centroid - origin).length
-    if growth_length <= EPSILON:
-        raise ValueError('Petal growth direction is degenerate')
-    return Vector((
-        flower_center.x + sector.x * maximum_radius * guide_radius_ratio,
-        flower_center.y + sector.y * maximum_radius * guide_radius_ratio,
-        origin.z + growth_length * guide_height_ratio,
-    ))
+
+def compute_tip_guide_point(
+    origin: Vector,
+    flower_center: Vector,
+    centroid: Vector,
+    maximum_radius: float,
+    settings: MorphSettings,
+    petal_index: int,
+) -> Vector | None:
+    values = (
+        settings.tip_guide_radius_ratio,
+        settings.tip_guide_height_ratio,
+        settings.alternate_tip_guide_radius_ratio,
+        settings.alternate_tip_guide_height_ratio,
+        settings.tip_blend_start,
+    )
+    if all(value is None for value in values):
+        return None
+    if any(value is None for value in values):
+        raise ValueError('Tip guide settings must be provided together')
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError('Tip guide settings must be finite')
+    even_radius, even_height, odd_radius, odd_height, blend_start = values
+    if not 0.0 < even_radius <= 1.0 or not 0.0 < odd_radius <= 1.0:
+        raise ValueError('Tip guide radius ratios must be in (0, 1]')
+    if even_height <= 0.0 or odd_height <= 0.0:
+        raise ValueError('Tip guide height ratios must be positive')
+    if not ROOT_LOCK_END < blend_start < 1.0:
+        raise ValueError('Tip blend start must be between root lock and 1')
+    compute_guide_point(origin, flower_center, centroid, maximum_radius, settings, petal_index)
+    radius_ratio = odd_radius if petal_index % 2 else even_radius
+    height_ratio = odd_height if petal_index % 2 else even_height
+    return _compute_guide_point_for_ratios(
+        origin,
+        flower_center,
+        centroid,
+        maximum_radius,
+        radius_ratio,
+        height_ratio,
+        settings.angular_offset_radians,
+        petal_index,
+    )
 
 
 def generate_bud_world_positions(
@@ -109,8 +160,13 @@ def generate_bud_world_positions(
     if growth_length <= EPSILON:
         raise ValueError('Petal growth direction is degenerate')
     growth_direction = growth / growth_length
-    guide = compute_guide_point(origin, flower_center, centroid, maximum_radius, settings, petal_index)
-    desired = (guide - origin).normalized()
+    body_guide = compute_guide_point(
+        origin, flower_center, centroid, maximum_radius, settings, petal_index
+    )
+    tip_guide = compute_tip_guide_point(
+        origin, flower_center, centroid, maximum_radius, settings, petal_index
+    )
+    desired = (body_guide - origin).normalized()
     bend_axis = _stable_bend_axis(growth_direction, desired)
 
     closed_points = []
@@ -123,7 +179,14 @@ def generate_bud_world_positions(
             continue
         weight = smoothstep01((parameter - ROOT_LOCK_END) / (1.0 - ROOT_LOCK_END))
         curved = origin + Quaternion(bend_axis, settings.bend_radians * weight) @ (point - origin)
-        guide_line_point = origin + (guide - origin) * parameter
+        body_line_point = origin + (body_guide - origin) * parameter
+        guide_line_point = body_line_point
+        if tip_guide is not None:
+            tip_blend = smoothstep01(
+                (parameter - settings.tip_blend_start) / (1.0 - settings.tip_blend_start)
+            )
+            tip_line_point = origin + (tip_guide - origin) * parameter
+            guide_line_point = body_line_point.lerp(tip_line_point, tip_blend)
         curved += (guide_line_point - curved) * (settings.guide_pull * weight)
         if not all(math.isfinite(component) for component in curved):
             raise ValueError('Morph deformation produced a non-finite vertex')
