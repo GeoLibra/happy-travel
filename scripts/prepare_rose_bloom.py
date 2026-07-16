@@ -19,7 +19,13 @@ from mathutils import Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rosebud_morph import MorphSettings, ROOT_LOCK_END, generate_bud_world_positions
+from rosebud_morph import (
+    MorphSettings,
+    ROOT_LOCK_END,
+    apply_angular_guide_phase,
+    compute_angular_guide_indices,
+    generate_bud_world_positions,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +35,7 @@ MIRROR_GLB = REPO_ROOT / "public/models/rose.glb"
 FPS = 30
 END_FRAME = 135
 EXPECTED_PETAL_COUNT = 25
+INNER_GUIDE_PHASE = 1
 PETAL_COMPONENTS_PER_PETAL = 3
 MIN_PETAL_COMPONENT_VERTICES = 100
 MAX_PETAL_CLUSTER_COST = 0.08
@@ -39,9 +46,21 @@ MATERIAL_OBJECTS = {
     "m_thorns": "thorn",
 }
 MORPH_SETTINGS = {
-    "outer": MorphSettings(1, math.radians(12.0), 0.55, 0.75, 0.25, math.radians(1.0)),
+    "outer": MorphSettings(1, math.radians(12.0), 0.50, 0.75, 0.30, math.radians(1.0)),
     "middle": MorphSettings(18, math.radians(24.0), 0.30, 0.90, 0.45, math.radians(2.0)),
-    "inner": MorphSettings(34, math.radians(38.0), 0.12, 1.05, 0.90, math.radians(3.0)),
+    "inner": MorphSettings(
+        34,
+        math.radians(38.0),
+        0.12,
+        1.05,
+        0.90,
+        math.radians(3.0),
+        tip_guide_radius_ratio=0.04,
+        tip_guide_height_ratio=1.10,
+        alternate_tip_guide_radius_ratio=0.09,
+        alternate_tip_guide_height_ratio=1.04,
+        tip_blend_start=0.65,
+    ),
 }
 
 
@@ -294,22 +313,55 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
     if max_radius <= 1e-12:
         raise RuntimeError("Petal centroids have no usable radial distribution")
 
-    guide_radii = [MORPH_SETTINGS[layer].guide_radius_ratio for layer in ("outer", "middle", "inner")]
-    if not guide_radii[0] > guide_radii[1] > guide_radii[2] > 0.0:
-        raise RuntimeError(f"Guide ring radii must descend outer-to-inner, found {guide_radii}")
+    layers = {}
+    for petal in petals:
+        normalized_radius = radial[petal] / max_radius
+        layers[petal] = "outer" if normalized_radius >= 0.66 else "middle" if normalized_radius >= 0.33 else "inner"
 
-    for index, petal in enumerate(petals):
+    inner_petals = [petal for petal in petals if layers[petal] == "inner"]
+    if len(inner_petals) != 8:
+        raise RuntimeError(f"Expected 8 inner petals for circular alternation, found {len(inner_petals)}")
+    inner_guide_indices = compute_angular_guide_indices(
+        [(petal.name, centers[petal]) for petal in inner_petals],
+        flower_center,
+    )
+    inner_guide_indices = apply_angular_guide_phase(inner_guide_indices, INNER_GUIDE_PHASE)
+    even_count = sum(index % 2 == 0 for index in inner_guide_indices.values())
+    odd_count = sum(index % 2 == 1 for index in inner_guide_indices.values())
+    if (even_count, odd_count) != (4, 4):
+        raise RuntimeError(f'Inner phased guides must split 4/4, found {even_count}/{odd_count}')
+    for petal in sorted(inner_petals, key=lambda item: inner_guide_indices[item.name]):
+        print(
+            f'INNER_GUIDE petal={petal.name} '
+            f'angular_rank={inner_guide_indices[petal.name] - INNER_GUIDE_PHASE} '
+            f'guide_index={inner_guide_indices[petal.name]}'
+        )
+
+    outer_radius = MORPH_SETTINGS["outer"].guide_radius_ratio
+    middle_radius = MORPH_SETTINGS["middle"].guide_radius_ratio
+    inner_body_radius = MORPH_SETTINGS["inner"].guide_radius_ratio
+    inner_odd_tip = MORPH_SETTINGS["inner"].alternate_tip_guide_radius_ratio
+    inner_even_tip = MORPH_SETTINGS["inner"].tip_guide_radius_ratio
+    if inner_odd_tip is None or inner_even_tip is None:
+        raise RuntimeError('Inner tip guide radii are required')
+    if not outer_radius > middle_radius > inner_body_radius > inner_odd_tip > inner_even_tip > 0.0:
+        raise RuntimeError(
+            'Guide radii must descend outer > middle > inner body > odd tip > even tip; '
+            f'found {[outer_radius, middle_radius, inner_body_radius, inner_odd_tip, inner_even_tip]}'
+        )
+
+    for animation_index, petal in enumerate(petals):
         if petal.data.shape_keys is not None:
             petal.shape_key_clear()
         origin = attachment_origin(petal)
         set_world_origin(petal, origin)
         petal.matrix_world = petal.matrix_world.copy()
 
-        normalized_radius = radial[petal] / max_radius
-        layer = "outer" if normalized_radius >= 0.66 else "middle" if normalized_radius >= 0.33 else "inner"
+        layer = layers[petal]
         settings = MORPH_SETTINGS[layer]
+        guide_index = inner_guide_indices[petal.name] if layer == "inner" else animation_index
         petal["RoseLayer"] = layer
-        stagger = (index % 5) * 2
+        stagger = (animation_index % 5) * 2
         opening_frame = settings.opening_frame + stagger
         open_frame = opening_frame + 82
         if open_frame >= END_FRAME:
@@ -320,7 +372,7 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
         open_world = petal.matrix_world.copy()
         open_points = [open_world @ point.co for point in basis.data]
         closed_points, parameters = generate_bud_world_positions(
-            open_points, origin, flower_center, centers[petal], max_radius, settings, index
+            open_points, origin, flower_center, centers[petal], max_radius, settings, guide_index
         )
         inverse_world = open_world.inverted_safe()
         for vertex_index, closed_world in enumerate(closed_points):
