@@ -129,28 +129,29 @@ Black and navy occupy most of every frame. Red is used for velocity, heat, start
 
 ## Materials
 
-The model uses an explicit vehicle material profile. Node and material names map to semantic categories such as body paint, carbon, glass, wheel metal, tire rubber, brake, and light. Unclassified materials preserve their imported glTF appearance.
+The current rigged GLB exposes four independent wheel nodes but only one baked material shared by all body and wheel meshes. Its carbon, paint, glass-like highlights, decals, and mechanical detail are encoded into shared textures rather than separate semantic material slots. The first showroom release therefore uses an explicit object-role profile with two reliable categories: body meshes and wheel meshes. It preserves the baked texture maps, gives those roles separate physical-material clones, and adds brake heat and lights as controlled auxiliary effects. It must not guess transparent glass regions from texture color or make baked carbon areas uniformly metallic.
+
+True paint, carbon, glass, tire, brake, and light material separation requires reauthoring the source geometry and mask textures. That reauthoring is deferred until a revised source asset is available; the runtime interfaces remain category-based so a richer profile can be introduced without changing scene code.
 
 ### Body paint
 
 - `MeshPhysicalMaterial` cloned from the imported PBR material where possible.
-- Clearcoat near `1.0` with low clearcoat roughness.
+- Body-role clearcoat starts at `0.55` with clearcoat roughness near `0.16`, preserving strong softbox highlights without washing out baked carbon and glass-like regions.
 - Base roughness remains in a controlled mid-low range so the body reflects softboxes without becoming chrome.
 - Metallic response remains physically plausible for automotive paint and does not force every body surface to full metalness.
 - Original base color, normal, occlusion, and detail maps remain available when valid.
 
-### Carbon fiber
+### Baked carbon and mechanical detail
 
-- Dark dielectric base.
-- Fine tiled normal or anisotropic detail if available.
-- Higher roughness than painted body panels.
-- Detail must remain subtle at normal camera distance to avoid moire.
+- Preserve the imported base-color, occlusion, normal, and metallic-roughness textures.
+- Do not apply a separate carbon material without an authored material mask.
+- Keep added clearcoat restrained enough that baked carbon areas do not read as chrome.
 
-### Glass
+### Baked glass-like regions
 
-- Tinted physical transmission on the high tier.
-- Transparent, low-cost fallback material on mid and low tiers.
-- Glass does not write opaque depth in a way that hides interior or rear surfaces incorrectly.
+- Preserve the imported opaque treatment in the first showroom release.
+- Do not enable transmission on the shared body material because it would make unrelated bodywork transparent.
+- Introduce physical transmission only after a revised model provides an explicit glass material slot or authored mask.
 
 ### Wheels, tires, brakes, and lights
 
@@ -219,7 +220,7 @@ Loads the car model, HDR environments, compressed textures, and optional effects
 
 ### `MaterialSystem`
 
-Classifies model materials from a vehicle profile, builds PBR variants, manages the hologram blend, and exposes body, brake heat, glass, and light controls.
+Classifies body and wheel object roles from a vehicle profile, builds physical-material variants while preserving baked maps, manages the hologram blend, and exposes body reveal and wheel-surface controls. Brake heat and lights remain auxiliary effects until the model supplies dedicated semantic materials.
 
 ### `EffectSystem`
 
@@ -361,8 +362,8 @@ Acceptance targets:
 ### Asset checks
 
 - Required car nodes and four wheel pivots remain present after compression.
-- Vehicle material profile resolves expected semantic materials.
-- Missing names warn and preserve imported materials.
+- Vehicle material profile resolves the body group and four wheel nodes.
+- Missing role names warn and preserve imported materials.
 - HDR and texture fallbacks initialize successfully.
 - Optimized asset sizes are reported by a verification script.
 
@@ -387,7 +388,7 @@ Acceptance targets:
 
 1. The existing long-press ignition unlocks a scroll-driven showroom instead of immediately entering the itinerary.
 2. The showroom contains the five confirmed post-ignition chapters and the 80/20 racing-to-Shanghai balance.
-3. The car uses classified PBR materials, studio/night environment lighting, ACES tone mapping, and restrained selective bloom.
+3. The car uses role-aware body and wheel PBR treatment that preserves baked texture maps, plus studio/night environment lighting, ACES tone mapping, and restrained selective bloom.
 4. Hologram-to-PBR blending completes without repeatedly replacing materials or leaking GPU resources.
 5. Airflow, wheel motion, brake heat, audio, and telemetry share a coherent smoothed performance signal.
 6. One continuous line morphs from performance waveform to Shanghai circuit to itinerary route.
