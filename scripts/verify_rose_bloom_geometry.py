@@ -11,7 +11,9 @@ MODEL = Path(__file__).resolve().parent.parent / "public/models/rose.glb"
 FRAMES = (1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 105, 120, 135)
 MAX_INTERSECTING_PAIRS = 80
 MAX_TRIANGLE_PAIRS = 40_000
-MAX_ROTATION_DEGREES = 8.05
+ROTATION_CAP_DEGREES = {"outer": 1.0, "middle": 4.0, "inner": 8.0}
+ROTATION_TOLERANCE_DEGREES = 0.05
+MAX_ROTATION_DEGREES = 8.0
 
 
 def material_names(obj):
@@ -39,6 +41,11 @@ petals = sorted(
 if len(petals) != 25:
     raise RuntimeError(f"Expected 25 petals, found {len(petals)}")
 
+petal_layers = {petal: petal.get("RoseLayer") for petal in petals}
+for petal, layer in petal_layers.items():
+    if layer not in ROTATION_CAP_DEGREES:
+        raise RuntimeError(f"{petal.name} must declare a valid RoseLayer, found {layer!r}")
+
 bpy.context.scene.frame_set(135)
 bpy.context.view_layer.update()
 final_rotations = {petal: petal.matrix_world.to_quaternion() for petal in petals}
@@ -53,10 +60,11 @@ for frame in FRAMES:
     ]
     intersecting_pairs = sum(count > 0 for count in overlaps)
     triangle_pairs = sum(overlaps)
-    maximum_rotation = max(
-        math.degrees(petal.matrix_world.to_quaternion().rotation_difference(final_rotations[petal]).angle)
+    rotations = {
+        petal: math.degrees(petal.matrix_world.to_quaternion().rotation_difference(final_rotations[petal]).angle)
         for petal in petals
-    )
+    }
+    maximum_rotation = max(rotations.values())
     print(
         f"FRAME {frame:03d}: intersecting_pairs={intersecting_pairs:03d} "
         f"triangle_pairs={triangle_pairs:05d} rotation_max={maximum_rotation:05.2f}"
@@ -65,7 +73,13 @@ for frame in FRAMES:
         raise RuntimeError(f"Frame {frame} has {intersecting_pairs} intersecting petal pairs")
     if triangle_pairs > MAX_TRIANGLE_PAIRS:
         raise RuntimeError(f"Frame {frame} has {triangle_pairs} overlapping triangle pairs")
-    if maximum_rotation > MAX_ROTATION_DEGREES:
+    for petal, rotation in rotations.items():
+        layer = petal_layers[petal]
+        if rotation > ROTATION_CAP_DEGREES[layer] + ROTATION_TOLERANCE_DEGREES:
+            raise RuntimeError(
+                f"Frame {frame} rotates {petal.name} ({layer}) by {rotation:.3f} degrees"
+            )
+    if maximum_rotation > MAX_ROTATION_DEGREES + ROTATION_TOLERANCE_DEGREES:
         raise RuntimeError(f"Frame {frame} rotates a petal by {maximum_rotation:.3f} degrees")
 
 print("PASS: sampled rose bloom geometry stays within intersection and rotation limits")
