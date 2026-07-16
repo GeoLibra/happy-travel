@@ -10,11 +10,16 @@ import json
 import math
 import shutil
 import struct
+import sys
 from itertools import combinations
 from pathlib import Path
 
 import bpy
-from mathutils import Matrix, Quaternion, Vector
+from mathutils import Vector
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from rosebud_morph import MorphSettings, ROOT_LOCK_END, generate_bud_world_positions
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -33,11 +38,10 @@ MATERIAL_OBJECTS = {
     "m_stem": "stem",
     "m_thorns": "thorn",
 }
-LAYER_SETTINGS = {
-    # opening frame, inward translation, local scale, maximum inward fold
-    "outer": (1, 0.08, (0.86, 0.86, 0.98), math.radians(1.0)),
-    "middle": (18, 0.26, (0.74, 0.74, 0.98), math.radians(4.0)),
-    "inner": (34, 0.42, (0.84, 0.84, 0.995), math.radians(8.0)),
+MORPH_SETTINGS = {
+    "outer": MorphSettings(1, math.radians(3.0), 0.12, 0.015),
+    "middle": MorphSettings(18, math.radians(6.0), 0.25, 0.025),
+    "inner": MorphSettings(34, math.radians(11.0), 0.38, 0.035),
 }
 
 
@@ -159,6 +163,9 @@ def reset_and_import() -> list[bpy.types.Object]:
     final_world_matrices = {obj: obj.matrix_world.copy() for obj in imported}
     for obj in imported:
         obj.animation_data_clear()
+        shape_keys = obj.data.shape_keys if obj.type == "MESH" else None
+        if shape_keys is not None:
+            shape_keys.animation_data_clear()
     for action in list(bpy.data.actions):
         bpy.data.actions.remove(action)
     for obj in imported:
@@ -262,15 +269,6 @@ def attachment_origin(obj: bpy.types.Object) -> Vector:
     return sum(band, Vector()) / len(band)
 
 
-def capped_rotation(source: Vector, target: Vector, maximum_angle: float) -> Quaternion:
-    if source.length_squared < 1e-16 or target.length_squared < 1e-16 or maximum_angle <= 0:
-        return Quaternion()
-    delta = source.normalized().rotation_difference(target.normalized())
-    if delta.angle > maximum_angle and delta.angle > 1e-12:
-        delta = Quaternion().slerp(delta, maximum_angle / delta.angle)
-    return delta
-
-
 def action_fcurves(action: bpy.types.Action):
     # Blender 5 creates layered actions. Legacy actions expose fcurves directly;
     # layered actions expose them through channel bags.
@@ -297,56 +295,48 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
         raise RuntimeError("Petal centroids have no usable radial distribution")
 
     for index, petal in enumerate(petals):
+        if petal.data.shape_keys is not None:
+            petal.shape_key_clear()
         origin = attachment_origin(petal)
         set_world_origin(petal, origin)
-        petal.rotation_mode = "QUATERNION"
         petal.matrix_world = petal.matrix_world.copy()
-
-        open_location = petal.location.copy()
-        open_rotation = petal.rotation_quaternion.copy()
-        open_scale = petal.scale.copy()
-        open_world = petal.matrix_world.copy()
-        open_world_location, open_world_rotation, open_world_scale = open_world.decompose()
 
         normalized_radius = radial[petal] / max_radius
         layer = "outer" if normalized_radius >= 0.66 else "middle" if normalized_radius >= 0.33 else "inner"
-        layer_frame, inward, scale_factors, max_angle = LAYER_SETTINGS[layer]
+        settings = MORPH_SETTINGS[layer]
         petal["RoseLayer"] = layer
         stagger = (index % 5) * 2
-        opening_frame = layer_frame + stagger
+        opening_frame = settings.opening_frame + stagger
         open_frame = opening_frame + 82
         if open_frame >= END_FRAME:
             raise RuntimeError(f"Open frame {open_frame} leaves no final hold for {petal.name}")
 
-        closed_world_location = open_world_location.copy()
-        closed_world_location.x += (flower_center.x - open_world_location.x) * inward
-        closed_world_location.y += (flower_center.y - open_world_location.y) * inward
-        growth = centers[petal] - open_world_location
-        toward_axis = Vector((flower_center.x, flower_center.y, centers[petal].z)) - open_world_location
-        rotation_delta = capped_rotation(growth, toward_axis, max_angle)
-        closed_world_rotation = rotation_delta @ open_world_rotation
-        closed_world_scale = Vector(tuple(open_world_scale[axis] * scale_factors[axis] for axis in range(3)))
-        closed_world = Matrix.LocRotScale(closed_world_location, closed_world_rotation, closed_world_scale)
-        closed_local = petal.parent.matrix_world.inverted_safe() @ closed_world if petal.parent else closed_world
-        closed_location, closed_rotation, closed_scale = closed_local.decompose()
+        basis = petal.shape_key_add(name="Basis", from_mix=False)
+        bud = petal.shape_key_add(name="Bud", from_mix=False)
+        open_world = petal.matrix_world.copy()
+        open_points = [open_world @ point.co for point in basis.data]
+        closed_points, parameters = generate_bud_world_positions(
+            open_points, origin, flower_center, centers[petal], settings, index
+        )
+        inverse_world = open_world.inverted_safe()
+        for vertex_index, closed_world in enumerate(closed_points):
+            bud.data[vertex_index].co = inverse_world @ closed_world
+            if parameters[vertex_index] <= ROOT_LOCK_END:
+                displacement = (bud.data[vertex_index].co - basis.data[vertex_index].co).length
+                if displacement > 1e-5:
+                    raise RuntimeError(f"{petal.name} root vertex moved by {displacement:.9g}")
 
-        petal.location = closed_location
-        petal.rotation_quaternion = closed_rotation
-        petal.scale = closed_scale
-        for path in ("location", "rotation_quaternion", "scale"):
-            petal.keyframe_insert(data_path=path, frame=1)
-            petal.keyframe_insert(data_path=path, frame=opening_frame)
+        bud.value = 1.0
+        bud.keyframe_insert(data_path="value", frame=1)
+        bud.keyframe_insert(data_path="value", frame=opening_frame)
+        bud.value = 0.0
+        bud.keyframe_insert(data_path="value", frame=open_frame)
+        bud.keyframe_insert(data_path="value", frame=END_FRAME)
 
-        petal.location = open_location
-        petal.rotation_quaternion = open_rotation
-        petal.scale = open_scale
-        for path in ("location", "rotation_quaternion", "scale"):
-            petal.keyframe_insert(data_path=path, frame=open_frame)
-            petal.keyframe_insert(data_path=path, frame=END_FRAME)
-
-        action = petal.animation_data.action
+        shape_keys = petal.data.shape_keys
+        action = shape_keys.animation_data.action
         if action is None:
-            raise RuntimeError(f"Blender did not create an action for {petal.name}")
+            raise RuntimeError(f"Blender did not create a shape-key action for {petal.name}")
         action.name = f"{petal.name}_RoseBloom"
         for curve in action_fcurves(action):
             for keyframe in curve.keyframe_points:
@@ -354,9 +344,8 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
                 keyframe.handle_left_type = "AUTO_CLAMPED"
                 keyframe.handle_right_type = "AUTO_CLAMPED"
 
-        # One identically named NLA track per object is merged into one glTF clip.
-        petal.animation_data.action = None
-        track = petal.animation_data.nla_tracks.new()
+        shape_keys.animation_data.action = None
+        track = shape_keys.animation_data.nla_tracks.new()
         track.name = "RoseBloom"
         strip = track.strips.new("RoseBloom", 1, action)
         strip.action_frame_start = 1
@@ -379,16 +368,20 @@ def ensure_root(objects: list[bpy.types.Object], open_bounds: tuple[float, ...])
 
 def verify_scene_animation(petals: list[bpy.types.Object]) -> None:
     petal_names = {petal.name for petal in petals}
-    animated = []
     for obj in bpy.context.scene.objects:
-        data = obj.animation_data
-        has_animation = bool(data and (data.action or len(data.nla_tracks)))
-        if has_animation:
-            animated.append(obj.name)
-            if obj.name not in petal_names or not obj.name.startswith("Petal_"):
-                raise RuntimeError(f"Only Petal_* objects may have animation data; found {obj.name}")
-    if set(animated) != petal_names:
-        raise RuntimeError(f"Every petal must be animated; animated {len(animated)} of {len(petals)}")
+        if obj.animation_data and (obj.animation_data.action or len(obj.animation_data.nla_tracks)):
+            raise RuntimeError(f"Object transforms may not be animated; found {obj.name}")
+    animated = set()
+    for petal in petals:
+        keys = petal.data.shape_keys
+        if keys is None or [key.name for key in keys.key_blocks] != ["Basis", "Bud"]:
+            raise RuntimeError(f"{petal.name} must contain exactly Basis and Bud shape keys")
+        data = keys.animation_data
+        if not data or len(data.nla_tracks) != 1:
+            raise RuntimeError(f"{petal.name} must contain one shape-key NLA track")
+        animated.add(petal.name)
+    if animated != petal_names:
+        raise RuntimeError(f"Every petal must have morph animation; found {len(animated)}")
 
 
 def read_glb_json(path: Path) -> dict:
@@ -424,6 +417,10 @@ def export_and_validate(petals: list[bpy.types.Object], original_bounds: tuple[f
         export_nla_strips_merged_animation_name="RoseBloom",
         export_frame_range=True,
         export_force_sampling=False,
+        export_morph=True,
+        export_morph_animation=True,
+        export_morph_normal=True,
+        export_morph_tangent=False,
         export_materials="EXPORT",
         export_texcoords=True,
         export_normals=True,

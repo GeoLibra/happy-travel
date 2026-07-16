@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import math
+import sys
 from itertools import combinations
 from pathlib import Path
 
 import bpy
+from mathutils import Vector
 from mathutils.bvhtree import BVHTree
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from rosebud_morph import ROOT_LOCK_END
 
 MODEL = Path(__file__).resolve().parent.parent / "public/models/rose.glb"
 FRAMES = (1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 105, 120, 135)
 MAX_INTERSECTING_PAIRS = 80
 MAX_TRIANGLE_PAIRS = 40_000
-ROTATION_CAP_DEGREES = {"outer": 1.0, "middle": 4.0, "inner": 8.0}
-ROTATION_TOLERANCE_DEGREES = 0.05
-MAX_ROTATION_DEGREES = 8.0
+MAX_OBJECT_ROTATION_DEGREES = 0.05
 
 
 def material_names(obj):
@@ -41,10 +45,25 @@ petals = sorted(
 if len(petals) != 25:
     raise RuntimeError(f"Expected 25 petals, found {len(petals)}")
 
-petal_layers = {petal: petal.get("RoseLayer") for petal in petals}
-for petal, layer in petal_layers.items():
-    if layer not in ROTATION_CAP_DEGREES:
-        raise RuntimeError(f"{petal.name} must declare a valid RoseLayer, found {layer!r}")
+for petal in petals:
+    keys = petal.data.shape_keys
+    if keys is None or [key.name for key in keys.key_blocks] != ["Basis", "Bud"]:
+        raise RuntimeError(f"{petal.name} must contain exactly Basis and Bud shape keys")
+    basis, bud = keys.key_blocks
+    open_world = petal.matrix_world
+    open_points = [open_world @ point.co for point in basis.data]
+    origin = open_world.translation
+    centroid = sum(open_points, Vector()) / len(open_points)
+    growth = centroid - origin
+    if growth.length <= 1e-12:
+        raise RuntimeError(f"{petal.name} has a degenerate growth direction")
+    growth_direction = growth.normalized()
+    for index, point in enumerate(open_points):
+        parameter = min(max((point - origin).dot(growth_direction) / growth.length, 0.0), 1.0)
+        if parameter <= ROOT_LOCK_END:
+            displacement = (open_world.to_3x3() @ (bud.data[index].co - basis.data[index].co)).length
+            if displacement > 1e-5:
+                raise RuntimeError(f"{petal.name} root vertex moved by {displacement:.9g}")
 
 bpy.context.scene.frame_set(135)
 bpy.context.view_layer.update()
@@ -73,13 +92,7 @@ for frame in FRAMES:
         raise RuntimeError(f"Frame {frame} has {intersecting_pairs} intersecting petal pairs")
     if triangle_pairs > MAX_TRIANGLE_PAIRS:
         raise RuntimeError(f"Frame {frame} has {triangle_pairs} overlapping triangle pairs")
-    for petal, rotation in rotations.items():
-        layer = petal_layers[petal]
-        if rotation > ROTATION_CAP_DEGREES[layer] + ROTATION_TOLERANCE_DEGREES:
-            raise RuntimeError(
-                f"Frame {frame} rotates {petal.name} ({layer}) by {rotation:.3f} degrees"
-            )
-    if maximum_rotation > MAX_ROTATION_DEGREES + ROTATION_TOLERANCE_DEGREES:
-        raise RuntimeError(f"Frame {frame} rotates a petal by {maximum_rotation:.3f} degrees")
+    if maximum_rotation > MAX_OBJECT_ROTATION_DEGREES:
+        raise RuntimeError(f"Frame {frame} rotates a petal object by {maximum_rotation:.3f} degrees")
 
 print("PASS: sampled rose bloom geometry stays within intersection and rotation limits")
