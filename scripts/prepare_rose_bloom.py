@@ -46,7 +46,7 @@ MATERIAL_OBJECTS = {
     "m_thorns": "thorn",
 }
 MORPH_SETTINGS = {
-    "outer": MorphSettings(1, math.radians(12.0), 0.50, 0.75, 0.30, math.radians(1.0)),
+    "outer": MorphSettings(1, math.radians(16.0), 0.36, 0.82, 0.44, math.radians(1.0)),
     "middle": MorphSettings(18, math.radians(24.0), 0.30, 0.90, 0.45, math.radians(2.0)),
     "inner": MorphSettings(
         34,

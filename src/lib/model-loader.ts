@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader, GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import localforage from 'localforage';
 
 // Configure localforage
@@ -7,6 +8,12 @@ localforage.config({
   name: 'happy-travel',
   storeName: 'models'
 });
+
+const createGLTFLoader = () => {
+  const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  return loader;
+};
 
 export const loadModelWithCache = async (
   url: string,
@@ -18,7 +25,7 @@ export const loadModelWithCache = async (
     console.log(`[ModelLoader] Loading ${url} from cache`);
     onProgress?.(100);
     return new Promise((resolve, reject) => {
-      const loader = new GLTFLoader();
+      const loader = createGLTFLoader();
       loader.parse(cachedModel, '', (gltf) => {
         resolve(gltf);
       }, (error) => {
@@ -65,7 +72,7 @@ export const loadModelWithCache = async (
   await localforage.setItem(url, arrayBuffer);
 
   return new Promise((resolve, reject) => {
-    const loader = new GLTFLoader();
+    const loader = createGLTFLoader();
     loader.parse(arrayBuffer, '', (gltf) => {
       resolve(gltf);
     }, (error) => {
