@@ -68,7 +68,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
     };
 
     Promise.all([
-      loadModelWithCache('/models/red_bull_f1_rigged.glb', (p) => {
+      loadModelWithCache('/models/red_bull_f1_showroom.glb', (p) => {
         carProg = p;
         updateCombinedProgress();
       }),

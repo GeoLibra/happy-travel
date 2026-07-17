@@ -7,6 +7,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "check:f1-motion": "tsx scripts/check-f1-motion.ts",
+    "check:showroom-assets": "node scripts/check-showroom-assets.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
@@ -36,6 +37,7 @@
     "vite": "^6.2.0"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.4.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.14",
