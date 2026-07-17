@@ -6,6 +6,7 @@ const GLB_VERSION = 2;
 const JSON_CHUNK = 0x4e4f534a;
 const BIN_CHUNK = 0x004e4942;
 const FLOAT_COMPONENT_TYPE = 5126;
+const COMPONENTS_BY_TYPE = { SCALAR: 1, VEC3: 3, VEC4: 4 };
 
 function readGlb(filePath) {
   const glb = readFileSync(filePath);
@@ -45,63 +46,26 @@ function readGlb(filePath) {
   };
 }
 
-function readScalarAccessor(json, bin, accessorIndex) {
+function readFloatAccessor(json, bin, accessorIndex, expectedType) {
   const accessor = json.accessors?.[accessorIndex];
   assert(accessor, `Accessor ${accessorIndex} is missing`);
-  assert.equal(accessor.type, 'SCALAR', `Accessor ${accessorIndex} must be SCALAR`);
-  assert.equal(
-    accessor.componentType,
-    FLOAT_COMPONENT_TYPE,
-    `Accessor ${accessorIndex} must use FLOAT components`,
-  );
-
+  assert.equal(accessor.type, expectedType, `Accessor ${accessorIndex} must be ${expectedType}`);
+  assert.equal(accessor.componentType, FLOAT_COMPONENT_TYPE, `Accessor ${accessorIndex} must use FLOAT components`);
+  const componentCount = COMPONENTS_BY_TYPE[expectedType];
+  const elementSize = componentCount * Float32Array.BYTES_PER_ELEMENT;
   const bufferView = json.bufferViews?.[accessor.bufferView];
   assert(bufferView, `Buffer view ${accessor.bufferView} is missing`);
-  const bufferViewOffset = bufferView.byteOffset ?? 0;
-  const accessorOffset = accessor.byteOffset ?? 0;
-  const bufferViewLength = bufferView.byteLength;
-  const count = accessor.count;
-  const stride = bufferView.byteStride ?? Float32Array.BYTES_PER_ELEMENT;
-
-  for (const [label, value] of [
-    ['buffer view byteOffset', bufferViewOffset],
-    ['accessor byteOffset', accessorOffset],
-    ['accessor count', count],
-    ['buffer view byteLength', bufferViewLength],
-  ]) {
-    assert(
-      Number.isSafeInteger(value) && value >= 0,
-      `Accessor ${accessorIndex} ${label} must be a finite nonnegative integer`,
-    );
-  }
-  assert(
-    Number.isSafeInteger(stride) && stride >= Float32Array.BYTES_PER_ELEMENT,
-    `Accessor ${accessorIndex} byte stride must be at least 4`,
+  const start = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+  const stride = bufferView.byteStride ?? elementSize;
+  const end = accessor.count === 0 ? start : start + (accessor.count - 1) * stride + elementSize;
+  assert(stride >= elementSize && stride % 4 === 0, `Accessor ${accessorIndex} has an invalid stride`);
+  assert(end <= (bufferView.byteOffset ?? 0) + bufferView.byteLength, `Accessor ${accessorIndex} exceeds its buffer view`);
+  assert(end <= bin.length, `Accessor ${accessorIndex} exceeds the BIN chunk`);
+  return Array.from({ length: accessor.count }, (_, elementIndex) =>
+    Array.from({ length: componentCount }, (_, componentIndex) =>
+      bin.readFloatLE(start + elementIndex * stride + componentIndex * 4),
+    ),
   );
-  assert.equal(
-    stride % Float32Array.BYTES_PER_ELEMENT,
-    0,
-    `Accessor ${accessorIndex} byte stride must be divisible by 4`,
-  );
-
-  const start = bufferViewOffset + accessorOffset;
-  const bufferViewEnd = bufferViewOffset + bufferViewLength;
-  const accessorEnd = count === 0
-    ? start
-    : start + (count - 1) * stride + Float32Array.BYTES_PER_ELEMENT;
-  assert(
-    Number.isSafeInteger(accessorEnd) && accessorEnd <= bufferViewEnd,
-    `Accessor ${accessorIndex} exceeds its buffer view`,
-  );
-  assert(accessorEnd <= bin.length, `Accessor ${accessorIndex} exceeds the BIN chunk`);
-  const values = [];
-
-  for (let index = 0; index < count; index += 1) {
-    const valueOffset = start + index * stride;
-    values.push(bin.readFloatLE(valueOffset));
-  }
-
-  return values;
 }
 
 function verifyRoseBloom(filePath) {
@@ -116,25 +80,42 @@ function verifyRoseBloom(filePath) {
     sampler: animation.samplers[channel.sampler],
   }));
 
-  assert(targets.length >= 6, 'RoseBloom must animate multiple petals');
+  assert.equal(targets.length, 25, 'RoseBloom must contain one channel per physical petal');
   assert(
-    new Set(targets.map(({ node }) => node)).size >= 3,
-    'RoseBloom must target at least three petal nodes',
+    targets.every(({ node, path }) => node.startsWith('Petal_') && path === 'weights'),
+    'RoseBloom may contain only Petal_* morph weight channels',
   );
-  assert(
-    targets.every(({ node }) => node.startsWith('Petal_')),
-    'RoseBloom may animate only Petal_* nodes',
-  );
-  assert(
-    ['translation', 'rotation', 'scale'].every((path) =>
-      targets.some((target) => target.path === path),
-    ),
-    'RoseBloom must contain translation, rotation, and scale channels',
-  );
+
+  const petalNodes = new Set(targets.map(({ node }) => node));
+  assert.equal(petalNodes.size, 25, 'RoseBloom must animate 25 unique physical petals');
+  const layers = new Set();
+
+  for (const { node: nodeName, sampler } of targets) {
+    const node = json.nodes.find(({ name }) => name === nodeName);
+    assert(node, `${nodeName} node is missing`);
+    assert(['outer', 'middle', 'inner'].includes(node.extras?.RoseLayer), `${nodeName} must declare RoseLayer`);
+    layers.add(node.extras.RoseLayer);
+
+    const mesh = json.meshes?.[node.mesh];
+    assert(mesh, `${nodeName} mesh is missing`);
+    assert.deepEqual(mesh.extras?.targetNames, ['Bud'], `${nodeName} must expose one Bud target name`);
+    assert.equal(mesh.weights?.length, 1, `${nodeName} must have one default morph weight`);
+    assert.equal(mesh.primitives?.length, 1, `${nodeName} must have one mesh primitive`);
+    assert.equal(mesh.primitives[0].targets?.length, 1, `${nodeName} must have one morph target`);
+    assert(mesh.primitives[0].targets[0].POSITION !== undefined, `${nodeName} Bud target must contain positions`);
+
+    const weights = readFloatAccessor(json, bin, sampler.output, 'SCALAR').flat();
+    assert(weights.length >= 2, `${nodeName} weights sampler must contain multiple keys`);
+    assert(weights.every((value) => Number.isFinite(value) && value >= -1e-5 && value <= 1 + 1e-5), `${nodeName} weights must stay in [0, 1]`);
+    assert(Math.abs(weights[0] - 1) <= 1e-5, `${nodeName} must start at Bud weight 1`);
+    assert(Math.abs(weights.at(-1)) <= 1e-5, `${nodeName} must finish at Bud weight 0`);
+  }
+
+  assert.deepEqual(layers, new Set(['outer', 'middle', 'inner']));
 
   const inputTimes = animation.samplers.flatMap((sampler) => {
     assert(sampler, 'RoseBloom channel sampler is missing');
-    return readScalarAccessor(json, bin, sampler.input);
+    return readFloatAccessor(json, bin, sampler.input, 'SCALAR').flat();
   });
   const duration = Math.max(...inputTimes);
   assert(

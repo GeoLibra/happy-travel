@@ -10,10 +10,22 @@ import json
 import math
 import shutil
 import struct
+import sys
+from itertools import combinations
 from pathlib import Path
 
 import bpy
-from mathutils import Matrix, Quaternion, Vector
+from mathutils import Vector
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from rosebud_morph import (
+    MorphSettings,
+    ROOT_LOCK_END,
+    apply_angular_guide_phase,
+    compute_angular_guide_indices,
+    generate_bud_world_positions,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -22,16 +34,33 @@ OUTPUT_GLB = SOURCE_GLB
 MIRROR_GLB = REPO_ROOT / "public/models/rose.glb"
 FPS = 30
 END_FRAME = 135
+EXPECTED_PETAL_COUNT = 25
+INNER_GUIDE_PHASE = 1
+PETAL_COMPONENTS_PER_PETAL = 3
+MIN_PETAL_COMPONENT_VERTICES = 100
+MAX_PETAL_CLUSTER_COST = 0.08
 
 MATERIAL_OBJECTS = {
     "m_leafs": "leaf",
     "m_stem": "stem",
     "m_thorns": "thorn",
 }
-LAYER_SETTINGS = {
-    "outer": (1, 0.18, (0.72, 0.72, 0.94), math.radians(38.0)),
-    "middle": (18, 0.13, (0.80, 0.80, 0.97), math.radians(28.0)),
-    "inner": (34, 0.08, (0.88, 0.88, 0.99), math.radians(16.0)),
+MORPH_SETTINGS = {
+    "outer": MorphSettings(1, math.radians(16.0), 0.36, 0.82, 0.44, math.radians(1.0)),
+    "middle": MorphSettings(18, math.radians(24.0), 0.30, 0.90, 0.45, math.radians(2.0)),
+    "inner": MorphSettings(
+        34,
+        math.radians(38.0),
+        0.12,
+        1.05,
+        0.90,
+        math.radians(3.0),
+        tip_guide_radius_ratio=0.04,
+        tip_guide_height_ratio=1.10,
+        alternate_tip_guide_radius_ratio=0.09,
+        alternate_tip_guide_height_ratio=1.04,
+        tip_blend_start=0.65,
+    ),
 }
 
 
@@ -65,6 +94,72 @@ def centroid(obj: bpy.types.Object) -> Vector:
     return sum(points, Vector()) / len(points)
 
 
+def component_bounds(obj: bpy.types.Object) -> tuple[float, ...]:
+    points = world_vertices(obj)
+    return tuple(min(point[axis] for point in points) for axis in range(3)) + tuple(
+        max(point[axis] for point in points) for axis in range(3)
+    )
+
+
+def bounds_distance(left: tuple[float, ...], right: tuple[float, ...]) -> float:
+    return math.sqrt(sum((a - b) ** 2 for a, b in zip(left, right)))
+
+
+def cluster_petal_components(components: list[bpy.types.Object]) -> list[tuple[bpy.types.Object, ...]]:
+    expected_components = EXPECTED_PETAL_COUNT * PETAL_COMPONENTS_PER_PETAL
+    if len(components) != expected_components:
+        raise RuntimeError(
+            f"Expected {expected_components} substantial petal components "
+            f"({EXPECTED_PETAL_COUNT} petals x {PETAL_COMPONENTS_PER_PETAL}), found {len(components)}"
+        )
+
+    component_bounds_by_object = {obj: component_bounds(obj) for obj in components}
+    candidates = []
+    for group in combinations(components, PETAL_COMPONENTS_PER_PETAL):
+        cost = sum(
+            bounds_distance(component_bounds_by_object[left], component_bounds_by_object[right])
+            for left, right in combinations(group, 2)
+        )
+        candidates.append((cost, tuple(sorted(group, key=lambda obj: obj.name))))
+    candidates.sort(key=lambda item: (item[0], tuple(obj.name for obj in item[1])))
+
+    assigned: set[bpy.types.Object] = set()
+    clusters = []
+    for cost, group in candidates:
+        if any(obj in assigned for obj in group):
+            continue
+        if cost > MAX_PETAL_CLUSTER_COST:
+            raise RuntimeError(
+                f"Could not identify a coherent physical petal; nearest remaining cluster cost is {cost:.6f}"
+            )
+        clusters.append(group)
+        assigned.update(group)
+        if len(assigned) == len(components):
+            break
+
+    if len(clusters) != EXPECTED_PETAL_COUNT or len(assigned) != len(components):
+        raise RuntimeError(
+            f"Expected {EXPECTED_PETAL_COUNT} complete petal clusters, "
+            f"formed {len(clusters)} from {len(assigned)} of {len(components)} components"
+        )
+    return clusters
+
+
+def join_petal_components(clusters: list[tuple[bpy.types.Object, ...]]) -> list[bpy.types.Object]:
+    petals = []
+    for index, cluster in enumerate(clusters):
+        bpy.ops.object.select_all(action="DESELECT")
+        active = cluster[0]
+        for component in cluster:
+            component.select_set(True)
+        bpy.context.view_layer.objects.active = active
+        bpy.ops.object.join()
+        active.name = f"__CompletePetal_{index:03d}"
+        active.data.name = f"__CompletePetalMesh_{index:03d}"
+        petals.append(active)
+    return petals
+
+
 def reset_and_import() -> list[bpy.types.Object]:
     bpy.ops.object.mode_set(mode="OBJECT") if bpy.context.object and bpy.context.object.mode != "OBJECT" else None
     bpy.ops.object.select_all(action="SELECT")
@@ -87,6 +182,9 @@ def reset_and_import() -> list[bpy.types.Object]:
     final_world_matrices = {obj: obj.matrix_world.copy() for obj in imported}
     for obj in imported:
         obj.animation_data_clear()
+        shape_keys = obj.data.shape_keys if obj.type == "MESH" else None
+        if shape_keys is not None:
+            shape_keys.animation_data_clear()
     for action in list(bpy.data.actions):
         bpy.data.actions.remove(action)
     for obj in imported:
@@ -105,6 +203,7 @@ def find_required_meshes(objects: list[bpy.types.Object]) -> None:
 def discover_petals(objects: list[bpy.types.Object]) -> list[bpy.types.Object]:
     material_petals = [obj for obj in objects if "m_petal" in material_names(obj)]
     generated_petals = [obj for obj in material_petals if obj.name.startswith("Petal_")]
+    petals = None
 
     if len(material_petals) == 1 and not generated_petals:
         source = material_petals[0]
@@ -115,19 +214,35 @@ def discover_petals(objects: list[bpy.types.Object]) -> list[bpy.types.Object]:
         bpy.ops.mesh.select_all(action="SELECT")
         bpy.ops.mesh.separate(type="LOOSE")
         bpy.ops.object.mode_set(mode="OBJECT")
-        petals = sorted(
+        components = sorted(
             [obj for obj in bpy.context.selected_objects if obj.type == "MESH"],
             key=lambda obj: tuple(round(value, 6) for value in obj.bound_box[0]),
         )
-        if len(petals) < 3:
-            raise RuntimeError(f"Expected at least 3 petal islands, found {len(petals)}")
-    elif len(generated_petals) >= 3 and len(generated_petals) == len(material_petals):
+        if len(components) < 3:
+            raise RuntimeError(f"Expected at least 3 petal islands, found {len(components)}")
+    elif len(generated_petals) == EXPECTED_PETAL_COUNT and len(generated_petals) == len(material_petals):
         petals = generated_petals
+        components = []
+    elif len(generated_petals) >= 3 and len(generated_petals) == len(material_petals):
+        components = generated_petals
     else:
         raise RuntimeError(
             "Expected exactly one m_petal mesh or at least three generated Petal_* meshes; "
             f"found {len(material_petals)} m_petal meshes and {len(generated_petals)} Petal_* meshes"
         )
+
+    if petals is None:
+        substantial_components = [
+            component
+            for component in components
+            if len(component.data.vertices) >= MIN_PETAL_COMPONENT_VERTICES
+        ]
+        debris = [component for component in components if component not in substantial_components]
+        for component in debris:
+            bpy.data.objects.remove(component, do_unlink=True)
+
+        clusters = cluster_petal_components(substantial_components)
+        petals = join_petal_components(clusters)
 
     centers = {obj: centroid(obj) for obj in petals}
     flower_center = sum(centers.values(), Vector()) / len(centers)
@@ -173,16 +288,6 @@ def attachment_origin(obj: bpy.types.Object) -> Vector:
     return sum(band, Vector()) / len(band)
 
 
-def capped_rotation(source: Vector, target: Vector, maximum_angle: float) -> Quaternion:
-    if source.length_squared < 1e-16 or target.length_squared < 1e-16:
-        return Quaternion()
-    delta = source.normalized().rotation_difference(target.normalized())
-    angle = delta.angle
-    if angle > maximum_angle and angle > 1e-12:
-        delta = Quaternion().slerp(delta, maximum_angle / angle)
-    return delta
-
-
 def action_fcurves(action: bpy.types.Action):
     # Blender 5 creates layered actions. Legacy actions expose fcurves directly;
     # layered actions expose them through channel bags.
@@ -208,62 +313,86 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
     if max_radius <= 1e-12:
         raise RuntimeError("Petal centroids have no usable radial distribution")
 
-    for index, petal in enumerate(petals):
+    layers = {}
+    for petal in petals:
+        normalized_radius = radial[petal] / max_radius
+        layers[petal] = "outer" if normalized_radius >= 0.66 else "middle" if normalized_radius >= 0.33 else "inner"
+
+    inner_petals = [petal for petal in petals if layers[petal] == "inner"]
+    if len(inner_petals) != 8:
+        raise RuntimeError(f"Expected 8 inner petals for circular alternation, found {len(inner_petals)}")
+    inner_guide_indices = compute_angular_guide_indices(
+        [(petal.name, centers[petal]) for petal in inner_petals],
+        flower_center,
+    )
+    inner_guide_indices = apply_angular_guide_phase(inner_guide_indices, INNER_GUIDE_PHASE)
+    even_count = sum(index % 2 == 0 for index in inner_guide_indices.values())
+    odd_count = sum(index % 2 == 1 for index in inner_guide_indices.values())
+    if (even_count, odd_count) != (4, 4):
+        raise RuntimeError(f'Inner phased guides must split 4/4, found {even_count}/{odd_count}')
+    for petal in sorted(inner_petals, key=lambda item: inner_guide_indices[item.name]):
+        print(
+            f'INNER_GUIDE petal={petal.name} '
+            f'angular_rank={inner_guide_indices[petal.name] - INNER_GUIDE_PHASE} '
+            f'guide_index={inner_guide_indices[petal.name]}'
+        )
+
+    outer_radius = MORPH_SETTINGS["outer"].guide_radius_ratio
+    middle_radius = MORPH_SETTINGS["middle"].guide_radius_ratio
+    inner_body_radius = MORPH_SETTINGS["inner"].guide_radius_ratio
+    inner_odd_tip = MORPH_SETTINGS["inner"].alternate_tip_guide_radius_ratio
+    inner_even_tip = MORPH_SETTINGS["inner"].tip_guide_radius_ratio
+    if inner_odd_tip is None or inner_even_tip is None:
+        raise RuntimeError('Inner tip guide radii are required')
+    if not outer_radius > middle_radius > inner_body_radius > inner_odd_tip > inner_even_tip > 0.0:
+        raise RuntimeError(
+            'Guide radii must descend outer > middle > inner body > odd tip > even tip; '
+            f'found {[outer_radius, middle_radius, inner_body_radius, inner_odd_tip, inner_even_tip]}'
+        )
+
+    for animation_index, petal in enumerate(petals):
+        if petal.data.shape_keys is not None:
+            petal.shape_key_clear()
         origin = attachment_origin(petal)
         set_world_origin(petal, origin)
-        petal.rotation_mode = "QUATERNION"
         petal.matrix_world = petal.matrix_world.copy()
 
-        open_location = petal.location.copy()
-        open_rotation = petal.rotation_quaternion.copy()
-        open_scale = petal.scale.copy()
-        open_world = petal.matrix_world.copy()
-        open_world_location, open_world_rotation, open_world_scale = open_world.decompose()
-
-        normalized_radius = radial[petal] / max_radius
-        layer = "outer" if normalized_radius >= 0.66 else "middle" if normalized_radius >= 0.33 else "inner"
-        layer_frame, inward, scale_factors, max_angle = LAYER_SETTINGS[layer]
-        stagger = (index % 5) * 2
-        opening_frame = layer_frame + stagger
+        layer = layers[petal]
+        settings = MORPH_SETTINGS[layer]
+        guide_index = inner_guide_indices[petal.name] if layer == "inner" else animation_index
+        petal["RoseLayer"] = layer
+        stagger = (animation_index % 5) * 2
+        opening_frame = settings.opening_frame + stagger
         open_frame = opening_frame + 82
         if open_frame >= END_FRAME:
             raise RuntimeError(f"Open frame {open_frame} leaves no final hold for {petal.name}")
 
-        closed_world_location = open_world_location.copy()
-        closed_world_location.x += (flower_center.x - open_world_location.x) * inward
-        closed_world_location.y += (flower_center.y - open_world_location.y) * inward
-        growth = centers[petal] - open_world_location
-        toward_axis = Vector((flower_center.x, flower_center.y, centers[petal].z)) - open_world_location
-        rotation_delta = capped_rotation(growth, toward_axis, max_angle)
-        closed_world_rotation = rotation_delta @ open_world_rotation
-        closed_world_scale = Vector(
-            (
-                open_world_scale.x * scale_factors[0],
-                open_world_scale.y * scale_factors[1],
-                open_world_scale.z * scale_factors[2],
-            )
+        basis = petal.shape_key_add(name="Basis", from_mix=False)
+        bud = petal.shape_key_add(name="Bud", from_mix=False)
+        open_world = petal.matrix_world.copy()
+        open_points = [open_world @ point.co for point in basis.data]
+        closed_points, parameters = generate_bud_world_positions(
+            open_points, origin, flower_center, centers[petal], max_radius, settings, guide_index
         )
-        closed_world = Matrix.LocRotScale(closed_world_location, closed_world_rotation, closed_world_scale)
-        closed_local = petal.parent.matrix_world.inverted_safe() @ closed_world if petal.parent else closed_world
-        closed_location, closed_rotation, closed_scale = closed_local.decompose()
+        inverse_world = open_world.inverted_safe()
+        for vertex_index, closed_world in enumerate(closed_points):
+            bud.data[vertex_index].co = inverse_world @ closed_world
+            if parameters[vertex_index] <= ROOT_LOCK_END:
+                displacement = (bud.data[vertex_index].co - basis.data[vertex_index].co).length
+                if displacement > 1e-5:
+                    raise RuntimeError(f"{petal.name} root vertex moved by {displacement:.9g}")
 
-        petal.location = closed_location
-        petal.rotation_quaternion = closed_rotation
-        petal.scale = closed_scale
-        for path in ("location", "rotation_quaternion", "scale"):
-            petal.keyframe_insert(data_path=path, frame=1)
-            petal.keyframe_insert(data_path=path, frame=opening_frame)
+        bud.value = 1.0
+        bud.keyframe_insert(data_path="value", frame=1)
+        bud.keyframe_insert(data_path="value", frame=opening_frame)
+        bud.value = 0.0
+        bud.keyframe_insert(data_path="value", frame=open_frame)
+        bud.keyframe_insert(data_path="value", frame=END_FRAME)
 
-        petal.location = open_location
-        petal.rotation_quaternion = open_rotation
-        petal.scale = open_scale
-        for path in ("location", "rotation_quaternion", "scale"):
-            petal.keyframe_insert(data_path=path, frame=open_frame)
-            petal.keyframe_insert(data_path=path, frame=END_FRAME)
-
-        action = petal.animation_data.action
+        shape_keys = petal.data.shape_keys
+        action = shape_keys.animation_data.action
         if action is None:
-            raise RuntimeError(f"Blender did not create an action for {petal.name}")
+            raise RuntimeError(f"Blender did not create a shape-key action for {petal.name}")
         action.name = f"{petal.name}_RoseBloom"
         for curve in action_fcurves(action):
             for keyframe in curve.keyframe_points:
@@ -271,9 +400,8 @@ def animate_petals(petals: list[bpy.types.Object]) -> None:
                 keyframe.handle_left_type = "AUTO_CLAMPED"
                 keyframe.handle_right_type = "AUTO_CLAMPED"
 
-        # One identically named NLA track per object is merged into one glTF clip.
-        petal.animation_data.action = None
-        track = petal.animation_data.nla_tracks.new()
+        shape_keys.animation_data.action = None
+        track = shape_keys.animation_data.nla_tracks.new()
         track.name = "RoseBloom"
         strip = track.strips.new("RoseBloom", 1, action)
         strip.action_frame_start = 1
@@ -296,16 +424,20 @@ def ensure_root(objects: list[bpy.types.Object], open_bounds: tuple[float, ...])
 
 def verify_scene_animation(petals: list[bpy.types.Object]) -> None:
     petal_names = {petal.name for petal in petals}
-    animated = []
     for obj in bpy.context.scene.objects:
-        data = obj.animation_data
-        has_animation = bool(data and (data.action or len(data.nla_tracks)))
-        if has_animation:
-            animated.append(obj.name)
-            if obj.name not in petal_names or not obj.name.startswith("Petal_"):
-                raise RuntimeError(f"Only Petal_* objects may have animation data; found {obj.name}")
-    if set(animated) != petal_names:
-        raise RuntimeError(f"Every petal must be animated; animated {len(animated)} of {len(petals)}")
+        if obj.animation_data and (obj.animation_data.action or len(obj.animation_data.nla_tracks)):
+            raise RuntimeError(f"Object transforms may not be animated; found {obj.name}")
+    animated = set()
+    for petal in petals:
+        keys = petal.data.shape_keys
+        if keys is None or [key.name for key in keys.key_blocks] != ["Basis", "Bud"]:
+            raise RuntimeError(f"{petal.name} must contain exactly Basis and Bud shape keys")
+        data = keys.animation_data
+        if not data or len(data.nla_tracks) != 1:
+            raise RuntimeError(f"{petal.name} must contain one shape-key NLA track")
+        animated.add(petal.name)
+    if animated != petal_names:
+        raise RuntimeError(f"Every petal must have morph animation; found {len(animated)}")
 
 
 def read_glb_json(path: Path) -> dict:
@@ -341,6 +473,10 @@ def export_and_validate(petals: list[bpy.types.Object], original_bounds: tuple[f
         export_nla_strips_merged_animation_name="RoseBloom",
         export_frame_range=True,
         export_force_sampling=False,
+        export_morph=True,
+        export_morph_animation=True,
+        export_morph_normal=True,
+        export_morph_tangent=False,
         export_materials="EXPORT",
         export_texcoords=True,
         export_normals=True,

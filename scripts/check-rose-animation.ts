@@ -27,7 +27,7 @@ const closeTo = (actual: number, expected: number, tolerance = 1e-6) => {
   assert(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`);
 };
 
-assert.equal(ROSE_MODEL_URL, "/models/rose.glb?v=1ba2e7a");
+assert.equal(ROSE_MODEL_URL, "/models/rose.glb?v=guided-bud-3");
 assert.equal(ROSE_ASSEMBLY_MS, 3_000);
 assert.equal(ROSE_HANDOFF_MS, 600);
 assert.equal(ROSE_HANDOFF_END_MS, 3_600);
