@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { createF1Airflow } from '../src/components/effects/f1Airflow';
+
+const high = createF1Airflow('high');
+assert.equal(high.group.children.length, 14);
+const materials = new Set(high.group.children.map((child: any) => child.material));
+assert.equal(materials.size, 1);
+high.update({ time: 1, holdIntensity: 1, reducedMotion: false });
+assert.equal(high.material.uniforms.uOpacity.value, 1);
+const phase = high.material.uniforms.uTime.value;
+high.update({ time: 2, holdIntensity: 0, reducedMotion: false });
+assert.equal(high.material.uniforms.uOpacity.value, 0);
+assert(high.material.uniforms.uTime.value > phase);
+const low = createF1Airflow('low');
+assert.equal(low.group.children.length, 8);
+high.dispose();
+high.dispose();
+low.dispose();
