@@ -94,6 +94,19 @@ assert.ok(modelStat.size <= 15 * 1024 * 1024, `Showroom GLB is ${modelStat.size}
 
 const sourceGltf = await parseGlbJson(assets.sourceModel);
 const gltf = await parseGlbJson(assets.model);
+const airflowCheckSource = await readFile('scripts/check-f1-airflow.ts', 'utf8');
+assert.match(
+  airflowCheckSource,
+  /public\/models\/red_bull_f1_showroom\.glb/,
+  'the airflow check must read the real shipped showroom GLB',
+);
+for (const pivotName of ['WheelPivot_FL', 'WheelPivot_FR', 'WheelPivot_RL', 'WheelPivot_RR']) {
+  assert.match(
+    airflowCheckSource,
+    new RegExp(pivotName),
+    `the airflow check must verify the shipped ${pivotName} axle pivot`,
+  );
+}
 const names = new Set(gltf.nodes.map((node) => node.name));
 for (const name of ['F1_Car', 'Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR']) {
   assert.ok(names.has(name), `Missing required node: ${name}`);

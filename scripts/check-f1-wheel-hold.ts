@@ -93,12 +93,12 @@ assert.match(
 );
 assert.match(
   particleBackgroundSource,
-  /if \(carGesture\.travelPx > CAR_DRAG_TOLERANCE_PX\) \{[\s\S]*?if \(carGesture\.holdStarted\) \{[\s\S]*?stateRef\.current\.carHeld = false;[\s\S]*?carGesture\.startedOnCar = false;[\s\S]*?carGesture\.holdStarted = false;[\s\S]*?controls\.enabled = stateRef\.current\.progress >= 100 && hasSetOrbitTarget;/,
+  /if \(carGesture\.travelPx > CAR_DRAG_TOLERANCE_PX\) \{[\s\S]*?if \(carGesture\.holdStarted\) \{[\s\S]*?stateRef\.current\.carHeld = false;[\s\S]*?carGesture\.startedOnCar = false;[\s\S]*?carGesture\.holdStarted = false;[\s\S]*?controls\.enabled = stateRef\.current\.progress >= 100 && isOrbitInteractionReady;/,
   'dragging beyond tolerance after hold activation must stop the hold and invalidate release toggling',
 );
 assert.match(
   particleBackgroundSource,
-  /if \(isAdditionalCarGesturePointer\(carGesture\?\.pointerId \?\? null, event\.pointerId\)\) \{[\s\S]*?clearCarGesture\(false\);[\s\S]*?controls\.enabled = stateRef\.current\.progress >= 100 && hasSetOrbitTarget;[\s\S]*?return;/,
+  /if \(isAdditionalCarGesturePointer\(carGesture\?\.pointerId \?\? null, event\.pointerId\)\) \{[\s\S]*?clearCarGesture\(false\);[\s\S]*?controls\.enabled = stateRef\.current\.progress >= 100 && isOrbitInteractionReady;[\s\S]*?return;/,
   'an additional pointer must synchronously cancel custom hold state before OrbitControls handles it',
 );
 assert.match(
@@ -108,10 +108,18 @@ assert.match(
 );
 assert.match(
   particleBackgroundSource,
-  /if \(s\.progress >= 100\) \{[\s\S]*?if \(s\.carHeld \|\| !hasSetOrbitTarget\) \{[\s\S]*?controls\.enabled = false;[\s\S]*?\} else \{[\s\S]*?controls\.enabled = true;/,
-  'the primary stopped camera path must wait for the final orbit target before enabling controls',
+  /let isOrbitInteractionReady = false;/,
+  'camera target initialization and user OrbitControls readiness must have separate state',
+);
+assert.match(
+  particleBackgroundSource,
+  /if \(s\.progress >= 100\) \{[\s\S]*?if \(s\.carHeld \|\| !isOrbitInteractionReady\) \{[\s\S]*?controls\.enabled = false;[\s\S]*?\} else \{[\s\S]*?controls\.enabled = true;/,
+  'the primary stopped camera path must wait for settling before enabling user controls',
 );
 
+const finalStoppedZ = particleBackgroundSource.indexOf(
+  'f1CarGroup.position.z = targetZ;',
+);
 const finalStoppedY = particleBackgroundSource.indexOf(
   'f1CarGroup.position.y = s.progress >= 100 ? -10 : -10 + engineVibration;',
 );
@@ -127,34 +135,52 @@ const floorPlacementCommit = particleBackgroundSource.indexOf(
   'hasPlacedStudioFloor = true;',
   floorPlacement,
 );
-const revealAdvance = particleBackgroundSource.indexOf(
-  'studioReveal = stepStudioReveal(',
+const orbitTargetCopy = particleBackgroundSource.indexOf(
+  'controls.target.copy(assembledCenter);',
   floorPlacementCommit,
 );
-const stoppedPoseGate = particleBackgroundSource.indexOf(
-  'const stoppedPoseSettled =',
-  floorPlacementCommit,
+const orbitTargetUpdate = particleBackgroundSource.indexOf(
+  'controls.update();',
+  orbitTargetCopy,
 );
 const orbitTargetCommit = particleBackgroundSource.indexOf(
   'hasSetOrbitTarget = true;',
+  orbitTargetUpdate,
+);
+const revealAdvance = particleBackgroundSource.indexOf(
+  'studioReveal = stepStudioReveal(',
+  orbitTargetCommit,
+);
+const stoppedPoseGate = particleBackgroundSource.indexOf(
+  'const stoppedPoseSettled =',
+  orbitTargetCommit,
+);
+const orbitInteractionReadyCommit = particleBackgroundSource.indexOf(
+  'isOrbitInteractionReady = true;',
   stoppedPoseGate,
 );
 
+assert(finalStoppedZ >= 0, 'the first progress-100 frame must commit the final car depth');
 assert(finalStoppedY >= 0, 'the first stopped frame must receive its final assembled Y');
+assert(finalStoppedZ < finalStoppedY, 'final depth must be committed before the final Y/scale transform');
 assert(finalScale > finalStoppedY, 'final scale must be applied after final assembled Y');
 assert(floorPlacement > finalScale, 'floor placement must measure the first final assembled transform');
 assert(
-  floorPlacementCommit > floorPlacement && revealAdvance > floorPlacementCommit,
-  'floor placement must commit before the first positive reveal update',
+  floorPlacementCommit > floorPlacement
+    && orbitTargetCopy > floorPlacementCommit
+    && orbitTargetUpdate > orbitTargetCopy
+    && orbitTargetCommit > orbitTargetUpdate
+    && revealAdvance > orbitTargetCommit,
+  'floor placement and the final camera target update must both commit before positive reveal',
 );
 assert(
-  stoppedPoseGate > floorPlacementCommit && orbitTargetCommit > stoppedPoseGate,
-  'orbit target enablement must remain separately gated on settled Z/speed after floor placement',
+  stoppedPoseGate > orbitTargetCommit && orbitInteractionReadyCommit > stoppedPoseGate,
+  'user OrbitControls enablement must remain separately gated on settled motion after target setup',
 );
 assert.match(
   particleBackgroundSource,
-  /studioReveal = stepStudioReveal\([\s\S]*?s\.progress >= 100 && hasPlacedStudioFloor,[\s\S]*?delta,[\s\S]*?\);/,
-  'the floor reveal must not advance until final floor placement is committed',
+  /studioReveal = stepStudioReveal\([\s\S]*?s\.progress >= 100 && hasPlacedStudioFloor && hasSetOrbitTarget,[\s\S]*?delta,[\s\S]*?\);/,
+  'the floor reveal must not advance until final floor placement and camera target are committed',
 );
 assert.equal(
   particleBackgroundSource.match(/reflection\.floor\.position\.y = assembledWorldBounds\.min\.y - 0\.03;/g)?.length,
@@ -164,7 +190,7 @@ assert.equal(
 assert.equal(
   particleBackgroundSource.match(/hasSetOrbitTarget = true;/g)?.length,
   1,
-  'orbit target must only be committed once after the stopped pose settles',
+  'orbit target must only be committed once before the reveal starts',
 );
 assert.match(
   particleBackgroundSource,

@@ -74,8 +74,10 @@ export const classifyCarRelease = (
   if (
     !input.startedOnCar
     || !input.stopped
-    || input.exploded
     || input.travelPx > CAR_DRAG_TOLERANCE_PX
   ) return 'ignore';
+  if (input.exploded) {
+    return input.elapsedMs < CAR_HOLD_DELAY_MS ? 'toggle' : 'ignore';
+  }
   return input.elapsedMs >= CAR_HOLD_DELAY_MS ? 'end-hold' : 'toggle';
 };

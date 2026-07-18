@@ -11,6 +11,54 @@ const assertApproximatelyEqual = (actual: number, expected: number, message: str
   assert(Math.abs(actual - expected) <= 1e-6, `${message}: expected ${expected}, received ${actual}`);
 };
 
+interface ShippedGlbNode {
+  name?: string;
+  translation?: [number, number, number];
+}
+
+interface ShippedGlbJson {
+  nodes: ShippedGlbNode[];
+}
+
+const shippedModelBytes = readFileSync(
+  new URL('../public/models/red_bull_f1_showroom.glb', import.meta.url),
+);
+assert.equal(
+  shippedModelBytes.toString('ascii', 16, 20),
+  'JSON',
+  'the shipped showroom asset must expose a GLB JSON chunk',
+);
+const shippedJsonLength = shippedModelBytes.readUInt32LE(12);
+const shippedModel = JSON.parse(
+  shippedModelBytes.toString('utf8', 20, 20 + shippedJsonLength),
+) as ShippedGlbJson;
+const shippedPivotZ = (name: string): number => {
+  const node = shippedModel.nodes.find((candidate) => candidate.name === name);
+  assert(node, `the shipped showroom GLB must contain ${name}`);
+  assert(node.translation, `the shipped ${name} must expose its authored pivot translation`);
+  return node.translation[2];
+};
+const shippedFrontPivotZ = [
+  shippedPivotZ('WheelPivot_FL'),
+  shippedPivotZ('WheelPivot_FR'),
+];
+const shippedRearPivotZ = [
+  shippedPivotZ('WheelPivot_RL'),
+  shippedPivotZ('WheelPivot_RR'),
+];
+assert(
+  shippedFrontPivotZ.every((z) => z > 0),
+  'the real shipped front wheel pivots must be on local positive Z',
+);
+assert(
+  shippedRearPivotZ.every((z) => z < 0),
+  'the real shipped rear wheel pivots must be on local negative Z',
+);
+assert(
+  Math.min(...shippedFrontPivotZ) > Math.max(...shippedRearPivotZ),
+  'the real shipped front axle must remain ahead of the rear axle in local +Z',
+);
+
 const assertMirroredWithFloorMargin = (
   bounds: THREE.Box3,
   paths: THREE.Vector3[][],

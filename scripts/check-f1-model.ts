@@ -77,6 +77,51 @@ for (let frame = 0; frame <= 120; frame += 1) {
   assertEveryPartClearsFloor('reassembly', frame);
 }
 
+const countPartMatrixUpdates = (run: () => void): number => {
+  let updates = 0;
+  const originals = parts.map((part) => part.object.updateMatrixWorld);
+  parts.forEach((part, index) => {
+    part.object.updateMatrixWorld = function updateMatrixWorld(force?: boolean): void {
+      updates += 1;
+      originals[index].call(this, force);
+    };
+  });
+  try {
+    run();
+  } finally {
+    parts.forEach((part, index) => {
+      part.object.updateMatrixWorld = originals[index];
+    });
+  }
+  return updates;
+};
+
+const nearlyExploded = 1 - 5e-5;
+for (let frame = 0; frame < 240; frame += 1) {
+  updateF1ExplodedParts(parts, nearlyExploded, 1 / 60, { floorY, clearance });
+  assertEveryPartClearsFloor('near-exploded settling', frame);
+}
+assert.equal(
+  countPartMatrixUpdates(() => {
+    updateF1ExplodedParts(parts, nearlyExploded, 1 / 60, { floorY, clearance });
+  }),
+  0,
+  'a threshold-settled exploded pose must skip all matrix and corner floor-guard work',
+);
+
+const nearlyReassembled = 5e-5;
+for (let frame = 0; frame < 240; frame += 1) {
+  updateF1ExplodedParts(parts, nearlyReassembled, 1 / 60, { floorY, clearance });
+  assertEveryPartClearsFloor('near-reassembled settling', frame);
+}
+assert.equal(
+  countPartMatrixUpdates(() => {
+    updateF1ExplodedParts(parts, nearlyReassembled, 1 / 60, { floorY, clearance });
+  }),
+  0,
+  'a threshold-settled reassembled pose must skip all matrix and corner floor-guard work',
+);
+
 parts.forEach((part, index) => {
   const cachedPart = part as typeof part & {
     localCorners?: readonly THREE.Vector3[];

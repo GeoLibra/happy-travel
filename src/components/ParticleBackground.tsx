@@ -327,6 +327,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     controls.maxDistance = 68;
     controls.enabled = false;
     let hasSetOrbitTarget = false;
+    let isOrbitInteractionReady = false;
 
     // ── Stopped-car gestures ──
     const raycaster = new THREE.Raycaster();
@@ -375,7 +376,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
           stateRef.current.carHeld = false;
           carGesture.startedOnCar = false;
           carGesture.holdStarted = false;
-          controls.enabled = stateRef.current.progress >= 100 && hasSetOrbitTarget;
+          controls.enabled = stateRef.current.progress >= 100 && isOrbitInteractionReady;
         }
       }
     };
@@ -407,7 +408,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     const handleCarPointerDown = (event: PointerEvent) => {
       if (isAdditionalCarGesturePointer(carGesture?.pointerId ?? null, event.pointerId)) {
         clearCarGesture(false);
-        controls.enabled = stateRef.current.progress >= 100 && hasSetOrbitTarget;
+        controls.enabled = stateRef.current.progress >= 100 && isOrbitInteractionReady;
         return;
       }
       if (
@@ -848,7 +849,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       bgCamera.lookAt(0, 0, 0);
 
       if (s.progress >= 100) {
-        if (s.carHeld || !hasSetOrbitTarget) {
+        if (s.carHeld || !isOrbitInteractionReady) {
           controls.enabled = false;
         } else {
           controls.enabled = true;
@@ -921,7 +922,11 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         // Restore the original long-distance reveal while keeping the newer
         // wheel and environment motion.
         const targetZ = getF1Depth(s.progress);
-        f1CarGroup.position.z += (targetZ - f1CarGroup.position.z) * 0.1;
+        if (s.progress >= 100) {
+          f1CarGroup.position.z = targetZ;
+        } else {
+          f1CarGroup.position.z += (targetZ - f1CarGroup.position.z) * 0.1;
+        }
         f1CarGroup.position.x = 0; // Stay centered
         const engineVibration =
           (Math.sin(time * 42) * 0.035 + Math.sin(time * 19) * 0.02) * racingSpeed;
@@ -962,6 +967,13 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
             .applyMatrix4(f1CarGroup.matrixWorld);
           reflection.floor.position.y = assembledWorldBounds.min.y - 0.03;
           hasPlacedStudioFloor = true;
+
+          assembledWorldBounds.getCenter(assembledCenter);
+          assembledWorldBounds.getSize(assembledSize);
+          assembledCenter.y -= assembledSize.y * 0.08;
+          controls.target.copy(assembledCenter);
+          controls.update();
+          hasSetOrbitTarget = true;
         }
 
         const stoppedPoseSettled =
@@ -970,19 +982,11 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
           && Math.abs(f1CarGroup.scale.x - 12) < 0.02
           && racingSpeed < 0.01;
         if (
-          !hasSetOrbitTarget
+          !isOrbitInteractionReady
+          && hasSetOrbitTarget
           && stoppedPoseSettled
-          && f1AssembledLocalBounds
         ) {
-          f1CarGroup.updateMatrixWorld(true);
-          assembledWorldBounds
-            .copy(f1AssembledLocalBounds)
-            .applyMatrix4(f1CarGroup.matrixWorld);
-          assembledWorldBounds.getCenter(assembledCenter);
-          assembledWorldBounds.getSize(assembledSize);
-          assembledCenter.y -= assembledSize.y * 0.08;
-          controls.target.copy(assembledCenter);
-          hasSetOrbitTarget = true;
+          isOrbitInteractionReady = true;
         }
 
         // Update Trails (Trailing logic) (Removed old shader trail logic)
@@ -994,7 +998,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
 
       studioReveal = stepStudioReveal(
         studioReveal,
-        s.progress >= 100 && hasPlacedStudioFloor,
+        s.progress >= 100 && hasPlacedStudioFloor && hasSetOrbitTarget,
         delta,
       );
       reflection.setReveal(studioReveal);

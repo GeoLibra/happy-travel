@@ -38,6 +38,31 @@ assert.equal(
 );
 assert.equal(classifyCarRelease({ ...base, elapsedMs: 100, holdStarted: false }), 'toggle');
 assert.equal(classifyCarRelease({ ...base, travelPx: CAR_DRAG_TOLERANCE_PX + 1, holdStarted: false }), 'ignore');
+assert.equal(
+  classifyCarRelease({ ...base, elapsedMs: 100, exploded: false, holdStarted: false }),
+  'toggle',
+  'an assembled-car short press must toggle into the exploded view',
+);
+assert.equal(
+  classifyCarRelease({ ...base, elapsedMs: 100, exploded: true, holdStarted: false }),
+  'toggle',
+  'an exploded-car short press must toggle back into the assembled view',
+);
+assert.equal(
+  canStartCarHold({ ...base, elapsedMs: CAR_HOLD_DELAY_MS + 100, exploded: true }),
+  false,
+  'an exploded-car long press must never start wheel or airflow hold behavior',
+);
+assert.equal(
+  classifyCarRelease({
+    ...base,
+    elapsedMs: CAR_HOLD_DELAY_MS + 100,
+    exploded: true,
+    holdStarted: false,
+  }),
+  'ignore',
+  'an exploded-car long press must remain inert instead of becoming airflow or a delayed tap',
+);
 
 assert.equal(isAdditionalCarGesturePointer(null, 2), false);
 assert.equal(isAdditionalCarGesturePointer(2, 2), false);

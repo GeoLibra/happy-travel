@@ -43,12 +43,21 @@ export interface F1ExplodedPart {
     localOrigin: THREE.Vector3;
     localLift: THREE.Vector3;
   };
+  settledFloorGuard: {
+    amount: 0 | 1 | null;
+    floorY: number;
+    clearance: number;
+    position: THREE.Vector3;
+    parentMatrixWorld: THREE.Matrix4;
+  };
   delay: number;
 }
 
 const EXPLODE_DISTANCE = 0.72;
 const EXPLODE_LIFT = 0.12;
+const EXPLODE_AMOUNT_SETTLED_EPSILON = 1e-4;
 const POSITION_SETTLED_EPSILON_SQ = 1e-10;
+const POSITION_SETTLED_EPSILON = Math.sqrt(POSITION_SETTLED_EPSILON_SQ);
 
 const createBoxCorners = (bounds: THREE.Box3): THREE.Vector3[] => {
   const corners: THREE.Vector3[] = [];
@@ -154,6 +163,13 @@ export const createF1ExplodedParts = (root: THREE.Object3D): F1ExplodedPart[] =>
         localOrigin: new THREE.Vector3(),
         localLift: new THREE.Vector3(),
       },
+      settledFloorGuard: {
+        amount: null,
+        floorY: Number.NaN,
+        clearance: Number.NaN,
+        position: new THREE.Vector3(),
+        parentMatrixWorld: new THREE.Matrix4(),
+      },
       delay: index / Math.max(1, candidates.length - 1) * 0.22,
     };
   });
@@ -165,7 +181,12 @@ export const updateF1ExplodedParts = (
   delta: number,
   options?: { floorY: number; clearance: number },
 ): void => {
-  const safeAmount = THREE.MathUtils.clamp(amount, 0, 1);
+  const clampedAmount = THREE.MathUtils.clamp(amount, 0, 1);
+  const safeAmount = clampedAmount <= EXPLODE_AMOUNT_SETTLED_EPSILON
+    ? 0
+    : clampedAmount >= 1 - EXPLODE_AMOUNT_SETTLED_EPSILON
+      ? 1
+      : clampedAmount;
   const damping = 1 - Math.exp(-Math.max(0, delta) * 7.5);
 
   for (const part of parts) {
@@ -174,6 +195,25 @@ export const updateF1ExplodedParts = (
       part.delay,
       Math.min(1, part.delay + 0.62),
     );
+    const endpointAmount: 0 | 1 | null = localAmount === 0 || localAmount === 1
+      ? localAmount
+      : null;
+    const parent = part.object.parent;
+    const settledGuard = part.settledFloorGuard;
+    if (
+      options
+      && endpointAmount !== null
+      && settledGuard.amount === endpointAmount
+      && settledGuard.floorY === options.floorY
+      && settledGuard.clearance === options.clearance
+      && part.object.position.distanceToSquared(settledGuard.position)
+        <= POSITION_SETTLED_EPSILON_SQ
+      && (!parent || parent.matrixWorld.equals(settledGuard.parentMatrixWorld))
+    ) {
+      continue;
+    }
+    settledGuard.amount = null;
+
     const target = part.scratch.targetPosition.copy(part.assembledPosition).addScaledVector(
       part.explodedOffset,
       localAmount,
@@ -184,6 +224,7 @@ export const updateF1ExplodedParts = (
       part.object.position.lerp(target, damping);
     }
 
+    let correction = 0;
     if (localAmount > 0 && options) {
       part.object.updateMatrixWorld(true);
       let worldMinY = Infinity;
@@ -194,9 +235,9 @@ export const updateF1ExplodedParts = (
         );
       }
 
-      const correction = Math.max(0, options.floorY + options.clearance - worldMinY);
-      if (correction > 0 && part.object.parent) {
-        part.scratch.parentInverse.copy(part.object.parent.matrixWorld).invert();
+      correction = Math.max(0, options.floorY + options.clearance - worldMinY);
+      if (correction > 0 && parent) {
+        part.scratch.parentInverse.copy(parent.matrixWorld).invert();
         part.scratch.localOrigin
           .set(0, 0, 0)
           .applyMatrix4(part.scratch.parentInverse);
@@ -206,6 +247,21 @@ export const updateF1ExplodedParts = (
           .sub(part.scratch.localOrigin);
         part.object.position.add(part.scratch.localLift);
       }
+    }
+
+    const endpointPositionSettled = endpointAmount !== null
+      && Math.abs(part.object.position.x - target.x) <= POSITION_SETTLED_EPSILON
+      && Math.abs(part.object.position.z - target.z) <= POSITION_SETTLED_EPSILON
+      && (
+        correction > 0
+        || Math.abs(part.object.position.y - target.y) <= POSITION_SETTLED_EPSILON
+      );
+    if (options && endpointAmount !== null && endpointPositionSettled) {
+      settledGuard.amount = endpointAmount;
+      settledGuard.floorY = options.floorY;
+      settledGuard.clearance = options.clearance;
+      settledGuard.position.copy(part.object.position);
+      if (parent) settledGuard.parentMatrixWorld.copy(parent.matrixWorld);
     }
   }
 };
