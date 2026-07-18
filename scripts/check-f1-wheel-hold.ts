@@ -78,18 +78,88 @@ assert.match(particleBackgroundSource, /reflection\.setReveal\(studioReveal\)/);
 assert.match(particleBackgroundSource, /updateF1ExplodedParts\([\s\S]*?floorY: reflection\.floor\.position\.y/);
 assert.match(
   particleBackgroundSource,
+  /onCarManualInteraction\?: \(\) => void;/,
+  'ParticleBackground must expose a focused accepted-hold callback',
+);
+assert.match(
+  particleBackgroundSource,
+  /carGesture\.holdStarted = true;[\s\S]*?onCarManualInteractionRef\.current\?\.\(\);[\s\S]*?stateRef\.current\.carHeld = true;/,
+  'timer-accepted holds must cancel pending automatic explosion before activating hold visuals',
+);
+assert.match(
+  particleBackgroundSource,
+  /const holdStartedBeforeRelease = carGesture\.holdStarted;[\s\S]*?if \(release === 'end-hold'\) \{[\s\S]*?if \(!holdStartedBeforeRelease\) onCarManualInteractionRef\.current\?\.\(\);/,
+  'an exact-deadline release must report manual interaction when its hold timer has not fired',
+);
+assert.match(
+  particleBackgroundSource,
   /if \(carGesture\.travelPx > CAR_DRAG_TOLERANCE_PX\) \{[\s\S]*?if \(carGesture\.holdStarted\) \{[\s\S]*?stateRef\.current\.carHeld = false;[\s\S]*?carGesture\.startedOnCar = false;[\s\S]*?carGesture\.holdStarted = false;[\s\S]*?controls\.enabled = stateRef\.current\.progress >= 100 && hasSetOrbitTarget;/,
   'dragging beyond tolerance after hold activation must stop the hold and invalidate release toggling',
+);
+assert.match(
+  particleBackgroundSource,
+  /if \(isAdditionalCarGesturePointer\(carGesture\?\.pointerId \?\? null, event\.pointerId\)\) \{[\s\S]*?clearCarGesture\(false\);[\s\S]*?controls\.enabled = stateRef\.current\.progress >= 100 && hasSetOrbitTarget;[\s\S]*?return;/,
+  'an additional pointer must synchronously cancel custom hold state before OrbitControls handles it',
+);
+assert.match(
+  particleBackgroundSource,
+  /const pointerIsInsideCanvas = \(event: PointerEvent\)[\s\S]*?isPointInsideCarGestureBounds\([\s\S]*?const handleCarPointerMove = \(event: PointerEvent\) => \{[\s\S]*?!pointerIsInsideCanvas\(event\)[\s\S]*?forwardCarPointerCancel\(\);[\s\S]*?return;/,
+  'captured pointer movement outside the canvas must cancel pending and active holds',
 );
 assert.match(
   particleBackgroundSource,
   /if \(s\.progress >= 100\) \{[\s\S]*?if \(s\.carHeld \|\| !hasSetOrbitTarget\) \{[\s\S]*?controls\.enabled = false;[\s\S]*?\} else \{[\s\S]*?controls\.enabled = true;/,
   'the primary stopped camera path must wait for the final orbit target before enabling controls',
 );
+
+const finalStoppedY = particleBackgroundSource.indexOf(
+  'f1CarGroup.position.y = s.progress >= 100 ? -10 : -10 + engineVibration;',
+);
+const finalScale = particleBackgroundSource.indexOf(
+  'f1CarGroup.scale.set(targetScale, targetScale, targetScale);',
+  finalStoppedY,
+);
+const floorPlacement = particleBackgroundSource.indexOf(
+  'reflection.floor.position.y = assembledWorldBounds.min.y - 0.03;',
+  finalScale,
+);
+const floorPlacementCommit = particleBackgroundSource.indexOf(
+  'hasPlacedStudioFloor = true;',
+  floorPlacement,
+);
+const revealAdvance = particleBackgroundSource.indexOf(
+  'studioReveal = stepStudioReveal(',
+  floorPlacementCommit,
+);
+const stoppedPoseGate = particleBackgroundSource.indexOf(
+  'const stoppedPoseSettled =',
+  floorPlacementCommit,
+);
+const orbitTargetCommit = particleBackgroundSource.indexOf(
+  'hasSetOrbitTarget = true;',
+  stoppedPoseGate,
+);
+
+assert(finalStoppedY >= 0, 'the first stopped frame must receive its final assembled Y');
+assert(finalScale > finalStoppedY, 'final scale must be applied after final assembled Y');
+assert(floorPlacement > finalScale, 'floor placement must measure the first final assembled transform');
+assert(
+  floorPlacementCommit > floorPlacement && revealAdvance > floorPlacementCommit,
+  'floor placement must commit before the first positive reveal update',
+);
+assert(
+  stoppedPoseGate > floorPlacementCommit && orbitTargetCommit > stoppedPoseGate,
+  'orbit target enablement must remain separately gated on settled Z/speed after floor placement',
+);
 assert.match(
   particleBackgroundSource,
-  /const stoppedPoseSettled =[\s\S]*?if \([\s\S]*?!hasPlacedStudioFloor[\s\S]*?&& stoppedPoseSettled[\s\S]*?\) \{[\s\S]*?reflection\.floor\.position\.y = assembledWorldBounds\.min\.y - 0\.03;[\s\S]*?controls\.target\.copy\(assembledCenter\);[\s\S]*?hasSetOrbitTarget = true;/,
-  'orbit targeting and floor placement must share the final stopped-pose gate',
+  /studioReveal = stepStudioReveal\([\s\S]*?s\.progress >= 100 && hasPlacedStudioFloor,[\s\S]*?delta,[\s\S]*?\);/,
+  'the floor reveal must not advance until final floor placement is committed',
+);
+assert.equal(
+  particleBackgroundSource.match(/reflection\.floor\.position\.y = assembledWorldBounds\.min\.y - 0\.03;/g)?.length,
+  1,
+  'the measured floor Y must be written only once so it cannot jump later',
 );
 assert.equal(
   particleBackgroundSource.match(/hasSetOrbitTarget = true;/g)?.length,
@@ -108,6 +178,26 @@ assert.match(
 );
 assert.match(particleBackgroundSource, /role="button"/);
 assert.match(particleBackgroundSource, /aria-pressed=\{exploded\}/);
+assert.match(
+  particleBackgroundSource,
+  /onClick=\{\(event\) => \{[\s\S]*?event\.detail === 0[\s\S]*?onCarClick\?\.\(\);/,
+  'only zero-detail AT/synthetic clicks may activate through the React click path',
+);
+assert.match(
+  particleBackgroundSource,
+  /onKeyDown=\{\(event\) => \{[\s\S]*?event\.repeat[\s\S]*?event\.key === 'Enter'[\s\S]*?onCarClick\?\.\(\);/,
+  'Enter activation must ignore held/repeated keydown events',
+);
+assert.match(
+  particleBackgroundSource,
+  /onKeyUp=\{\(event\) => \{[\s\S]*?event\.key === ' '[\s\S]*?spaceKeyArmedRef\.current[\s\S]*?onCarClick\?\.\(\);/,
+  'Space must activate once on keyup after a non-repeated keydown',
+);
+assert.match(
+  particleBackgroundSource,
+  /focus-visible:ring-2[\s\S]*?focus-visible:ring-inset[\s\S]*?focus-visible:ring-\[#FFB800\]/,
+  'the full-canvas accessible control must expose a visible focus-visible ring',
+);
 assert.match(
   particleBackgroundSource,
   /applyF1WheelAngle\(f1Wheels, wheelMotion\.angle\);/,

@@ -59,14 +59,14 @@ export const createF1AirflowPaths = (bounds: THREE.Box3): THREE.Vector3[][] => {
   const size = bounds.getSize(new THREE.Vector3());
   const bodyHalfWidth = size.x * 0.34;
   const floorY = center.y - size.y * 0.5;
-  const noseZ = center.z - size.z * 0.5;
+  const frontNoseZ = bounds.max.z;
 
   return LEFT_AIRFLOW_FAMILIES.flatMap((family) => {
     const createSide = (mirror: number): THREE.Vector3[] => family.map(([x, y, z]) => (
       new THREE.Vector3(
         center.x + x * bodyHalfWidth * mirror,
         floorY + Math.max(0.12, y) * size.y,
-        noseZ + z * size.z,
+        frontNoseZ - z * size.z,
       )
     ));
     return [createSide(1), createSide(-1)];
@@ -121,9 +121,11 @@ export const createF1Airflow = (
           float pulse = smoothstep(0.04, 0.20, phase) * (1.0 - smoothstep(0.64, 0.94, phase));
           float alpha = uOpacity * mix(0.28, 1.0, pulse);
           gl_FragColor = vec4(uColor * mix(0.65, 1.6, pulse), alpha);
+          #include <colorspace_fragment>
         }
       `,
       transparent: true,
+      toneMapped: false,
       depthTest: tier !== 'low',
       depthWrite: false,
       blending: THREE.AdditiveBlending,

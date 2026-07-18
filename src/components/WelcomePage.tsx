@@ -8,6 +8,7 @@ import f1EngineSound from '../audio/f1-engine.mp3';
 import ParticleBackground from './ParticleBackground';
 import { loadModelWithCache } from '../lib/model-loader';
 import { ROSE_MODEL_URL } from '../lib/rose-animation';
+import { markF1ManualInteraction } from '../lib/f1-showroom-interaction';
 import { useI18n } from '../i18n';
 
 const F1_SHOWROOM_MODEL_URL = '/models/red_bull_f1_showroom.glb?v=fixed-front-covers-5';
@@ -58,18 +59,22 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoExplodeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasManuallyToggledRef = React.useRef(false);
+  const hasManualInteractionRef = React.useRef(false);
+
+  const handleCarManualInteraction = useCallback(() => {
+    markF1ManualInteraction(
+      hasManualInteractionRef,
+      autoExplodeTimerRef,
+      clearTimeout,
+    );
+  }, []);
 
   const toggleExplodedView = useCallback(() => {
     if (isTransitioning) return;
 
-    hasManuallyToggledRef.current = true;
-    if (autoExplodeTimerRef.current) {
-      clearTimeout(autoExplodeTimerRef.current);
-      autoExplodeTimerRef.current = null;
-    }
+    handleCarManualInteraction();
     setIsCarExploded((value) => !value);
-  }, [isTransitioning]);
+  }, [handleCarManualInteraction, isTransitioning]);
 
   const enterAfterReassembly = useCallback(() => {
     if (isTransitioning) return;
@@ -123,7 +128,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   }, []);
 
   useEffect(() => {
-    if (progress < 100 || isTransitioning || hasManuallyToggledRef.current) return;
+    if (progress < 100 || isTransitioning || hasManualInteractionRef.current) return;
 
     autoExplodeTimerRef.current = setTimeout(() => {
       autoExplodeTimerRef.current = null;
@@ -215,6 +220,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
         loadedModel={loadedModel}
         exploded={isCarExploded}
         onCarClick={toggleExplodedView}
+        onCarManualInteraction={handleCarManualInteraction}
       />
 
       <StartLights progress={progress} isPressing={isPressing} />

@@ -47,9 +47,25 @@ const compactBounds = new THREE.Box3(
 );
 const paths = createF1AirflowPaths(compactBounds);
 assert.equal(paths.length, 14);
+const compactModelFrontNoseZ = compactBounds.max.z;
+const compactModelRearZ = compactBounds.min.z;
+const compactModelLength = compactBounds.max.z - compactBounds.min.z;
 for (const path of paths) {
-  assert(path[0].z <= compactBounds.min.z + 1.5, 'paths must begin near the nose');
-  assert(path.at(-1)!.z > compactBounds.max.z, 'paths must exit behind the rear');
+  assert(
+    path[0].z >= compactModelFrontNoseZ - compactModelLength * 0.07,
+    'paths must begin near the shipped model positive-Z front nose',
+  );
+  assertApproximatelyEqual(
+    path.at(-1)!.z,
+    compactModelRearZ - compactModelLength * 0.16,
+    'paths must exit behind the shipped model negative-Z rear',
+  );
+  for (let pointIndex = 1; pointIndex < path.length; pointIndex += 1) {
+    assert(
+      path[pointIndex].z < path[pointIndex - 1].z,
+      'airflow curve UV must increase from the positive-Z nose toward the negative-Z rear',
+    );
+  }
   assert(path.every((point) => point.y >= compactBounds.min.y), 'paths must not run below the car');
 }
 assertMirroredWithFloorMargin(compactBounds, paths);
@@ -61,6 +77,8 @@ const translatedBounds = new THREE.Box3(
 const translatedPaths = createF1AirflowPaths(translatedBounds);
 assert.equal(translatedPaths.length, 14);
 assertMirroredWithFloorMargin(translatedBounds, translatedPaths);
+const translatedModelFrontNoseZ = translatedBounds.max.z;
+const translatedModelRearZ = translatedBounds.min.z;
 
 interface CapturedAirflowGeometry {
   start: THREE.Vector3;
@@ -90,13 +108,13 @@ const translatedSize = translatedBounds.getSize(new THREE.Vector3());
 const translatedFloorMarginY = translatedBounds.min.y + translatedSize.y * 0.12;
 for (const captured of capturedGeometries) {
   assert(
-    captured.start.z <= translatedBounds.min.z + translatedSize.z * 0.07,
-    'bounded curve must start near the supplied nose',
+    captured.start.z >= translatedModelFrontNoseZ - translatedSize.z * 0.07,
+    'bounded curve must start near the supplied positive-Z front nose',
   );
   assertApproximatelyEqual(
     captured.end.z,
-    translatedBounds.max.z + translatedSize.z * 0.16,
-    'bounded curve must end behind the supplied rear',
+    translatedModelRearZ - translatedSize.z * 0.16,
+    'bounded curve must end behind the supplied negative-Z rear',
   );
   assert(
     captured.bounds.min.x >= translatedBounds.min.x - 1e-6
@@ -120,6 +138,21 @@ assert.equal(high.group.visible, false, 'airflow must start hidden');
 const materials = new Set(high.group.children.map((child: any) => child.material));
 assert.equal(materials.size, 1);
 assert(high.material, 'successful airflow creation must expose its material');
+assert.match(
+  high.material.fragmentShader,
+  /#include <colorspace_fragment>/,
+  'airflow output must be converted to the renderer output color space',
+);
+assert.equal(
+  high.material.toneMapped,
+  false,
+  'airflow tone-mapping behavior must be explicit so white/cyan authored color stays stable',
+);
+assert.match(
+  high.material.fragmentShader,
+  /fract\(vUv\.x \* 2\.4 - uTime \* uSpeed\)/,
+  'the animated pulse must travel along increasing UV from model front to rear',
+);
 high.update({ time: 1, holdIntensity: 1, reducedMotion: false });
 assert.equal(high.material.uniforms.uOpacity.value, 1);
 assert.equal(high.group.visible, true);

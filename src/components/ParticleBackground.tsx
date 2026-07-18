@@ -9,7 +9,15 @@ import { HologramShaderUniforms, applyHologramMaterial, revertHologramMaterial }
 import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '../lib/f1-motion';
 import { createF1ExplodedParts, getF1LocalBounds, resolveF1WheelNodes, updateF1ExplodedParts, type F1ExplodedPart } from '../lib/f1-model';
 import { applyF1WheelAngle, createF1WheelMotionState, stepF1WheelMotion } from '../lib/f1-wheel-motion';
-import { CAR_DRAG_TOLERANCE_PX, CAR_HOLD_DELAY_MS, canStartCarHold, classifyCarRelease, stepStudioReveal } from '../lib/f1-showroom-interaction';
+import {
+  CAR_DRAG_TOLERANCE_PX,
+  CAR_HOLD_DELAY_MS,
+  canStartCarHold,
+  classifyCarRelease,
+  isAdditionalCarGesturePointer,
+  isPointInsideCarGestureBounds,
+  stepStudioReveal,
+} from '../lib/f1-showroom-interaction';
 import { advanceF1AirflowTime, createF1Airflow } from './effects/f1Airflow';
 import { createF1StudioLighting } from './effects/f1StudioLighting';
 import { createStudioReflection } from './effects/studioReflection';
@@ -20,6 +28,7 @@ interface ParticleBackgroundProps {
   audioRef?: React.RefObject<HTMLAudioElement | null>;
   loadedModel?: THREE.Group | null;
   onCarClick?: () => void;
+  onCarManualInteraction?: () => void;
   exploded?: boolean;
 }
 
@@ -33,8 +42,17 @@ const COLORS = {
 const SPEED_LINE_COUNT = 100;
 const CPU_PARTICLE_COUNT = 1000;
 
-const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel, onCarClick, exploded = false }) => {
+const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
+  isPressing,
+  progress,
+  audioRef,
+  loadedModel,
+  onCarClick,
+  onCarManualInteraction,
+  exploded = false,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const spaceKeyArmedRef = useRef(false);
 
   // Track state in ref to avoid re-triggering the animation loop closure
   const stateRef = useRef({
@@ -71,6 +89,11 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
   useEffect(() => {
     onCarClickRef.current = onCarClick;
   }, [onCarClick]);
+
+  const onCarManualInteractionRef = useRef(onCarManualInteraction);
+  useEffect(() => {
+    onCarManualInteractionRef.current = onCarManualInteraction;
+  }, [onCarManualInteraction]);
 
   const modelRef = useRef<THREE.Group | null>(null);
   useEffect(() => {
@@ -251,6 +274,9 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     let f1ExplodedParts: F1ExplodedPart[] = [];
     let explodeAmount = 0;
     let hasPlacedStudioFloor = false;
+    const assembledWorldBounds = new THREE.Box3();
+    const assembledCenter = new THREE.Vector3();
+    const assembledSize = new THREE.Vector3();
     let isCarMaterialReplaced = false;
     const racingMotion: F1MotionState = { speed: 0, wheelAngle: 0 };
 
@@ -373,7 +399,17 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       });
     };
 
+    const pointerIsInsideCanvas = (event: PointerEvent): boolean => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      return isPointInsideCarGestureBounds(event.clientX, event.clientY, rect);
+    };
+
     const handleCarPointerDown = (event: PointerEvent) => {
+      if (isAdditionalCarGesturePointer(carGesture?.pointerId ?? null, event.pointerId)) {
+        clearCarGesture(false);
+        controls.enabled = stateRef.current.progress >= 100 && hasSetOrbitTarget;
+        return;
+      }
       if (
         carGesture
         || !event.isPrimary
@@ -405,6 +441,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
           exploded: stateRef.current.exploded,
         })) {
           carGesture.holdStarted = true;
+          onCarManualInteractionRef.current?.();
           stateRef.current.carHeld = true;
           controls.enabled = false;
         }
@@ -412,12 +449,21 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     };
 
     const handleCarPointerMove = (event: PointerEvent) => {
+      if (carGesture?.pointerId === event.pointerId && !pointerIsInsideCanvas(event)) {
+        forwardCarPointerCancel();
+        return;
+      }
       updateGestureTravel(event);
     };
 
     const handleCarPointerUp = (event: PointerEvent) => {
       if (!carGesture || carGesture.pointerId !== event.pointerId) return;
+      if (!pointerIsInsideCanvas(event)) {
+        forwardCarPointerCancel();
+        return;
+      }
       updateGestureTravel(event);
+      const holdStartedBeforeRelease = carGesture.holdStarted;
       const release = classifyCarRelease({
         elapsedMs: performance.now() - carGesture.startedAt,
         travelPx: carGesture.travelPx,
@@ -428,7 +474,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       });
 
       if (release === 'toggle') onCarClickRef.current?.();
-      if (release === 'end-hold') stateRef.current.carHeld = false;
+      if (release === 'end-hold') {
+        stateRef.current.carHeld = false;
+        if (!holdStartedBeforeRelease) onCarManualInteractionRef.current?.();
+      }
       // Pointer capture is released automatically after pointerup (and by
       // OrbitControls); keeping it through this dispatch avoids a second
       // release racing the controls' own handler.
@@ -733,22 +782,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         }
       }
       studioLighting.update(wheelMotion.holdIntensity);
-      studioReveal = stepStudioReveal(studioReveal, s.progress >= 100, delta);
-      reflection.setReveal(studioReveal);
-
-      const explodeTarget = s.progress >= 100 && s.exploded ? 1 : 0;
-      explodeAmount += (explodeTarget - explodeAmount) * (1 - Math.exp(-delta * 4.2));
-      updateF1ExplodedParts(f1ExplodedParts, explodeAmount, delta, {
-        floorY: reflection.floor.position.y,
-        clearance: 0.03,
-      });
-      explodedCoreLight.intensity = 0.35 + explodeAmount * 7.15;
-      if (f1CarGroup) {
-        explodedCoreWorldPosition
-          .copy(explodedCoreAnchor)
-          .applyMatrix4(f1CarGroup.matrixWorld);
-        explodedCoreLight.position.copy(explodedCoreWorldPosition);
-      }
 
       applyF1WheelAngle(f1Wheels, wheelMotion.angle);
 
@@ -892,7 +925,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         f1CarGroup.position.x = 0; // Stay centered
         const engineVibration =
           (Math.sin(time * 42) * 0.035 + Math.sin(time * 19) * 0.02) * racingSpeed;
-        f1CarGroup.position.y = -10 + engineVibration;
+        f1CarGroup.position.y = s.progress >= 100 ? -10 : -10 + engineVibration;
 
         // Scale: Grow to a balanced size
         const targetScale = 8 + (progressFactor * 4); // Final scale 12
@@ -918,27 +951,38 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         }
         // When progress >= 100, we just keep the final rotation values intact so it doesn't snap!
 
+        if (
+          !hasPlacedStudioFloor
+          && s.progress >= 100
+          && f1AssembledLocalBounds
+        ) {
+          f1CarGroup.updateMatrixWorld(true);
+          assembledWorldBounds
+            .copy(f1AssembledLocalBounds)
+            .applyMatrix4(f1CarGroup.matrixWorld);
+          reflection.floor.position.y = assembledWorldBounds.min.y - 0.03;
+          hasPlacedStudioFloor = true;
+        }
+
         const stoppedPoseSettled =
           s.progress >= 100
           && Math.abs(f1CarGroup.position.z - getF1Depth(100)) < 0.05
           && Math.abs(f1CarGroup.scale.x - 12) < 0.02
           && racingSpeed < 0.01;
         if (
-          !hasPlacedStudioFloor
-          && !hasSetOrbitTarget
+          !hasSetOrbitTarget
           && stoppedPoseSettled
           && f1AssembledLocalBounds
         ) {
           f1CarGroup.updateMatrixWorld(true);
-          const assembledWorldBounds = f1AssembledLocalBounds
-            .clone()
+          assembledWorldBounds
+            .copy(f1AssembledLocalBounds)
             .applyMatrix4(f1CarGroup.matrixWorld);
-          reflection.floor.position.y = assembledWorldBounds.min.y - 0.03;
-          const assembledCenter = assembledWorldBounds.getCenter(new THREE.Vector3());
-          assembledCenter.y -= assembledWorldBounds.getSize(new THREE.Vector3()).y * 0.08;
+          assembledWorldBounds.getCenter(assembledCenter);
+          assembledWorldBounds.getSize(assembledSize);
+          assembledCenter.y -= assembledSize.y * 0.08;
           controls.target.copy(assembledCenter);
           hasSetOrbitTarget = true;
-          hasPlacedStudioFloor = true;
         }
 
         // Update Trails (Trailing logic) (Removed old shader trail logic)
@@ -946,6 +990,27 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
       } else if (f1CarGroup) {
         f1CarGroup.visible = false;
+      }
+
+      studioReveal = stepStudioReveal(
+        studioReveal,
+        s.progress >= 100 && hasPlacedStudioFloor,
+        delta,
+      );
+      reflection.setReveal(studioReveal);
+
+      const explodeTarget = s.progress >= 100 && s.exploded ? 1 : 0;
+      explodeAmount += (explodeTarget - explodeAmount) * (1 - Math.exp(-delta * 4.2));
+      updateF1ExplodedParts(f1ExplodedParts, explodeAmount, delta, {
+        floorY: reflection.floor.position.y,
+        clearance: 0.03,
+      });
+      explodedCoreLight.intensity = 0.35 + explodeAmount * 7.15;
+      if (f1CarGroup) {
+        explodedCoreWorldPosition
+          .copy(explodedCoreAnchor)
+          .applyMatrix4(f1CarGroup.matrixWorld);
+        explodedCoreLight.position.copy(explodedCoreWorldPosition);
       }
 
       // ── Update Hairline Road & Speed Lines Fading ──
@@ -1092,11 +1157,34 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     tabIndex={progress >= 100 ? 0 : -1}
     aria-label="Interactive Formula One showroom car"
     aria-pressed={exploded}
+    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#FFB800]"
+    onClick={(event) => {
+      if (progress >= 100 && event.detail === 0) onCarClick?.();
+    }}
     onKeyDown={(event) => {
-      if (progress >= 100 && (event.key === 'Enter' || event.key === ' ')) {
+      if (progress < 100) return;
+      if (event.repeat) {
+        if (event.key === ' ') event.preventDefault();
+        return;
+      }
+      if (event.key === 'Enter') {
         event.preventDefault();
         onCarClick?.();
+      } else if (event.key === ' ') {
+        event.preventDefault();
+        spaceKeyArmedRef.current = true;
       }
+    }}
+    onKeyUp={(event) => {
+      if (event.key === ' ') {
+        event.preventDefault();
+        const shouldActivate = progress >= 100 && spaceKeyArmedRef.current;
+        spaceKeyArmedRef.current = false;
+        if (shouldActivate) onCarClick?.();
+      }
+    }}
+    onBlur={() => {
+      spaceKeyArmedRef.current = false;
     }}
     style={{ position: 'fixed', inset: 0, zIndex: 65, pointerEvents: progress >= 100 ? 'auto' : 'none', cursor: progress >= 100 ? 'grab' : 'default' }}
   />;

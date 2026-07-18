@@ -29,6 +29,22 @@ for (const axis of ['x', 'y', 'z'] as const) {
 }
 
 const parts = createF1ExplodedParts(root);
+const cachedPartResources = parts.map((part) => {
+  const cachedPart = part as typeof part & {
+    localCorners?: readonly THREE.Vector3[];
+    scratch?: object;
+  };
+  assert.equal(
+    cachedPart.localCorners?.length,
+    8,
+    'each exploded part must cache its eight local bounds corners once',
+  );
+  assert(cachedPart.scratch, 'each exploded part must cache per-frame scratch math objects');
+  return {
+    corners: cachedPart.localCorners,
+    scratch: cachedPart.scratch,
+  };
+});
 for (const part of parts) {
   assert(part.object.parent, 'fixture mesh must have a parent');
   const explodedPosition = part.assembledPosition.clone().add(part.explodedOffset);
@@ -39,10 +55,41 @@ for (const part of parts) {
   const worldOffset = parentLocalOffset.applyMatrix3(parentWorldLinearTransform);
   assert(worldOffset.y >= -1e-9, 'exploded offset must not point downward in world space');
 }
-for (let index = 0; index < 120; index += 1) {
-  updateF1ExplodedParts(parts, 1, 1 / 60, { floorY: -0.01, clearance: 0.01 });
+
+const clearance = 0.01;
+const floorY = new THREE.Box3().setFromObject(root).min.y - clearance;
+const assertEveryPartClearsFloor = (phase: string, frame: number): void => {
   root.updateMatrixWorld(true);
+  for (const part of parts) {
+    assert(
+      new THREE.Box3().setFromObject(part.object).min.y >= floorY + clearance - 1e-4,
+      `${phase} frame ${frame}: every part must retain floor clearance`,
+    );
+  }
+};
+
+for (let frame = 0; frame <= 120; frame += 1) {
+  updateF1ExplodedParts(parts, frame / 120, 1 / 60, { floorY, clearance });
+  assertEveryPartClearsFloor('explosion', frame);
 }
-for (const part of parts) {
-  assert(new THREE.Box3().setFromObject(part.object).min.y >= -1e-4, 'part must stay above floor');
+for (let frame = 0; frame <= 120; frame += 1) {
+  updateF1ExplodedParts(parts, 1 - frame / 120, 1 / 60, { floorY, clearance });
+  assertEveryPartClearsFloor('reassembly', frame);
 }
+
+parts.forEach((part, index) => {
+  const cachedPart = part as typeof part & {
+    localCorners?: readonly THREE.Vector3[];
+    scratch?: object;
+  };
+  assert.equal(
+    cachedPart.localCorners,
+    cachedPartResources[index].corners,
+    'animation must reuse the same cached bounds-corner array',
+  );
+  assert.equal(
+    cachedPart.scratch,
+    cachedPartResources[index].scratch,
+    'animation must reuse the same per-part scratch objects',
+  );
+});

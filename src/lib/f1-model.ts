@@ -35,30 +35,42 @@ export interface F1ExplodedPart {
   assembledPosition: THREE.Vector3;
   explodedOffset: THREE.Vector3;
   localBounds: THREE.Box3;
+  localCorners: readonly THREE.Vector3[];
+  scratch: {
+    targetPosition: THREE.Vector3;
+    worldCorner: THREE.Vector3;
+    parentInverse: THREE.Matrix4;
+    localOrigin: THREE.Vector3;
+    localLift: THREE.Vector3;
+  };
   delay: number;
 }
 
 const EXPLODE_DISTANCE = 0.72;
 const EXPLODE_LIFT = 0.12;
+const POSITION_SETTLED_EPSILON_SQ = 1e-10;
 
-const forEachBoxCorner = (
-  bounds: THREE.Box3,
-  visit: (corner: THREE.Vector3) => void,
-): void => {
-  for (const x of [bounds.min.x, bounds.max.x]) {
-    for (const y of [bounds.min.y, bounds.max.y]) {
-      for (const z of [bounds.min.z, bounds.max.z]) {
-        visit(new THREE.Vector3(x, y, z));
+const createBoxCorners = (bounds: THREE.Box3): THREE.Vector3[] => {
+  const corners: THREE.Vector3[] = [];
+  for (let xIndex = 0; xIndex < 2; xIndex += 1) {
+    for (let yIndex = 0; yIndex < 2; yIndex += 1) {
+      for (let zIndex = 0; zIndex < 2; zIndex += 1) {
+        corners.push(new THREE.Vector3(
+          xIndex === 0 ? bounds.min.x : bounds.max.x,
+          yIndex === 0 ? bounds.min.y : bounds.max.y,
+          zIndex === 0 ? bounds.min.z : bounds.max.z,
+        ));
       }
     }
   }
+  return corners;
 };
 
 export const getF1LocalBounds = (root: THREE.Object3D): THREE.Box3 => {
   root.updateMatrixWorld(true);
 
   const bounds = new THREE.Box3();
-  const rootWorldInverse = root.matrixWorld.clone().invert();
+  const rootWorldInverse = new THREE.Matrix4().copy(root.matrixWorld).invert();
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
 
@@ -66,10 +78,10 @@ export const getF1LocalBounds = (root: THREE.Object3D): THREE.Box3 => {
     const geometryBounds = object.geometry.boundingBox;
     if (!geometryBounds) return;
 
-    const meshToRoot = rootWorldInverse.clone().multiply(object.matrixWorld);
-    forEachBoxCorner(geometryBounds, (corner) => {
+    const meshToRoot = new THREE.Matrix4().copy(rootWorldInverse).multiply(object.matrixWorld);
+    for (const corner of createBoxCorners(geometryBounds)) {
       bounds.expandByPoint(corner.applyMatrix4(meshToRoot));
-    });
+    }
   });
 
   return bounds;
@@ -97,6 +109,7 @@ export const createF1ExplodedParts = (root: THREE.Object3D): F1ExplodedPart[] =>
     const mesh = object as THREE.Mesh;
     mesh.geometry.computeBoundingBox();
     const localBounds = mesh.geometry.boundingBox?.clone() ?? new THREE.Box3();
+    const localCorners = createBoxCorners(localBounds);
     const partCenterWorld = new THREE.Box3()
       .setFromObject(object)
       .getCenter(new THREE.Vector3());
@@ -133,6 +146,14 @@ export const createF1ExplodedParts = (root: THREE.Object3D): F1ExplodedPart[] =>
       assembledPosition: object.position.clone(),
       explodedOffset: offsetLocal,
       localBounds,
+      localCorners,
+      scratch: {
+        targetPosition: new THREE.Vector3(),
+        worldCorner: new THREE.Vector3(),
+        parentInverse: new THREE.Matrix4(),
+        localOrigin: new THREE.Vector3(),
+        localLift: new THREE.Vector3(),
+      },
       delay: index / Math.max(1, candidates.length - 1) * 0.22,
     };
   });
@@ -153,27 +174,37 @@ export const updateF1ExplodedParts = (
       part.delay,
       Math.min(1, part.delay + 0.62),
     );
-    const target = part.assembledPosition.clone().addScaledVector(
+    const target = part.scratch.targetPosition.copy(part.assembledPosition).addScaledVector(
       part.explodedOffset,
       localAmount,
     );
-    part.object.position.lerp(target, damping);
+    if (part.object.position.distanceToSquared(target) <= POSITION_SETTLED_EPSILON_SQ) {
+      part.object.position.copy(target);
+    } else {
+      part.object.position.lerp(target, damping);
+    }
 
     if (localAmount > 0 && options) {
       part.object.updateMatrixWorld(true);
       let worldMinY = Infinity;
-      forEachBoxCorner(part.localBounds, (corner) => {
-        worldMinY = Math.min(worldMinY, corner.applyMatrix4(part.object.matrixWorld).y);
-      });
+      for (const corner of part.localCorners) {
+        worldMinY = Math.min(
+          worldMinY,
+          part.scratch.worldCorner.copy(corner).applyMatrix4(part.object.matrixWorld).y,
+        );
+      }
 
       const correction = Math.max(0, options.floorY + options.clearance - worldMinY);
       if (correction > 0 && part.object.parent) {
-        const parentInverse = part.object.parent.matrixWorld.clone().invert();
-        const localOrigin = new THREE.Vector3(0, 0, 0).applyMatrix4(parentInverse);
-        const localLift = new THREE.Vector3(0, correction, 0)
-          .applyMatrix4(parentInverse)
-          .sub(localOrigin);
-        part.object.position.add(localLift);
+        part.scratch.parentInverse.copy(part.object.parent.matrixWorld).invert();
+        part.scratch.localOrigin
+          .set(0, 0, 0)
+          .applyMatrix4(part.scratch.parentInverse);
+        part.scratch.localLift
+          .set(0, correction, 0)
+          .applyMatrix4(part.scratch.parentInverse)
+          .sub(part.scratch.localOrigin);
+        part.object.position.add(part.scratch.localLift);
       }
     }
   }
