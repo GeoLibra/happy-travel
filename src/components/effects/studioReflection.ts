@@ -13,6 +13,11 @@ export interface StudioReflectionOptions {
   camera: THREE.PerspectiveCamera;
   viewport: StudioReflectionViewport;
   tier: StudioReflectionTier;
+  createRenderTarget?: (
+    width: number,
+    height: number,
+    options: THREE.RenderTargetOptions,
+  ) => THREE.WebGLRenderTarget;
 }
 
 export interface StudioReflectionEffect {
@@ -32,6 +37,37 @@ const createFallbackMaterial = (): THREE.MeshStandardMaterial => new THREE.MeshS
   metalness: 0.55,
   roughness: 0.42,
 });
+
+const disposeSafely = (resource: { dispose: () => void } | undefined): void => {
+  if (!resource) return;
+  try {
+    resource.dispose();
+  } catch {
+    // Continue releasing the rest of the transaction's resources.
+  }
+};
+
+const createFallbackEffect = (scene: THREE.Scene): StudioReflectionEffect => {
+  const floorGeometry = createFloorGeometry();
+  const fallbackMaterial = createFallbackMaterial();
+  const floor = new THREE.Mesh(floorGeometry, fallbackMaterial);
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  let disposed = false;
+  return {
+    floor,
+    render: () => undefined,
+    resize: () => undefined,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      scene.remove(floor);
+      floorGeometry.dispose();
+      fallbackMaterial.dispose();
+    },
+  };
+};
 
 const createReflectionMaterial = (
   reflectionTexture: THREE.Texture,
@@ -126,33 +162,14 @@ export const createStudioReflection = ({
   camera,
   viewport,
   tier,
+  createRenderTarget,
 }: StudioReflectionOptions): StudioReflectionEffect => {
-  const floorGeometry = createFloorGeometry();
-
   if (tier === 'fallback') {
-    const fallbackMaterial = createFallbackMaterial();
-    const floor = new THREE.Mesh(floorGeometry, fallbackMaterial);
-    floor.rotation.x = -Math.PI / 2;
-    scene.add(floor);
-
-    let disposed = false;
-    return {
-      floor,
-      render: () => undefined,
-      resize: () => undefined,
-      dispose: () => {
-        if (disposed) return;
-        disposed = true;
-        scene.remove(floor);
-        floorGeometry.dispose();
-        fallbackMaterial.dispose();
-      },
-    };
+    return createFallbackEffect(scene);
   }
 
   if (!renderer) {
-    floorGeometry.dispose();
-    throw new Error('Reflective studio floor requires a WebGL renderer.');
+    return createFallbackEffect(scene);
   }
 
   const width = viewport.width;
@@ -165,85 +182,155 @@ export const createStudioReflection = ({
     depthBuffer: true,
     stencilBuffer: false,
   };
-  const targetA = new THREE.WebGLRenderTarget(halfWidth, halfHeight, targetOptions);
-  const targetB = new THREE.WebGLRenderTarget(halfWidth, halfHeight, targetOptions);
-  targetA.texture.name = 'StudioReflection.SceneAndBlur';
-  targetB.texture.name = 'StudioReflection.BlurIntermediate';
+  const renderTargetFactory = createRenderTarget
+    ?? ((targetWidth, targetHeight, options) => (
+      new THREE.WebGLRenderTarget(targetWidth, targetHeight, options)
+    ));
 
-  const textureMatrix = new THREE.Matrix4();
-  const floorMaterial = createReflectionMaterial(targetA.texture, textureMatrix);
-  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-  floor.rotation.x = -Math.PI / 2;
-  scene.add(floor);
+  let floorGeometry: THREE.PlaneGeometry | undefined;
+  let targetA: THREE.WebGLRenderTarget | undefined;
+  let targetB: THREE.WebGLRenderTarget | undefined;
+  let runtimeFallbackMaterial: THREE.MeshStandardMaterial | undefined;
+  let floorMaterial: THREE.ShaderMaterial | undefined;
+  let floor: THREE.Mesh<THREE.PlaneGeometry, THREE.Material> | undefined;
+  let horizontalBlurMaterial: THREE.ShaderMaterial | undefined;
+  let verticalBlurMaterial: THREE.ShaderMaterial | undefined;
+  let fullscreenGeometry: THREE.PlaneGeometry | undefined;
+  let fullscreenQuad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | undefined;
+  let textureMatrix: THREE.Matrix4;
+  let mirroredCamera: THREE.PerspectiveCamera;
+  let sourcePosition: THREE.Vector3;
+  let sourceDirection: THREE.Vector3;
+  let sourceLookAt: THREE.Vector3;
+  let mirroredPosition: THREE.Vector3;
+  let mirroredTarget: THREE.Vector3;
+  let mirroredUp: THREE.Vector3;
+  let textureBias: THREE.Matrix4;
+  let horizontalDirection: THREE.Vector2;
+  let verticalDirection: THREE.Vector2;
+  let blurScene: THREE.Scene;
+  let blurCamera: THREE.OrthographicCamera;
 
-  const mirroredCamera = new THREE.PerspectiveCamera();
-  const sourcePosition = new THREE.Vector3();
-  const sourceDirection = new THREE.Vector3();
-  const sourceLookAt = new THREE.Vector3();
-  const mirroredPosition = new THREE.Vector3();
-  const mirroredTarget = new THREE.Vector3();
-  const mirroredUp = new THREE.Vector3();
-  const textureBias = new THREE.Matrix4().set(
-    0.5, 0, 0, 0.5,
-    0, 0.5, 0, 0.5,
-    0, 0, 0.5, 0.5,
-    0, 0, 0, 1,
-  );
+  try {
+    floorGeometry = createFloorGeometry();
+    targetA = renderTargetFactory(halfWidth, halfHeight, targetOptions);
+    targetB = renderTargetFactory(halfWidth, halfHeight, targetOptions);
+    targetA.texture.name = 'StudioReflection.SceneAndBlur';
+    targetB.texture.name = 'StudioReflection.BlurIntermediate';
 
-  const horizontalDirection = new THREE.Vector2(1 / halfWidth, 0);
-  const verticalDirection = new THREE.Vector2(0, 1 / halfHeight);
-  const horizontalBlurMaterial = createBlurMaterial(targetA.texture, horizontalDirection);
-  const verticalBlurMaterial = createBlurMaterial(targetB.texture, verticalDirection);
-  const fullscreenGeometry = new THREE.PlaneGeometry(2, 2);
-  const fullscreenQuad = new THREE.Mesh(fullscreenGeometry, horizontalBlurMaterial);
-  const blurScene = new THREE.Scene();
-  const blurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  blurScene.add(fullscreenQuad);
+    runtimeFallbackMaterial = createFallbackMaterial();
+    textureMatrix = new THREE.Matrix4();
+    floorMaterial = createReflectionMaterial(targetA.texture, textureMatrix);
+    floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+
+    mirroredCamera = new THREE.PerspectiveCamera();
+    sourcePosition = new THREE.Vector3();
+    sourceDirection = new THREE.Vector3();
+    sourceLookAt = new THREE.Vector3();
+    mirroredPosition = new THREE.Vector3();
+    mirroredTarget = new THREE.Vector3();
+    mirroredUp = new THREE.Vector3();
+    textureBias = new THREE.Matrix4().set(
+      0.5, 0, 0, 0.5,
+      0, 0.5, 0, 0.5,
+      0, 0, 0.5, 0.5,
+      0, 0, 0, 1,
+    );
+
+    horizontalDirection = new THREE.Vector2(1 / halfWidth, 0);
+    verticalDirection = new THREE.Vector2(0, 1 / halfHeight);
+    horizontalBlurMaterial = createBlurMaterial(targetA.texture, horizontalDirection);
+    verticalBlurMaterial = createBlurMaterial(targetB.texture, verticalDirection);
+    fullscreenGeometry = new THREE.PlaneGeometry(2, 2);
+    fullscreenQuad = new THREE.Mesh(fullscreenGeometry, horizontalBlurMaterial);
+    blurScene = new THREE.Scene();
+    blurCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    blurScene.add(fullscreenQuad);
+    scene.add(floor);
+  } catch {
+    if (floor) scene.remove(floor);
+    disposeSafely(fullscreenGeometry);
+    disposeSafely(verticalBlurMaterial);
+    disposeSafely(horizontalBlurMaterial);
+    disposeSafely(floorMaterial);
+    disposeSafely(runtimeFallbackMaterial);
+    disposeSafely(targetB);
+    disposeSafely(targetA);
+    disposeSafely(floorGeometry);
+    return createFallbackEffect(scene);
+  }
 
   let disposed = false;
+  let fallbackActive = false;
+  let reflectiveResourcesDisposed = false;
+
+  const disposeReflectiveResources = (): void => {
+    if (reflectiveResourcesDisposed) return;
+    reflectiveResourcesDisposed = true;
+    disposeSafely(fullscreenGeometry);
+    disposeSafely(verticalBlurMaterial);
+    disposeSafely(horizontalBlurMaterial);
+    disposeSafely(floorMaterial);
+    disposeSafely(targetB);
+    disposeSafely(targetA);
+  };
+
+  const activateFallback = (): void => {
+    if (fallbackActive || disposed) return;
+    floor.material = runtimeFallbackMaterial;
+    fallbackActive = true;
+    disposeReflectiveResources();
+  };
+
   return {
     floor,
     render: () => {
-      if (disposed) return;
+      if (disposed || fallbackActive) return;
 
-      camera.updateWorldMatrix(true, false);
-      camera.getWorldPosition(sourcePosition);
-      camera.getWorldDirection(sourceDirection);
-      sourceLookAt.copy(sourcePosition).add(sourceDirection);
-
-      const floorY = floor.position.y;
-      mirroredPosition.copy(sourcePosition);
-      mirroredPosition.y = floorY * 2 - sourcePosition.y;
-      mirroredTarget.copy(sourceLookAt);
-      mirroredTarget.y = floorY * 2 - sourceLookAt.y;
-      mirroredUp.copy(camera.up);
-      mirroredUp.y *= -1;
-
-      mirroredCamera.position.copy(mirroredPosition);
-      mirroredCamera.up.copy(mirroredUp);
-      mirroredCamera.fov = camera.fov;
-      mirroredCamera.aspect = camera.aspect;
-      mirroredCamera.near = camera.near;
-      mirroredCamera.far = camera.far;
-      mirroredCamera.zoom = camera.zoom;
-      mirroredCamera.focus = camera.focus;
-      mirroredCamera.filmGauge = camera.filmGauge;
-      mirroredCamera.filmOffset = camera.filmOffset;
-      mirroredCamera.updateProjectionMatrix();
-      mirroredCamera.lookAt(mirroredTarget);
-      mirroredCamera.updateMatrixWorld(true);
-
-      textureMatrix.copy(textureBias)
-        .multiply(mirroredCamera.projectionMatrix)
-        .multiply(mirroredCamera.matrixWorldInverse);
-
-      const previousTarget = renderer.getRenderTarget();
       const floorWasVisible = floor.visible;
       const cameraWasVisible = camera.visible;
-      floor.visible = false;
-      camera.visible = false;
+      let previousTarget: THREE.WebGLRenderTarget | null = null;
+      let previousTargetKnown = false;
+      let renderFailed = false;
 
       try {
+        camera.updateWorldMatrix(true, false);
+        camera.getWorldPosition(sourcePosition);
+        camera.getWorldDirection(sourceDirection);
+        sourceLookAt.copy(sourcePosition).add(sourceDirection);
+
+        const floorY = floor.position.y;
+        mirroredPosition.copy(sourcePosition);
+        mirroredPosition.y = floorY * 2 - sourcePosition.y;
+        mirroredTarget.copy(sourceLookAt);
+        mirroredTarget.y = floorY * 2 - sourceLookAt.y;
+        mirroredUp.copy(camera.up);
+        mirroredUp.y *= -1;
+
+        mirroredCamera.position.copy(mirroredPosition);
+        mirroredCamera.up.copy(mirroredUp);
+        mirroredCamera.fov = camera.fov;
+        mirroredCamera.aspect = camera.aspect;
+        mirroredCamera.near = camera.near;
+        mirroredCamera.far = camera.far;
+        mirroredCamera.zoom = camera.zoom;
+        mirroredCamera.focus = camera.focus;
+        mirroredCamera.filmGauge = camera.filmGauge;
+        mirroredCamera.filmOffset = camera.filmOffset;
+        mirroredCamera.updateProjectionMatrix();
+        mirroredCamera.lookAt(mirroredTarget);
+        mirroredCamera.updateMatrixWorld(true);
+
+        textureMatrix.copy(textureBias)
+          .multiply(mirroredCamera.projectionMatrix)
+          .multiply(mirroredCamera.matrixWorldInverse);
+
+        previousTarget = renderer.getRenderTarget();
+        previousTargetKnown = true;
+        floor.visible = false;
+        camera.visible = false;
+
         renderer.setRenderTarget(targetA);
         renderer.render(scene, mirroredCamera);
 
@@ -254,14 +341,24 @@ export const createStudioReflection = ({
         fullscreenQuad.material = verticalBlurMaterial;
         renderer.setRenderTarget(targetA);
         renderer.render(blurScene, blurCamera);
+      } catch {
+        renderFailed = true;
       } finally {
         floor.visible = floorWasVisible;
         camera.visible = cameraWasVisible;
-        renderer.setRenderTarget(previousTarget);
+        if (previousTargetKnown) {
+          try {
+            renderer.setRenderTarget(previousTarget);
+          } catch {
+            renderFailed = true;
+          }
+        }
       }
+
+      if (renderFailed) activateFallback();
     },
     resize: (width, height) => {
-      if (disposed) return;
+      if (disposed || fallbackActive) return;
       const halfWidth = Math.ceil(width * 0.5);
       const halfHeight = Math.ceil(height * 0.5);
       targetA.setSize(halfWidth, halfHeight);
@@ -274,12 +371,8 @@ export const createStudioReflection = ({
       disposed = true;
       scene.remove(floor);
       floorGeometry.dispose();
-      floorMaterial.dispose();
-      horizontalBlurMaterial.dispose();
-      verticalBlurMaterial.dispose();
-      fullscreenGeometry.dispose();
-      targetA.dispose();
-      targetB.dispose();
+      disposeReflectiveResources();
+      runtimeFallbackMaterial.dispose();
     },
   };
 };

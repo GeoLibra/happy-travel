@@ -18,7 +18,7 @@ assert.match(source, /tier === 'fallback'/);
 const fallbackBranch = source.indexOf("if (tier === 'fallback')");
 const targetAllocation = source.indexOf('new THREE.WebGLRenderTarget');
 assert(fallbackBranch >= 0 && fallbackBranch < targetAllocation);
-assert.match(source.slice(fallbackBranch, targetAllocation), /return \{/);
+assert.match(source.slice(fallbackBranch, targetAllocation), /return createFallbackEffect\(scene\)/);
 
 const hideFloor = source.indexOf('floor.visible = false');
 const reflectionRender = source.indexOf('renderer.render(scene, mirroredCamera)');
@@ -64,3 +64,149 @@ fallback.dispose();
 fallback.dispose();
 assert.equal(geometryDisposals, 1);
 assert.equal(materialDisposals, 1);
+
+let setupAllocations = 0;
+let setupTargetDisposals = 0;
+const setupFailureScene = new THREE.Scene();
+const setupFailure = createStudioReflection({
+  renderer: {} as THREE.WebGLRenderer,
+  scene: setupFailureScene,
+  camera: new THREE.PerspectiveCamera(45, 4 / 3, 0.1, 100),
+  viewport: { width: 800, height: 600 },
+  tier: 'reflective',
+  createRenderTarget: (width, height, options) => {
+    setupAllocations += 1;
+    if (setupAllocations === 2) throw new Error('forced second-target failure');
+    const target = new THREE.WebGLRenderTarget(width, height, options);
+    target.dispose = () => { setupTargetDisposals += 1; };
+    return target;
+  },
+});
+
+assert.equal(setupAllocations, 2);
+assert.equal(setupTargetDisposals, 1);
+assert(setupFailure.floor.material instanceof THREE.MeshStandardMaterial);
+assert(setupFailureScene.children.includes(setupFailure.floor));
+assert.doesNotThrow(() => setupFailure.render());
+setupFailure.dispose();
+
+class FailingOnceScene extends THREE.Scene {
+  private addAttempts = 0;
+
+  override add(...objects: THREE.Object3D[]): this {
+    this.addAttempts += 1;
+    if (this.addAttempts === 1) throw new Error('forced scene-attachment failure');
+    return super.add(...objects);
+  }
+}
+
+let lateSetupTargetDisposals = 0;
+let lateSetupGeometryDisposals = 0;
+let lateSetupMaterialDisposals = 0;
+let lateSetupFallbackMaterialDisposals = 0;
+const originalGeometryDispose = THREE.PlaneGeometry.prototype.dispose;
+const originalMaterialDispose = THREE.ShaderMaterial.prototype.dispose;
+const originalFallbackMaterialDispose = THREE.MeshStandardMaterial.prototype.dispose;
+let lateSetupFailure!: ReturnType<typeof createStudioReflection>;
+
+try {
+  THREE.PlaneGeometry.prototype.dispose = function disposeTrackedGeometry() {
+    lateSetupGeometryDisposals += 1;
+    originalGeometryDispose.call(this);
+  };
+  THREE.ShaderMaterial.prototype.dispose = function disposeTrackedMaterial() {
+    lateSetupMaterialDisposals += 1;
+    originalMaterialDispose.call(this);
+  };
+  THREE.MeshStandardMaterial.prototype.dispose = function disposeTrackedFallbackMaterial() {
+    lateSetupFallbackMaterialDisposals += 1;
+    originalFallbackMaterialDispose.call(this);
+  };
+  lateSetupFailure = createStudioReflection({
+    renderer: {} as THREE.WebGLRenderer,
+    scene: new FailingOnceScene(),
+    camera: new THREE.PerspectiveCamera(45, 4 / 3, 0.1, 100),
+    viewport: { width: 800, height: 600 },
+    tier: 'reflective',
+    createRenderTarget: (width, height, options) => {
+      const target = new THREE.WebGLRenderTarget(width, height, options);
+      target.dispose = () => { lateSetupTargetDisposals += 1; };
+      return target;
+    },
+  });
+} finally {
+  THREE.PlaneGeometry.prototype.dispose = originalGeometryDispose;
+  THREE.ShaderMaterial.prototype.dispose = originalMaterialDispose;
+  THREE.MeshStandardMaterial.prototype.dispose = originalFallbackMaterialDispose;
+}
+
+assert.equal(lateSetupTargetDisposals, 2);
+assert.equal(lateSetupGeometryDisposals, 2);
+assert.equal(lateSetupMaterialDisposals, 3);
+assert.equal(lateSetupFallbackMaterialDisposals, 1);
+assert(lateSetupFailure.floor.material instanceof THREE.MeshStandardMaterial);
+lateSetupFailure.dispose();
+
+let renderTargetDisposals = 0;
+let renderTargetResizes = 0;
+const renderFailureScene = new THREE.Scene();
+const renderFailureCamera = new THREE.PerspectiveCamera(45, 4 / 3, 0.1, 100);
+const targetTransitions: Array<THREE.WebGLRenderTarget | null> = [];
+let firstTargetFailure = true;
+const failingRenderer = {
+  getRenderTarget: () => null,
+  setRenderTarget: (target: THREE.WebGLRenderTarget | null) => {
+    targetTransitions.push(target);
+    if (target && firstTargetFailure) {
+      firstTargetFailure = false;
+      throw new Error('forced first-render allocation failure');
+    }
+  },
+  render: () => assert.fail('scene render must not run after target binding fails'),
+} as unknown as THREE.WebGLRenderer;
+
+const renderFailure = createStudioReflection({
+  renderer: failingRenderer,
+  scene: renderFailureScene,
+  camera: renderFailureCamera,
+  viewport: { width: 800, height: 600 },
+  tier: 'reflective',
+  createRenderTarget: (width, height, options) => {
+    const target = new THREE.WebGLRenderTarget(width, height, options);
+    target.dispose = () => { renderTargetDisposals += 1; };
+    target.setSize = () => { renderTargetResizes += 1; };
+    return target;
+  },
+});
+
+assert(renderFailure.floor.material instanceof THREE.ShaderMaterial);
+const renderFailureGeometry = renderFailure.floor.geometry;
+const reflectiveMaterial = renderFailure.floor.material;
+let renderFailureGeometryDisposals = 0;
+let reflectiveMaterialDisposals = 0;
+renderFailureGeometry.dispose = () => { renderFailureGeometryDisposals += 1; };
+reflectiveMaterial.dispose = () => { reflectiveMaterialDisposals += 1; };
+
+assert.doesNotThrow(() => renderFailure.render());
+assert(renderFailure.floor.material instanceof THREE.MeshStandardMaterial);
+assert.equal(renderFailure.floor.geometry, renderFailureGeometry);
+assert.equal(renderFailure.floor.visible, true);
+assert.equal(renderFailureCamera.visible, true);
+assert.equal(targetTransitions.at(-1), null);
+assert.equal(renderTargetDisposals, 2);
+assert.equal(reflectiveMaterialDisposals, 1);
+assert.equal(renderFailureGeometryDisposals, 0);
+
+const transitionCountAfterFailure = targetTransitions.length;
+assert.doesNotThrow(() => renderFailure.render());
+renderFailure.resize(1280, 720);
+assert.equal(targetTransitions.length, transitionCountAfterFailure);
+assert.equal(renderTargetResizes, 0);
+
+let runtimeFallbackMaterialDisposals = 0;
+renderFailure.floor.material.dispose = () => { runtimeFallbackMaterialDisposals += 1; };
+renderFailure.dispose();
+renderFailure.dispose();
+assert.equal(renderFailureGeometryDisposals, 1);
+assert.equal(runtimeFallbackMaterialDisposals, 1);
+assert(!renderFailureScene.children.includes(renderFailure.floor));
