@@ -8,6 +8,8 @@ Base: `542f06d`
 
 Production/test commit: `25ffc93` (`fix: refine F1 showroom interaction flow`)
 
+Follow-up production/test commit: `11fa977` (`fix: stabilize F1 showroom follow-up interactions`)
+
 ## Outcome
 
 DONE. All six sections of the final-fix brief are implemented and verified as one cross-module interaction update:
@@ -16,7 +18,7 @@ DONE. All six sections of the final-fix brief are implemented and verified as on
 2. The studio floor is measured and placed on the first progress-100 frame after the final car transform. Reveal begins only after that placement, and no later orbit-target settling path rewrites floor Y.
 3. An accepted hold, including an exact-deadline release, notifies `WelcomePage`, marks manual interaction, and cancels the pending 4.6-second automatic explosion. The untouched no-interaction path still auto-explodes.
 4. Gesture arbitration is atomic for additional pointers, exact-threshold release, captured-pointer exit, cancellation, blur, lost capture, drag, and release decay.
-5. The canvas keeps the bottom exploded-view button absent while supporting repeat-safe Enter, Space-on-keyup, zero-detail assistive-technology clicks, `aria-pressed`, a state-specific label, and a visible inset yellow focus treatment.
+5. The canvas keeps the bottom exploded-view button absent while supporting repeat-safe Enter, Space-on-keyup, zero-detail assistive-technology clicks, a stable accessible label, state-specific `aria-pressed`, and a visible inset yellow focus treatment.
 6. Exploded-floor guards reuse cached local corners and scratch math objects; model coverage checks every sampled explosion and reassembly frame. Task 4 wording and follow-up evidence were corrected in the local Task 4 report.
 
 ## Changed files
@@ -111,7 +113,7 @@ Acceptance results:
 
 Representative evidence:
 
-- Airflow: `desktop-airflow-direction-a.png`, `desktop-airflow-direction-b.png`, `desktop-airflow-direction-c.png`, `desktop-airflow-direction.webm`, `desktop-airflow-decayed.png`, and the corresponding `mobile-airflow-*` captures.
+- Airflow: `desktop-airflow-direction-a.png`, `desktop-airflow-direction-b.png`, `desktop-airflow-direction-c.png`, `desktop-airflow-decayed.png`, and the corresponding `mobile-airflow-*` captures.
 - Floor: `desktop-floor-reveal-000ms.png`, `desktop-floor-reveal-300ms.png`, `desktop-floor-reveal-600ms.png`, `desktop-floor-reveal-900ms.png`, plus matching mobile captures.
 - Hold/gesture arbitration: `desktop-hold-before-auto-deadline.png`, `desktop-hold-across-auto-deadline.png`, `desktop-hold-after-auto-deadline-decayed.png`, `desktop-exact-threshold-release.png`, `desktop-two-pointer-cancelled.png`, `desktop-outside-cancel-active.png`, and `desktop-outside-cancelled.png`.
 - Accessibility: `desktop-enter-repeat-safe.png`, `desktop-space-keyup-activation.png`, `desktop-at-zero-detail-click.png`, `desktop-pointer-tap-single-toggle.png`, and `desktop-accessible-focus-visible.png`.
@@ -138,3 +140,14 @@ Verdict: **APPROVE**.
 - The headed development browser reports only the unrelated `/favicon.ico` 404 (one or two entries after reload), with zero warnings and no model/runtime errors.
 - The Playwright trace resource directory is large because it contains the complete multi-viewport interaction session; it is ignored and remains under the requested artifact root.
 - No remaining functional, accessibility, or visual acceptance blocker was observed.
+
+## Final follow-up verification
+
+Commit `11fa977` resolves the final review findings without changing the stable accessible label or restoring a bottom control:
+
+- assembled short press still toggles into exploded view, while exploded short press now toggles back to reassembly; exploded long press cannot start wheel/airflow hold behavior;
+- final car depth, measured floor placement, final controls target, and `controls.update()` all commit before the first positive floor reveal; user OrbitControls remain separately disabled until motion settles;
+- `check:f1-airflow` now parses `public/models/red_bull_f1_showroom.glb` and verifies the actual named front pivots are +Z and rear pivots are -Z;
+- threshold-settled exploded/reassembled poses skip matrix/corner floor-guard work while the frame-by-frame clearance checks remain green.
+
+The complete 11-command suite, lint, build, and diff checks all exit 0 on `11fa977`. The follow-up headed-browser evidence is under `output/playwright/f1-showroom-final-followup/`; desktop/mobile 0/300/600/900 ms captures keep a fixed horizon and car framing, and the desktop canvas-listener short-press sequence records `false -> true -> false`. Full RED/GREEN, artifact, self-review, and concern details are in `.superpowers/sdd/final-followup-report.md`.
