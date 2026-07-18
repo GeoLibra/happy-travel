@@ -7,6 +7,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "check:f1-motion": "tsx scripts/check-f1-motion.ts",
+    "check:f1-wheel-hold": "node --import tsx scripts/check-f1-wheel-hold.ts",
     "check:showroom-assets": "node scripts/check-showroom-assets.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
