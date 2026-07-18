@@ -60,6 +60,16 @@ assert.match(
   /applyF1WheelAngle\(f1Wheels, wheelMotion\.angle\);/,
   'ParticleBackground must apply the wheel helper to resolved F1 wheels',
 );
+assert.match(
+  particleBackgroundSource,
+  /airflow\.update\(\{[\s\S]*?holdIntensity: wheelMotion\.holdIntensity,[\s\S]*?\}\);/,
+  'ParticleBackground must pass decaying wheel hold intensity to airflow',
+);
+assert.doesNotMatch(
+  particleBackgroundSource,
+  /holdIntensity:\s*s\.isPressing\s*\?\s*wheelMotion\.holdIntensity\s*:\s*0/,
+  'ParticleBackground must not cut airflow opacity to zero immediately on release',
+);
 
 const reflectionRender = particleBackgroundSource.indexOf('reflection.render()');
 const mainSceneRender = particleBackgroundSource.indexOf('renderer.render(scene, camera)', reflectionRender);

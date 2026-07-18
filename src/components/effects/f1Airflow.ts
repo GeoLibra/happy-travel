@@ -96,10 +96,8 @@ export const createF1Airflow = (tier: AirflowTier): F1AirflowEffect => {
     group,
     material,
     update: ({ time, holdIntensity, reducedMotion }) => {
-      material.uniforms.uTime.value = time;
-      material.uniforms.uOpacity.value = reducedMotion
-        ? 0
-        : THREE.MathUtils.clamp(holdIntensity, 0, 1);
+      if (!reducedMotion) material.uniforms.uTime.value = time;
+      material.uniforms.uOpacity.value = THREE.MathUtils.clamp(holdIntensity, 0, 1);
     },
     dispose: () => {
       if (disposed) return;

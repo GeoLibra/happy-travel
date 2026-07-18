@@ -524,7 +524,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       stepF1WheelMotion(wheelMotion, s.isPressing, delta, prefersReducedMotion);
       airflow.update({
         time,
-        holdIntensity: s.isPressing ? wheelMotion.holdIntensity : 0,
+        holdIntensity: wheelMotion.holdIntensity,
         reducedMotion: prefersReducedMotion,
       });
       studioLighting.update(wheelMotion.holdIntensity);
