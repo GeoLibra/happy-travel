@@ -78,8 +78,13 @@ assert.match(particleBackgroundSource, /reflection\.setReveal\(studioReveal\)/);
 assert.match(particleBackgroundSource, /updateF1ExplodedParts\([\s\S]*?floorY: reflection\.floor\.position\.y/);
 assert.match(
   particleBackgroundSource,
-  /if \(carGesture\.travelPx > CAR_DRAG_TOLERANCE_PX\) \{[\s\S]*?if \(carGesture\.holdStarted\) \{[\s\S]*?stateRef\.current\.carHeld = false;[\s\S]*?carGesture\.startedOnCar = false;[\s\S]*?carGesture\.holdStarted = false;[\s\S]*?controls\.enabled = stateRef\.current\.progress >= 100;/,
+  /if \(carGesture\.travelPx > CAR_DRAG_TOLERANCE_PX\) \{[\s\S]*?if \(carGesture\.holdStarted\) \{[\s\S]*?stateRef\.current\.carHeld = false;[\s\S]*?carGesture\.startedOnCar = false;[\s\S]*?carGesture\.holdStarted = false;[\s\S]*?controls\.enabled = stateRef\.current\.progress >= 100 && hasSetOrbitTarget;/,
   'dragging beyond tolerance after hold activation must stop the hold and invalidate release toggling',
+);
+assert.match(
+  particleBackgroundSource,
+  /if \(s\.progress >= 100\) \{[\s\S]*?if \(s\.carHeld \|\| !hasSetOrbitTarget\) \{[\s\S]*?controls\.enabled = false;[\s\S]*?\} else \{[\s\S]*?controls\.enabled = true;/,
+  'the primary stopped camera path must wait for the final orbit target before enabling controls',
 );
 assert.match(
   particleBackgroundSource,

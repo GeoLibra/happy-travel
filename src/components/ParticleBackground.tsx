@@ -349,7 +349,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
           stateRef.current.carHeld = false;
           carGesture.startedOnCar = false;
           carGesture.holdStarted = false;
-          controls.enabled = stateRef.current.progress >= 100;
+          controls.enabled = stateRef.current.progress >= 100 && hasSetOrbitTarget;
         }
       }
     };
@@ -815,7 +815,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       bgCamera.lookAt(0, 0, 0);
 
       if (s.progress >= 100) {
-        if (s.carHeld) {
+        if (s.carHeld || !hasSetOrbitTarget) {
           controls.enabled = false;
         } else {
           controls.enabled = true;
