@@ -38,7 +38,7 @@ const particleBackgroundSource = readFileSync(
 const sceneSetup = particleBackgroundSource.indexOf('const scene = new THREE.Scene()');
 const rendererSetup = particleBackgroundSource.indexOf('const renderer = new THREE.WebGLRenderer');
 const wheelMotionSetup = particleBackgroundSource.indexOf('const wheelMotion = createF1WheelMotionState()');
-const airflowSetup = particleBackgroundSource.indexOf('const airflow = createF1Airflow(');
+const airflowSetup = particleBackgroundSource.indexOf('airflow = createF1Airflow(');
 const studioLightingSetup = particleBackgroundSource.indexOf('const studioLighting = createF1StudioLighting(scene)');
 const reflectionSetup = particleBackgroundSource.indexOf('const reflection = createStudioReflection({');
 
@@ -53,15 +53,29 @@ const modelInjection = particleBackgroundSource.indexOf('const checkModelInjecti
 const airflowAttachment = particleBackgroundSource.indexOf('f1CarGroup.add(airflow.group)', modelInjection);
 const modelCompilation = particleBackgroundSource.indexOf('renderer.compile(scene, camera)', modelInjection);
 assert(
+  airflowSetup > modelInjection && airflowSetup < airflowAttachment,
+  'ParticleBackground must create bounded airflow only after model injection',
+);
+assert(
   airflowAttachment > modelInjection && airflowAttachment < modelCompilation,
   'ParticleBackground must attach airflow to the F1 car before renderer compilation',
 );
 
 assert.match(
   particleBackgroundSource,
-  /const s = stateRef\.current;[\s\S]*?stepF1WheelMotion\(wheelMotion, s\.isPressing, delta, prefersReducedMotion\);/,
-  'ParticleBackground must feed current press state into wheel motion',
+  /carHeld:\s*false/,
+  'ParticleBackground must track stopped-car holds independently from start progress',
 );
+assert.match(particleBackgroundSource, /stepF1WheelMotion\(wheelMotion, s\.carHeld, delta, prefersReducedMotion\)/);
+assert.match(particleBackgroundSource, /holdIntensity: wheelMotion\.holdIntensity/);
+assert.doesNotMatch(particleBackgroundSource, /stepF1WheelMotion\(wheelMotion, s\.isPressing/);
+assert.match(particleBackgroundSource, /new THREE\.Raycaster\(\)/);
+assert.match(particleBackgroundSource, /raycaster\.intersectObject\(f1CarGroup, true\)/);
+assert.match(particleBackgroundSource, /controls\.minPolarAngle = Math\.PI \/ 3/);
+assert.match(particleBackgroundSource, /controls\.maxPolarAngle = Math\.PI \/ 2 - 0\.04/);
+assert.match(particleBackgroundSource, /controls\.enablePan = false/);
+assert.match(particleBackgroundSource, /reflection\.setReveal\(studioReveal\)/);
+assert.match(particleBackgroundSource, /updateF1ExplodedParts\([\s\S]*?floorY: reflection\.floor\.position\.y/);
 assert.match(
   particleBackgroundSource,
   /applyF1WheelAngle\(f1Wheels, wheelMotion\.angle\);/,
@@ -71,6 +85,11 @@ assert.match(
   particleBackgroundSource,
   /airflow\.update\(\{[\s\S]*?holdIntensity: wheelMotion\.holdIntensity,[\s\S]*?\}\);/,
   'ParticleBackground must pass decaying wheel hold intensity to airflow',
+);
+assert.match(
+  particleBackgroundSource,
+  /holdIntensity: wheelMotion\.holdIntensity \* 0\.35/,
+  'ParticleBackground must reduce airflow intensity under reduced motion',
 );
 assert.doesNotMatch(
   particleBackgroundSource,

@@ -177,12 +177,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
 
   if (!mounted) return null;
 
-  const explodedToggleLabel = isTransitioning
-    ? 'Reassembling car'
-    : isCarExploded
-      ? 'Reassemble car'
-      : 'Show exploded car view';
-
   return (
     <div
       className="fixed inset-0 z-50 overflow-hidden font-sans overscroll-none touch-none"
@@ -450,24 +444,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
           </div>
         </div>
       </div>
-
-      {/* Exploded view toggle */}
-      {progress >= 100 && (
-        <button
-          type="button"
-          onClick={toggleExplodedView}
-          aria-label={explodedToggleLabel}
-          aria-pressed={isCarExploded}
-          disabled={isTransitioning}
-          className="fixed bottom-5 sm:bottom-8 left-1/2 -translate-x-1/2 z-[90] pointer-events-auto rounded border border-[#FFB800]/60 bg-[#001A30]/90 px-4 py-2 text-[10px] sm:text-xs font-black tracking-[0.18em] text-[#FFB800] uppercase whitespace-nowrap shadow-[0_0_18px_rgba(255,184,0,0.2)] backdrop-blur-sm transition-colors hover:bg-[#001A30] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB800] disabled:cursor-wait disabled:opacity-60"
-        >
-          {isTransitioning
-            ? 'REASSEMBLING BEFORE DEPARTURE'
-            : isCarExploded
-              ? 'CLICK CAR TO REASSEMBLE'
-              : 'CLICK CAR FOR EXPLODED VIEW'}
-        </button>
-      )}
     </div>
   );
 };
