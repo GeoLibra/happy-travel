@@ -196,11 +196,12 @@ let reflectiveMaterialDisposals = 0;
 renderFailureGeometry.dispose = () => { renderFailureGeometryDisposals += 1; };
 reflectiveMaterial.dispose = () => { reflectiveMaterialDisposals += 1; };
 
-renderFailure.setReveal(1);
+renderFailure.setReveal(0.5);
 assert.doesNotThrow(() => renderFailure.render());
 assert(renderFailure.floor.material instanceof THREE.MeshStandardMaterial);
 assert.equal(renderFailure.floor.geometry, renderFailureGeometry);
 assert.equal(renderFailure.floor.visible, true);
+assert.equal(renderFailure.floor.material.opacity, 0.5);
 assert.equal(renderFailureCamera.visible, true);
 assert.equal(targetTransitions.at(-1), null);
 assert.equal(renderTargetDisposals, 2);
