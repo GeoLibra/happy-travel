@@ -50,6 +50,15 @@ const fallback = createStudioReflection({
   tier: 'fallback',
 });
 
+assert.equal(fallback.floor.visible, false, 'fallback floor must start hidden');
+fallback.setReveal(0.5);
+assert.equal(fallback.floor.visible, true);
+assert.equal((fallback.floor.material as THREE.MeshStandardMaterial).opacity, 0.5);
+fallback.setReveal(0);
+assert.equal(fallback.floor.visible, false);
+assert.match(source, /uReveal/);
+assert.match(source, /setReveal: \(reveal\) =>/);
+
 assert(fallback.floor.geometry instanceof THREE.PlaneGeometry);
 assert(fallback.floor.material instanceof THREE.MeshStandardMaterial);
 assert.equal(fallback.floor.rotation.x, -Math.PI / 2);
@@ -187,6 +196,7 @@ let reflectiveMaterialDisposals = 0;
 renderFailureGeometry.dispose = () => { renderFailureGeometryDisposals += 1; };
 reflectiveMaterial.dispose = () => { reflectiveMaterialDisposals += 1; };
 
+renderFailure.setReveal(1);
 assert.doesNotThrow(() => renderFailure.render());
 assert(renderFailure.floor.material instanceof THREE.MeshStandardMaterial);
 assert.equal(renderFailure.floor.geometry, renderFailureGeometry);

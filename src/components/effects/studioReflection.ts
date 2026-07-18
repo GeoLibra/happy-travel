@@ -22,6 +22,7 @@ export interface StudioReflectionOptions {
 
 export interface StudioReflectionEffect {
   floor: THREE.Mesh<THREE.PlaneGeometry, THREE.Material>;
+  setReveal: (reveal: number) => void;
   render: () => void;
   resize: (width: number, height: number) => void;
   dispose: () => void;
@@ -33,9 +34,12 @@ const createFloorGeometry = (): THREE.PlaneGeometry => {
 };
 
 const createFallbackMaterial = (): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({
-  color: 0x080b0f,
-  metalness: 0.55,
-  roughness: 0.42,
+  color: 0x15191e,
+  metalness: 0.32,
+  roughness: 0.58,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
 });
 
 const disposeSafely = (resource: { dispose: () => void } | undefined): void => {
@@ -52,11 +56,17 @@ const createFallbackEffect = (scene: THREE.Scene): StudioReflectionEffect => {
   const fallbackMaterial = createFallbackMaterial();
   const floor = new THREE.Mesh(floorGeometry, fallbackMaterial);
   floor.rotation.x = -Math.PI / 2;
+  floor.visible = false;
   scene.add(floor);
 
   let disposed = false;
   return {
     floor,
+    setReveal: (reveal) => {
+      const clampedReveal = THREE.MathUtils.clamp(reveal, 0, 1);
+      floor.visible = clampedReveal > 0.001;
+      fallbackMaterial.opacity = clampedReveal;
+    },
     render: () => undefined,
     resize: () => undefined,
     dispose: () => {
@@ -76,7 +86,8 @@ const createReflectionMaterial = (
   uniforms: {
     uReflection: { value: reflectionTexture },
     uTextureMatrix: { value: textureMatrix },
-    uFloorColor: { value: new THREE.Color(0x080b0f) },
+    uFloorColor: { value: new THREE.Color(0x15191e) },
+    uReveal: { value: 0 },
   },
   vertexShader: `
     uniform mat4 uTextureMatrix;
@@ -93,6 +104,7 @@ const createReflectionMaterial = (
   fragmentShader: `
     uniform sampler2D uReflection;
     uniform vec3 uFloorColor;
+    uniform float uReveal;
     varying vec2 vFloorUv;
     varying vec4 vReflectionUv;
 
@@ -117,9 +129,11 @@ const createReflectionMaterial = (
       vec3 reflection = texture2D(uReflection, projectedUv).rgb;
       float roughness = lowFrequencyNoise(vFloorUv * 14.0);
       vec3 roughFloor = uFloorColor * mix(0.86, 1.08, roughness);
-      gl_FragColor = vec4(mix(roughFloor, reflection, 0.42 * inside), 1.0);
+      gl_FragColor = vec4(mix(roughFloor, reflection, 0.42 * inside * uReveal), uReveal);
     }
   `,
+  transparent: true,
+  depthWrite: false,
 });
 
 const createBlurMaterial = (
@@ -223,6 +237,7 @@ export const createStudioReflection = ({
     floorMaterial = createReflectionMaterial(targetA.texture, textureMatrix);
     floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
+    floor.visible = false;
 
     mirroredCamera = new THREE.PerspectiveCamera();
     sourcePosition = new THREE.Vector3();
@@ -264,6 +279,7 @@ export const createStudioReflection = ({
   let disposed = false;
   let fallbackActive = false;
   let reflectiveResourcesDisposed = false;
+  let currentReveal = 0;
 
   const disposeReflectiveResources = (): void => {
     if (reflectiveResourcesDisposed) return;
@@ -279,14 +295,25 @@ export const createStudioReflection = ({
   const activateFallback = (): void => {
     if (fallbackActive || disposed) return;
     floor.material = runtimeFallbackMaterial;
+    runtimeFallbackMaterial.opacity = currentReveal;
+    floor.visible = currentReveal > 0.001;
     fallbackActive = true;
     disposeReflectiveResources();
   };
 
   return {
     floor,
+    setReveal: (reveal) => {
+      currentReveal = THREE.MathUtils.clamp(reveal, 0, 1);
+      floor.visible = currentReveal > 0.001;
+      if (floor.material instanceof THREE.ShaderMaterial) {
+        floor.material.uniforms.uReveal.value = currentReveal;
+      } else {
+        floor.material.opacity = currentReveal;
+      }
+    },
     render: () => {
-      if (disposed || fallbackActive) return;
+      if (disposed || fallbackActive || !floor.visible) return;
 
       const floorWasVisible = floor.visible;
       const cameraWasVisible = camera.visible;
