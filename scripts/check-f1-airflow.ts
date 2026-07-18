@@ -7,6 +7,40 @@ import {
   createF1AirflowPaths,
 } from '../src/components/effects/f1Airflow';
 
+const assertApproximatelyEqual = (actual: number, expected: number, message: string): void => {
+  assert(Math.abs(actual - expected) <= 1e-6, `${message}: expected ${expected}, received ${actual}`);
+};
+
+const assertMirroredWithFloorMargin = (
+  bounds: THREE.Box3,
+  paths: THREE.Vector3[][],
+): void => {
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  const floorMarginY = bounds.min.y + size.y * 0.12;
+  let minimumPathY = Infinity;
+
+  for (let index = 0; index < paths.length; index += 2) {
+    const left = paths[index];
+    const right = paths[index + 1];
+    assert.equal(left.length, right.length, 'mirrored path pairs must have equal point counts');
+    for (let pointIndex = 0; pointIndex < left.length; pointIndex += 1) {
+      const leftPoint = left[pointIndex];
+      const rightPoint = right[pointIndex];
+      assertApproximatelyEqual(
+        (leftPoint.x + rightPoint.x) * 0.5,
+        center.x,
+        'mirrored path midpoint x',
+      );
+      assertApproximatelyEqual(leftPoint.y, rightPoint.y, 'mirrored path y');
+      assertApproximatelyEqual(leftPoint.z, rightPoint.z, 'mirrored path z');
+      minimumPathY = Math.min(minimumPathY, leftPoint.y, rightPoint.y);
+    }
+  }
+
+  assertApproximatelyEqual(minimumPathY, floorMarginY, 'airflow path floor margin');
+};
+
 const compactBounds = new THREE.Box3(
   new THREE.Vector3(-2, -0.5, -5),
   new THREE.Vector3(2, 1.5, 5),
@@ -18,8 +52,67 @@ for (const path of paths) {
   assert(path.at(-1)!.z > compactBounds.max.z, 'paths must exit behind the rear');
   assert(path.every((point) => point.y >= compactBounds.min.y), 'paths must not run below the car');
 }
-const bounded = createF1Airflow('high', { bounds: compactBounds });
+assertMirroredWithFloorMargin(compactBounds, paths);
+
+const translatedBounds = new THREE.Box3(
+  new THREE.Vector3(8, 2, -18),
+  new THREE.Vector3(18, 8, 6),
+);
+const translatedPaths = createF1AirflowPaths(translatedBounds);
+assert.equal(translatedPaths.length, 14);
+assertMirroredWithFloorMargin(translatedBounds, translatedPaths);
+
+interface CapturedAirflowGeometry {
+  start: THREE.Vector3;
+  end: THREE.Vector3;
+  bounds: THREE.Box3;
+  radius: number;
+}
+
+const capturedGeometries: CapturedAirflowGeometry[] = [];
+const bounded = createF1Airflow('high', {
+  bounds: translatedBounds,
+  createGeometry: (curve, _tubularSegments, radius) => {
+    assert(curve instanceof THREE.CatmullRomCurve3, 'airflow geometry must use Catmull-Rom paths');
+    const sampledPoints = curve.getPoints(72);
+    capturedGeometries.push({
+      start: sampledPoints[0].clone(),
+      end: sampledPoints.at(-1)!.clone(),
+      bounds: new THREE.Box3().setFromPoints(sampledPoints),
+      radius,
+    });
+    return new THREE.BufferGeometry();
+  },
+});
 assert.equal(bounded.group.children.length, 14);
+assert.equal(capturedGeometries.length, 14);
+const translatedSize = translatedBounds.getSize(new THREE.Vector3());
+const translatedFloorMarginY = translatedBounds.min.y + translatedSize.y * 0.12;
+for (const captured of capturedGeometries) {
+  assert(
+    captured.start.z <= translatedBounds.min.z + translatedSize.z * 0.07,
+    'bounded curve must start near the supplied nose',
+  );
+  assertApproximatelyEqual(
+    captured.end.z,
+    translatedBounds.max.z + translatedSize.z * 0.16,
+    'bounded curve must end behind the supplied rear',
+  );
+  assert(
+    captured.bounds.min.x >= translatedBounds.min.x - 1e-6
+      && captured.bounds.max.x <= translatedBounds.max.x + 1e-6,
+    'bounded curve must use the supplied translated width',
+  );
+  assert(
+    captured.bounds.min.y >= translatedFloorMarginY - 1e-6,
+    'sampled bounded curve must preserve the supplied floor margin',
+  );
+  assertApproximatelyEqual(
+    captured.radius,
+    translatedSize.x * 0.0018,
+    'bounded airflow radius',
+  );
+}
 
 const high = createF1Airflow('high');
 assert.equal(high.group.children.length, 14);
@@ -46,6 +139,8 @@ high.update({ time: 5, holdIntensity: 0.051, reducedMotion: false });
 assert.equal(high.group.visible, true, 'airflow above the visibility threshold must be visible');
 const low = createF1Airflow('low');
 assert.equal(low.group.children.length, 8);
+const mid = createF1Airflow('mid');
+assert.equal(mid.group.children.length, 11);
 
 assert.equal(
   advanceF1AirflowTime(1, 30),
@@ -117,4 +212,5 @@ assert.match(
 high.dispose();
 high.dispose();
 low.dispose();
+mid.dispose();
 bounded.dispose();
