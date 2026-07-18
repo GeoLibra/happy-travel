@@ -8,6 +8,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { HologramShaderUniforms, applyHologramMaterial, revertHologramMaterial } from './hologram/HologramEffect';
 import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '../lib/f1-motion';
 import { createF1ExplodedParts, resolveF1WheelNodes, updateF1ExplodedParts, type F1ExplodedPart } from '../lib/f1-model';
+import { applyF1WheelAngle, createF1WheelMotionState, stepF1WheelMotion } from '../lib/f1-wheel-motion';
+import { createF1Airflow } from './effects/f1Airflow';
+import { createF1StudioLighting } from './effects/f1StudioLighting';
+import { createStudioReflection } from './effects/studioReflection';
 
 interface ParticleBackgroundProps {
   isPressing: boolean;
@@ -106,6 +110,20 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const usesLowPowerEffects = prefersReducedMotion || window.innerWidth < 768;
+    const studioLighting = createF1StudioLighting(scene);
+    const reflection = createStudioReflection({
+      renderer,
+      scene,
+      camera,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      tier: usesLowPowerEffects ? 'fallback' : 'reflective',
+    });
+    reflection.floor.position.y = -10.1;
+    const airflow = createF1Airflow(usesLowPowerEffects ? 'low' : 'high');
+    const wheelMotion = createF1WheelMotionState();
 
     // ── Advanced Effects Initializers ──
     // const gpuParticles = new GPUParticleSystem(renderer);
@@ -223,7 +241,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     let f1ExplodedParts: F1ExplodedPart[] = [];
     let explodeAmount = 0;
     let isCarMaterialReplaced = false;
-    const f1Motion: F1MotionState = { speed: 0, wheelAngle: 0 };
+    const racingMotion: F1MotionState = { speed: 0, wheelAngle: 0 };
 
     // We'll check for modelRef.current dynamically in the animate loop to support late arrivals
     const checkModelInjection = () => {
@@ -246,6 +264,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
             isCarMaterialReplaced = applyHologramMaterial(f1CarGroup);
         }
 
+        f1CarGroup.add(airflow.group);
         scene.add(f1CarGroup);
 
         // Performance Optimization: Pre-compile the model to avoid lag spikes
@@ -500,8 +519,15 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
       const s = stateRef.current;
       const targetRacingSpeed = getTargetSpeed(s.progress, s.isPressing);
-      stepF1Motion(f1Motion, targetRacingSpeed, delta);
-      const racingSpeed = f1Motion.speed;
+      stepF1Motion(racingMotion, targetRacingSpeed, delta);
+      const racingSpeed = racingMotion.speed;
+      stepF1WheelMotion(wheelMotion, s.isPressing, delta, prefersReducedMotion);
+      airflow.update({
+        time,
+        holdIntensity: s.isPressing ? wheelMotion.holdIntensity : 0,
+        reducedMotion: prefersReducedMotion,
+      });
+      studioLighting.update(wheelMotion.holdIntensity);
 
       const explodeTarget = s.progress >= 100 && s.exploded ? 1 : 0;
       explodeAmount += (explodeTarget - explodeAmount) * (1 - Math.exp(-delta * 4.2));
@@ -514,9 +540,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         explodedCoreLight.position.copy(explodedCoreWorldPosition);
       }
 
-      for (const wheel of f1Wheels) {
-        wheel.rotation.x = f1Motion.wheelAngle;
-      }
+      applyF1WheelAngle(f1Wheels, wheelMotion.angle);
 
       // Connect audio on first press
       /*
@@ -763,6 +787,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       // 1. Render background lines with stable camera
       renderer.render(bgScene, bgCamera);
       // 2. Render car with OrbitControls camera on top
+      const previousAutoClear = renderer.autoClear;
+      renderer.autoClear = true;
+      reflection.render();
+      renderer.autoClear = previousAutoClear;
       renderer.render(scene, camera);
     };
 
@@ -776,6 +804,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       bgCamera.updateProjectionMatrix();
 
       renderer.setSize(window.innerWidth, window.innerHeight);
+      reflection.resize(window.innerWidth, window.innerHeight);
       // godRays.resize(window.innerWidth, window.innerHeight);
     };
 
@@ -803,6 +832,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         (cpuParticles.material as THREE.Material).dispose();
       }
 
+      airflow.group.removeFromParent();
+      airflow.dispose();
+      studioLighting.dispose();
+      reflection.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
