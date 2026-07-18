@@ -101,7 +101,7 @@ Harness:
 
 Acceptance results:
 
-- Desktop and mobile airflow remained white/cyan, close-fitting, and not overbright; sequential active frames and a WebM show front-to-rear motion, while decay frames show complete removal after release.
+- Desktop and mobile airflow remained white/cyan, close-fitting, and not overbright; sequential active frames show front-to-rear motion, while decay frames show complete removal after release.
 - Desktop and mobile floor captures at approximately 0/300/600/900 ms show the final horizon established before opacity rises, with no intersection or vertical jump during reveal.
 - A first valid hold crossed the original 4.6-second automatic deadline without explosion and decayed normally on release.
 - An exact-260 ms release completed the hold/manual-interaction path without toggling explosion.
