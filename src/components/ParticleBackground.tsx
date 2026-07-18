@@ -14,6 +14,7 @@ import {
   CAR_HOLD_DELAY_MS,
   canStartCarHold,
   classifyCarRelease,
+  classifyShowroomPointerLayer,
   isAdditionalCarGesturePointer,
   isPointInsideCarGestureBounds,
   stepStudioReveal,
@@ -405,6 +406,20 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       return isPointInsideCarGestureBounds(event.clientX, event.clientY, rect);
     };
 
+    const forwardPointerToUnderlyingWelcomeUi = (event: PointerEvent): boolean => {
+      const interactiveUi = document
+        .elementsFromPoint(event.clientX, event.clientY)
+        .map((element) => element.closest<HTMLElement>('[data-f1-welcome-action]'))
+        .find((element): element is HTMLElement => element !== null);
+      const owner = classifyShowroomPointerLayer({
+        carHit: raycastHitsCar(event),
+        interactiveUiHit: interactiveUi !== undefined,
+      });
+      if (owner !== 'ui' || !interactiveUi) return false;
+      interactiveUi.click();
+      return true;
+    };
+
     const handleCarPointerDown = (event: PointerEvent) => {
       if (isAdditionalCarGesturePointer(carGesture?.pointerId ?? null, event.pointerId)) {
         clearCarGesture(false);
@@ -458,7 +473,16 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     };
 
     const handleCarPointerUp = (event: PointerEvent) => {
-      if (!carGesture || carGesture.pointerId !== event.pointerId) return;
+      if (!carGesture || carGesture.pointerId !== event.pointerId) {
+        if (
+          event.isPrimary
+          && (event.pointerType !== 'mouse' || event.button === 0)
+          && stateRef.current.progress >= 100
+        ) {
+          forwardPointerToUnderlyingWelcomeUi(event);
+        }
+        return;
+      }
       if (!pointerIsInsideCanvas(event)) {
         forwardCarPointerCancel();
         return;
@@ -1190,7 +1214,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     onBlur={() => {
       spaceKeyArmedRef.current = false;
     }}
-    style={{ position: 'fixed', inset: 0, zIndex: 65, pointerEvents: progress >= 100 ? 'auto' : 'none', cursor: progress >= 100 ? 'grab' : 'default' }}
+    style={{ position: 'fixed', inset: 0, zIndex: 95, pointerEvents: progress >= 100 ? 'auto' : 'none', cursor: progress >= 100 ? 'grab' : 'default' }}
   />;
 };
 

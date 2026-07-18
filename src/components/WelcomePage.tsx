@@ -20,7 +20,7 @@ const StartLights = ({ progress, isPressing }: { progress: number, isPressing: b
   const lightsOn = isGreen ? 5 : Math.ceil(progress / 20);
 
   return (
-    <div className="absolute top-8 sm:top-12 md:top-16 landscape:top-4 left-1/2 -translate-x-1/2 z-[95] flex gap-2 sm:gap-4 md:gap-6 landscape:gap-2 p-2 sm:p-5 landscape:p-2 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in duration-300">
+    <div className="absolute top-8 sm:top-12 md:top-16 landscape:top-4 left-1/2 -translate-x-1/2 z-[70] flex gap-2 sm:gap-4 md:gap-6 landscape:gap-2 p-2 sm:p-5 landscape:p-2 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in duration-300">
       {[...Array(5)].map((_, i) => {
         const isOn = i < lightsOn;
         const colorClass = isGreen
@@ -360,6 +360,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               className="mb-6 sm:mb-0 landscape:mb-4"
             >
             <button
+              data-f1-welcome-action="enter"
               onPointerDown={() => {
                 setIsPressing(true);
                 if (audioRef.current) {

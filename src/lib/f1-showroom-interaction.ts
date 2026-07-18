@@ -21,6 +21,20 @@ interface MutableRefValue<T> {
   current: T;
 }
 
+export interface ShowroomPointerLayerInput {
+  carHit: boolean;
+  interactiveUiHit: boolean;
+}
+
+export const classifyShowroomPointerLayer = ({
+  carHit,
+  interactiveUiHit,
+}: ShowroomPointerLayerInput): 'car' | 'ui' | 'background' => {
+  if (carHit) return 'car';
+  if (interactiveUiHit) return 'ui';
+  return 'background';
+};
+
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
 export const stepStudioReveal = (

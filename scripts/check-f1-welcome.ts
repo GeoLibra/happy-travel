@@ -9,6 +9,44 @@ const source = readFileSync(
   new URL('../src/components/WelcomePage.tsx', import.meta.url),
   'utf8',
 );
+const particleSource = readFileSync(
+  new URL('../src/components/ParticleBackground.tsx', import.meta.url),
+  'utf8',
+);
+const agentGuidance = readFileSync(
+  new URL('../AGENTS.md', import.meta.url),
+  'utf8',
+);
+
+assert.match(
+  particleSource,
+  /zIndex:\s*95/,
+  'the transparent car canvas must render above ordinary welcome UI',
+);
+assert.match(
+  particleSource,
+  /forwardPointerToUnderlyingWelcomeUi/,
+  'the foreground canvas must forward exposed-control clicks when the car ray misses',
+);
+assert.match(
+  particleSource,
+  /document\s*\.elementsFromPoint/,
+  'underlying welcome controls must be resolved from the real layered DOM',
+);
+assert.match(source, /data-f1-welcome-action="enter"/);
+assert.match(source, /z-\[70\][^\n]*StartLights|StartLights[\s\S]*?z-\[70\]/);
+assert.match(source, /z-\[100\]/, 'intentional modal overlays may remain above the car');
+assert.match(source, /z-\[110\]/, 'the blocking loader must remain above the car');
+
+for (const phrase of [
+  'car canvas stays above ordinary welcome UI',
+  'WheelSpin_FL',
+  'versioned GLB',
+  'desktop and mobile',
+  'arrival timeline',
+]) {
+  assert.match(agentGuidance, new RegExp(phrase), `AGENTS.md must contain: ${phrase}`);
+}
 
 assert.match(
   source,

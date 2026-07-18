@@ -4,10 +4,27 @@ import {
   CAR_HOLD_DELAY_MS,
   canStartCarHold,
   classifyCarRelease,
+  classifyShowroomPointerLayer,
   isAdditionalCarGesturePointer,
   isPointInsideCarGestureBounds,
   stepStudioReveal,
 } from '../src/lib/f1-showroom-interaction';
+
+assert.equal(
+  classifyShowroomPointerLayer({ carHit: true, interactiveUiHit: true }),
+  'car',
+  'a visible car ray hit must win over welcome UI beneath it',
+);
+assert.equal(
+  classifyShowroomPointerLayer({ carHit: false, interactiveUiHit: true }),
+  'ui',
+  'an exposed welcome control must remain operable when the car ray misses',
+);
+assert.equal(
+  classifyShowroomPointerLayer({ carHit: false, interactiveUiHit: false }),
+  'background',
+  'empty canvas space must remain available to OrbitControls',
+);
 
 let reveal = 0;
 for (let index = 0; index < 36; index += 1) reveal = stepStudioReveal(reveal, true, 1 / 60);
