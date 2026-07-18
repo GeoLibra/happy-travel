@@ -9,6 +9,7 @@
     "check:f1-motion": "tsx scripts/check-f1-motion.ts",
     "check:f1-wheel-hold": "node --import tsx scripts/check-f1-wheel-hold.ts",
     "check:f1-airflow": "node --import tsx scripts/check-f1-airflow.ts",
+    "check:f1-studio": "node --import tsx scripts/check-f1-studio.ts",
     "check:showroom-assets": "node scripts/check-showroom-assets.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
