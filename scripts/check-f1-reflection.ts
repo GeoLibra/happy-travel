@@ -8,8 +8,19 @@ const source = readFileSync(
   'utf8',
 );
 
+const assertVisibleCharcoal = (color: THREE.Color, label: string): void => {
+  const luminance = color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722;
+  assert(
+    luminance >= 0.03,
+    `${label} must remain visibly charcoal instead of reading as pure black`,
+  );
+};
+
 assert.match(source, /export interface StudioReflectionEffect/);
 assert.match(source, /export const createStudioReflection/);
+assert.match(source, /const STUDIO_FLOOR_COLOR = 0x30363d/);
+assert.match(source, /0\.32 \* inside \* uReveal/);
+assert.match(source, /#include <colorspace_fragment>/);
 assert.match(source, /new THREE\.PlaneGeometry\(90, 80\)/);
 assert.match(source, /Math\.ceil\(width \* 0\.5\)/);
 assert.match(source, /Math\.ceil\(height \* 0\.5\)/);
@@ -51,6 +62,15 @@ const fallback = createStudioReflection({
 });
 
 assert.equal(fallback.floor.visible, false, 'fallback floor must start hidden');
+assertVisibleCharcoal(
+  (fallback.floor.material as THREE.MeshStandardMaterial).color,
+  'fallback floor',
+);
+assert.equal(
+  fallback.floor.material.toneMapped,
+  false,
+  'fallback floor must preserve its authored charcoal tone',
+);
 fallback.setReveal(0.5);
 assert.equal(fallback.floor.visible, true);
 assert.equal((fallback.floor.material as THREE.MeshStandardMaterial).opacity, 0.5);
@@ -58,6 +78,25 @@ fallback.setReveal(0);
 assert.equal(fallback.floor.visible, false);
 assert.match(source, /uReveal/);
 assert.match(source, /setReveal: \(reveal\) =>/);
+
+const reflectivePreview = createStudioReflection({
+  renderer: {} as THREE.WebGLRenderer,
+  scene: new THREE.Scene(),
+  camera: new THREE.PerspectiveCamera(45, 4 / 3, 0.1, 100),
+  viewport: { width: 800, height: 600 },
+  tier: 'reflective',
+});
+assert(reflectivePreview.floor.material instanceof THREE.ShaderMaterial);
+assertVisibleCharcoal(
+  reflectivePreview.floor.material.uniforms.uFloorColor.value as THREE.Color,
+  'reflective floor',
+);
+assert.equal(
+  reflectivePreview.floor.material.toneMapped,
+  false,
+  'reflective floor must preserve its authored charcoal tone',
+);
+reflectivePreview.dispose();
 
 assert(fallback.floor.geometry instanceof THREE.PlaneGeometry);
 assert(fallback.floor.material instanceof THREE.MeshStandardMaterial);

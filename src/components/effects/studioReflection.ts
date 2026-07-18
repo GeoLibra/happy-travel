@@ -28,18 +28,21 @@ export interface StudioReflectionEffect {
   dispose: () => void;
 }
 
+const STUDIO_FLOOR_COLOR = 0x30363d;
+
 const createFloorGeometry = (): THREE.PlaneGeometry => {
   const geometry = new THREE.PlaneGeometry(90, 80);
   return geometry;
 };
 
 const createFallbackMaterial = (): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({
-  color: 0x15191e,
+  color: STUDIO_FLOOR_COLOR,
   metalness: 0.32,
   roughness: 0.58,
   transparent: true,
   opacity: 0,
   depthWrite: false,
+  toneMapped: false,
 });
 
 const disposeSafely = (resource: { dispose: () => void } | undefined): void => {
@@ -86,7 +89,7 @@ const createReflectionMaterial = (
   uniforms: {
     uReflection: { value: reflectionTexture },
     uTextureMatrix: { value: textureMatrix },
-    uFloorColor: { value: new THREE.Color(0x15191e) },
+    uFloorColor: { value: new THREE.Color(STUDIO_FLOOR_COLOR) },
     uReveal: { value: 0 },
   },
   vertexShader: `
@@ -129,11 +132,13 @@ const createReflectionMaterial = (
       vec3 reflection = texture2D(uReflection, projectedUv).rgb;
       float roughness = lowFrequencyNoise(vFloorUv * 14.0);
       vec3 roughFloor = uFloorColor * mix(0.86, 1.08, roughness);
-      gl_FragColor = vec4(mix(roughFloor, reflection, 0.42 * inside * uReveal), uReveal);
+      gl_FragColor = vec4(mix(roughFloor, reflection, 0.32 * inside * uReveal), uReveal);
+      #include <colorspace_fragment>
     }
   `,
   transparent: true,
   depthWrite: false,
+  toneMapped: false,
 });
 
 const createBlurMaterial = (
