@@ -9,6 +9,7 @@
     "check:f1-motion": "tsx scripts/check-f1-motion.ts",
     "check:f1-wheel-hold": "node --import tsx scripts/check-f1-wheel-hold.ts",
     "check:f1-airflow": "node --import tsx scripts/check-f1-airflow.ts",
+    "check:f1-model": "node --import tsx scripts/check-f1-model.ts",
     "check:f1-welcome": "node --import tsx scripts/check-f1-welcome.ts",
     "check:f1-studio": "node --import tsx scripts/check-f1-studio.ts",
     "check:f1-showroom-interaction": "node --import tsx scripts/check-f1-showroom-interaction.ts",

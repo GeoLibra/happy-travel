@@ -16,6 +16,7 @@ export interface F1AirflowEffect {
 }
 
 export interface F1AirflowFactoryOptions {
+  bounds?: THREE.Box3;
   createGeometry?: (
     path: THREE.Curve<THREE.Vector3>,
     tubularSegments: number,
@@ -34,32 +35,48 @@ let didWarnAboutCreationFailure = false;
 export const advanceF1AirflowTime = (time: number, rawDelta: number): number =>
   time + Math.min(MAX_AIRFLOW_DELTA, Math.max(0, rawDelta));
 
-// These paths are authored in the F1 model's local coordinate system. They
-// travel from the nose (negative z) through the sidepods to beyond the rear wing.
-const AIRFLOW_PATHS: readonly (readonly THREE.Vector3[])[] = [
-  // Low family
-  [new THREE.Vector3(-1.25, -0.15, -3.6), new THREE.Vector3(-1.45, -0.1, -2.7), new THREE.Vector3(-1.58, 0.02, -1.6), new THREE.Vector3(-1.52, 0.16, -0.4), new THREE.Vector3(-1.32, 0.3, 0.95), new THREE.Vector3(-1.12, 0.42, 2.25), new THREE.Vector3(-1.02, 0.5, 3.55)],
-  [new THREE.Vector3(1.25, -0.15, -3.6), new THREE.Vector3(1.45, -0.1, -2.7), new THREE.Vector3(1.58, 0.02, -1.6), new THREE.Vector3(1.52, 0.16, -0.4), new THREE.Vector3(1.32, 0.3, 0.95), new THREE.Vector3(1.12, 0.42, 2.25), new THREE.Vector3(1.02, 0.5, 3.55)],
-  [new THREE.Vector3(-0.8, -0.22, -3.55), new THREE.Vector3(-0.96, -0.18, -2.55), new THREE.Vector3(-1.08, -0.06, -1.35), new THREE.Vector3(-1.02, 0.08, -0.1), new THREE.Vector3(-0.86, 0.22, 1.2), new THREE.Vector3(-0.72, 0.34, 3.5)],
-  [new THREE.Vector3(0.8, -0.22, -3.55), new THREE.Vector3(0.96, -0.18, -2.55), new THREE.Vector3(1.08, -0.06, -1.35), new THREE.Vector3(1.02, 0.08, -0.1), new THREE.Vector3(0.86, 0.22, 1.2), new THREE.Vector3(0.72, 0.34, 3.5)],
-  [new THREE.Vector3(-1.62, 0.02, -3.4), new THREE.Vector3(-1.84, 0.1, -2.35), new THREE.Vector3(-1.9, 0.22, -1.1), new THREE.Vector3(-1.72, 0.3, 0.25), new THREE.Vector3(-1.48, 0.4, 1.75), new THREE.Vector3(-1.32, 0.5, 3.65)],
-  [new THREE.Vector3(1.62, 0.02, -3.4), new THREE.Vector3(1.84, 0.1, -2.35), new THREE.Vector3(1.9, 0.22, -1.1), new THREE.Vector3(1.72, 0.3, 0.25), new THREE.Vector3(1.48, 0.4, 1.75), new THREE.Vector3(1.32, 0.5, 3.65)],
-  [new THREE.Vector3(-0.38, -0.12, -3.65), new THREE.Vector3(-0.5, -0.04, -2.45), new THREE.Vector3(-0.58, 0.1, -1.1), new THREE.Vector3(-0.5, 0.24, 0.4), new THREE.Vector3(-0.4, 0.38, 1.9), new THREE.Vector3(-0.34, 0.48, 3.6)],
-  [new THREE.Vector3(0.38, -0.12, -3.65), new THREE.Vector3(0.5, -0.04, -2.45), new THREE.Vector3(0.58, 0.1, -1.1), new THREE.Vector3(0.5, 0.24, 0.4), new THREE.Vector3(0.4, 0.38, 1.9), new THREE.Vector3(0.34, 0.48, 3.6)],
-  // Mid family
-  [new THREE.Vector3(-1.15, 0.15, -3.45), new THREE.Vector3(-1.32, 0.36, -2.35), new THREE.Vector3(-1.36, 0.62, -1.05), new THREE.Vector3(-1.16, 0.78, 0.3), new THREE.Vector3(-0.94, 0.82, 1.75), new THREE.Vector3(-0.8, 0.78, 3.6)],
-  [new THREE.Vector3(1.15, 0.15, -3.45), new THREE.Vector3(1.32, 0.36, -2.35), new THREE.Vector3(1.36, 0.62, -1.05), new THREE.Vector3(1.16, 0.78, 0.3), new THREE.Vector3(0.94, 0.82, 1.75), new THREE.Vector3(0.8, 0.78, 3.6)],
-  [new THREE.Vector3(0, 0.18, -3.7), new THREE.Vector3(0, 0.45, -2.55), new THREE.Vector3(0, 0.7, -1.2), new THREE.Vector3(0, 0.9, 0.25), new THREE.Vector3(0, 0.98, 1.8), new THREE.Vector3(0, 0.9, 3.7)],
-  // High family
-  [new THREE.Vector3(-0.62, 0.25, -3.55), new THREE.Vector3(-0.78, 0.56, -2.4), new THREE.Vector3(-0.84, 0.94, -1.1), new THREE.Vector3(-0.7, 1.16, 0.32), new THREE.Vector3(-0.5, 1.18, 1.9), new THREE.Vector3(-0.4, 1.06, 3.68)],
-  [new THREE.Vector3(0.62, 0.25, -3.55), new THREE.Vector3(0.78, 0.56, -2.4), new THREE.Vector3(0.84, 0.94, -1.1), new THREE.Vector3(0.7, 1.16, 0.32), new THREE.Vector3(0.5, 1.18, 1.9), new THREE.Vector3(0.4, 1.06, 3.68)],
-  [new THREE.Vector3(0, 0.32, -3.55), new THREE.Vector3(0, 0.75, -2.35), new THREE.Vector3(0, 1.15, -0.95), new THREE.Vector3(0, 1.38, 0.55), new THREE.Vector3(0, 1.35, 2.1), new THREE.Vector3(0, 1.2, 3.75)],
+const DEFAULT_F1_BOUNDS = new THREE.Box3(
+  new THREE.Vector3(-2, -0.5, -4),
+  new THREE.Vector3(2, 1.5, 4),
+);
+
+type NormalizedAirflowPoint = readonly [x: number, y: number, z: number];
+
+// Left-side silhouette families: nose shoulder, front wing, sidepod,
+// cockpit, engine cover, floor edge, and outer wake.
+const LEFT_AIRFLOW_FAMILIES: readonly (readonly NormalizedAirflowPoint[])[] = [
+  [[-0.35, 0.24, 0.01], [-0.62, 0.26, 0.18], [-0.78, 0.32, 0.42], [-0.65, 0.38, 0.72], [-0.48, 0.42, 1.16]],
+  [[-0.82, 0.12, 0.03], [-1.18, 0.13, 0.16], [-1.28, 0.18, 0.36], [-1.08, 0.25, 0.70], [-0.82, 0.32, 1.16]],
+  [[-0.54, 0.18, 0.04], [-0.76, 0.23, 0.25], [-1.02, 0.35, 0.48], [-0.88, 0.43, 0.76], [-0.66, 0.46, 1.16]],
+  [[-0.24, 0.24, 0.02], [-0.38, 0.40, 0.26], [-0.50, 0.62, 0.48], [-0.40, 0.70, 0.74], [-0.26, 0.62, 1.16]],
+  [[-0.14, 0.30, 0.03], [-0.22, 0.54, 0.28], [-0.30, 0.76, 0.52], [-0.26, 0.78, 0.78], [-0.18, 0.66, 1.16]],
+  [[-0.62, 0.12, 0.04], [-0.88, 0.12, 0.26], [-1.12, 0.14, 0.50], [-1.04, 0.17, 0.78], [-0.90, 0.22, 1.16]],
+  [[-1.12, 0.20, 0.06], [-1.42, 0.25, 0.28], [-1.46, 0.34, 0.52], [-1.30, 0.40, 0.80], [-1.08, 0.44, 1.16]],
 ];
+
+export const createF1AirflowPaths = (bounds: THREE.Box3): THREE.Vector3[][] => {
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  const bodyHalfWidth = size.x * 0.34;
+  const floorY = center.y - size.y * 0.5;
+  const noseZ = center.z - size.z * 0.5;
+
+  return LEFT_AIRFLOW_FAMILIES.flatMap((family) => {
+    const createSide = (mirror: number): THREE.Vector3[] => family.map(([x, y, z]) => (
+      new THREE.Vector3(
+        center.x + x * bodyHalfWidth * mirror,
+        floorY + Math.max(0.12, y) * size.y,
+        noseZ + z * size.z,
+      )
+    ));
+    return [createSide(1), createSide(-1)];
+  });
+};
 
 const pathCountForTier = (tier: AirflowTier): number => {
   if (tier === 'low') return 8;
   if (tier === 'mid') return 11;
-  return AIRFLOW_PATHS.length;
+  return 14;
 };
 
 export const createF1Airflow = (
@@ -108,11 +125,15 @@ export const createF1Airflow = (
       blending: THREE.AdditiveBlending,
     });
 
-    for (const points of AIRFLOW_PATHS.slice(0, pathCountForTier(tier))) {
+    const paths = createF1AirflowPaths(options.bounds ?? DEFAULT_F1_BOUNDS);
+    for (const points of paths.slice(0, pathCountForTier(tier))) {
       const geometry = createGeometry(
-        new THREE.CatmullRomCurve3([...points]),
+        new THREE.CatmullRomCurve3(points),
         72,
-        tier === 'high' ? 0.006 : 0.009,
+        Math.max(
+          0.004,
+          options.bounds ? options.bounds.getSize(new THREE.Vector3()).x * 0.0018 : 0.006,
+        ),
         tier === 'high' ? 5 : 3,
         false,
       );

@@ -4,7 +4,22 @@ import * as THREE from 'three';
 import {
   advanceF1AirflowTime,
   createF1Airflow,
+  createF1AirflowPaths,
 } from '../src/components/effects/f1Airflow';
+
+const compactBounds = new THREE.Box3(
+  new THREE.Vector3(-2, -0.5, -5),
+  new THREE.Vector3(2, 1.5, 5),
+);
+const paths = createF1AirflowPaths(compactBounds);
+assert.equal(paths.length, 14);
+for (const path of paths) {
+  assert(path[0].z <= compactBounds.min.z + 1.5, 'paths must begin near the nose');
+  assert(path.at(-1)!.z > compactBounds.max.z, 'paths must exit behind the rear');
+  assert(path.every((point) => point.y >= compactBounds.min.y), 'paths must not run below the car');
+}
+const bounded = createF1Airflow('high', { bounds: compactBounds });
+assert.equal(bounded.group.children.length, 14);
 
 const high = createF1Airflow('high');
 assert.equal(high.group.children.length, 14);
@@ -102,3 +117,4 @@ assert.match(
 high.dispose();
 high.dispose();
 low.dispose();
+bounded.dispose();
