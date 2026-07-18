@@ -57,6 +57,19 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoExplodeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasManuallyToggledRef = React.useRef(false);
+
+  const toggleExplodedView = useCallback(() => {
+    if (isTransitioning) return;
+
+    hasManuallyToggledRef.current = true;
+    if (autoExplodeTimerRef.current) {
+      clearTimeout(autoExplodeTimerRef.current);
+      autoExplodeTimerRef.current = null;
+    }
+    setIsCarExploded((value) => !value);
+  }, [isTransitioning]);
 
   const enterAfterReassembly = useCallback(() => {
     if (isTransitioning) return;
@@ -106,17 +119,22 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
 
   useEffect(() => () => {
     if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
+    if (autoExplodeTimerRef.current) clearTimeout(autoExplodeTimerRef.current);
   }, []);
 
   useEffect(() => {
-    if (progress < 100 || isTransitioning) return;
+    if (progress < 100 || isTransitioning || hasManuallyToggledRef.current) return;
 
-    const explodeTimer = setTimeout(() => {
+    autoExplodeTimerRef.current = setTimeout(() => {
+      autoExplodeTimerRef.current = null;
       setIsCarExploded(true);
     }, HOLOGRAM_REVEAL_MS);
 
     return () => {
-      clearTimeout(explodeTimer);
+      if (autoExplodeTimerRef.current) {
+        clearTimeout(autoExplodeTimerRef.current);
+        autoExplodeTimerRef.current = null;
+      }
     };
   }, [progress, isTransitioning]);
 
@@ -159,6 +177,12 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
 
   if (!mounted) return null;
 
+  const explodedToggleLabel = isTransitioning
+    ? 'Reassembling car'
+    : isCarExploded
+      ? 'Reassemble car'
+      : 'Show exploded car view';
+
   return (
     <div
       className="fixed inset-0 z-50 overflow-hidden font-sans overscroll-none touch-none"
@@ -196,9 +220,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
         audioRef={audioRef}
         loadedModel={loadedModel}
         exploded={isCarExploded}
-        onCarClick={() => {
-          if (!isTransitioning) setIsCarExploded((value) => !value);
-        }}
+        onCarClick={toggleExplodedView}
       />
 
       <StartLights progress={progress} isPressing={isPressing} />
@@ -389,26 +411,8 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
 
             </motion.div>
 
-            {/* Keep this slot mounted so reaching 100% cannot change the
-                centered column's height and make the content jump upward. */}
-            <div className="h-6 sm:h-7 mt-3 flex items-start justify-center pointer-events-none">
-              <motion.p
-                initial={false}
-                animate={{
-                  opacity: progress >= 100 ? 1 : 0,
-                  y: progress >= 100 ? 0 : 8,
-                }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-                aria-hidden={progress < 100}
-                className="text-[10px] sm:text-xs font-black tracking-[0.22em] text-[#FFB800] uppercase whitespace-nowrap"
-              >
-                {isTransitioning
-                  ? 'REASSEMBLING BEFORE DEPARTURE'
-                  : isCarExploded
-                    ? 'CLICK CAR TO REASSEMBLE'
-                    : 'CLICK CAR FOR EXPLODED VIEW'}
-              </motion.p>
-            </div>
+            {/* Keep this slot mounted so reaching 100% cannot move the centered content. */}
+            <div className="h-8 sm:h-9 mt-3" aria-hidden="true" />
 
 
             {/* Glitch Overlay & Stats */}
@@ -446,6 +450,24 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
           </div>
         </div>
       </div>
+
+      {/* Exploded view toggle */}
+      {progress >= 100 && (
+        <button
+          type="button"
+          onClick={toggleExplodedView}
+          aria-label={explodedToggleLabel}
+          aria-pressed={isCarExploded}
+          disabled={isTransitioning}
+          className="fixed bottom-5 sm:bottom-8 left-1/2 -translate-x-1/2 z-[90] pointer-events-auto rounded border border-[#FFB800]/60 bg-[#001A30]/90 px-4 py-2 text-[10px] sm:text-xs font-black tracking-[0.18em] text-[#FFB800] uppercase whitespace-nowrap shadow-[0_0_18px_rgba(255,184,0,0.2)] backdrop-blur-sm transition-colors hover:bg-[#001A30] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFB800] disabled:cursor-wait disabled:opacity-60"
+        >
+          {isTransitioning
+            ? 'REASSEMBLING BEFORE DEPARTURE'
+            : isCarExploded
+              ? 'CLICK CAR TO REASSEMBLE'
+              : 'CLICK CAR FOR EXPLODED VIEW'}
+        </button>
+      )}
     </div>
   );
 };

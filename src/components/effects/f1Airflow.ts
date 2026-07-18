@@ -10,10 +10,29 @@ export interface F1AirflowUpdate {
 
 export interface F1AirflowEffect {
   group: THREE.Group;
-  material: THREE.ShaderMaterial;
+  material: THREE.ShaderMaterial | null;
   update: (input: F1AirflowUpdate) => void;
   dispose: () => void;
 }
+
+export interface F1AirflowFactoryOptions {
+  createGeometry?: (
+    path: THREE.Curve<THREE.Vector3>,
+    tubularSegments: number,
+    radius: number,
+    radialSegments: number,
+    closed: boolean,
+  ) => THREE.BufferGeometry;
+  createMaterial?: (parameters: THREE.ShaderMaterialParameters) => THREE.ShaderMaterial;
+  warn?: (...data: unknown[]) => void;
+}
+
+const MAX_AIRFLOW_DELTA = 0.1;
+const AIRFLOW_VISIBILITY_THRESHOLD = 0.05;
+let didWarnAboutCreationFailure = false;
+
+export const advanceF1AirflowTime = (time: number, rawDelta: number): number =>
+  time + Math.min(MAX_AIRFLOW_DELTA, Math.max(0, rawDelta));
 
 // These paths are authored in the F1 model's local coordinate system. They
 // travel from the nose (negative z) through the sidepods to beyond the rear wing.
@@ -43,67 +62,102 @@ const pathCountForTier = (tier: AirflowTier): number => {
   return AIRFLOW_PATHS.length;
 };
 
-export const createF1Airflow = (tier: AirflowTier): F1AirflowEffect => {
+export const createF1Airflow = (
+  tier: AirflowTier,
+  options: F1AirflowFactoryOptions = {},
+): F1AirflowEffect => {
   const group = new THREE.Group();
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uOpacity: { value: 0 },
-      uColor: { value: new THREE.Color('#dff6ff') },
-      uSpeed: { value: 1 },
-    },
-    vertexShader: `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      varying vec2 vUv;
-      uniform float uTime;
-      uniform float uOpacity;
-      uniform vec3 uColor;
-      uniform float uSpeed;
-      void main() {
-        float phase = fract(vUv.x * 2.4 - uTime * uSpeed);
-        float pulse = smoothstep(0.04, 0.20, phase) * (1.0 - smoothstep(0.64, 0.94, phase));
-        float alpha = uOpacity * mix(0.28, 1.0, pulse);
-        gl_FragColor = vec4(uColor * mix(0.65, 1.6, pulse), alpha);
-      }
-    `,
-    transparent: true,
-    depthTest: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-
+  group.visible = false;
   const geometries = new Set<THREE.BufferGeometry>();
-  for (const points of AIRFLOW_PATHS.slice(0, pathCountForTier(tier))) {
-    const geometry = new THREE.TubeGeometry(
-      new THREE.CatmullRomCurve3([...points]),
-      72,
-      tier === 'high' ? 0.006 : 0.009,
-      tier === 'high' ? 5 : 3,
-      false,
-    );
-    geometries.add(geometry);
-    group.add(new THREE.Mesh(geometry, material));
+  let material: THREE.ShaderMaterial | null = null;
+
+  try {
+    const createMaterial = options.createMaterial ?? ((parameters) => new THREE.ShaderMaterial(parameters));
+    const createGeometry = options.createGeometry ?? ((...parameters) => new THREE.TubeGeometry(...parameters));
+
+    material = createMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uOpacity: { value: 0 },
+        uColor: { value: new THREE.Color('#dff6ff') },
+        uSpeed: { value: 1 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform float uOpacity;
+        uniform vec3 uColor;
+        uniform float uSpeed;
+        void main() {
+          float phase = fract(vUv.x * 2.4 - uTime * uSpeed);
+          float pulse = smoothstep(0.04, 0.20, phase) * (1.0 - smoothstep(0.64, 0.94, phase));
+          float alpha = uOpacity * mix(0.28, 1.0, pulse);
+          gl_FragColor = vec4(uColor * mix(0.65, 1.6, pulse), alpha);
+        }
+      `,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+
+    for (const points of AIRFLOW_PATHS.slice(0, pathCountForTier(tier))) {
+      const geometry = createGeometry(
+        new THREE.CatmullRomCurve3([...points]),
+        72,
+        tier === 'high' ? 0.006 : 0.009,
+        tier === 'high' ? 5 : 3,
+        false,
+      );
+      geometries.add(geometry);
+      group.add(new THREE.Mesh(geometry, material));
+    }
+  } catch (error) {
+    group.clear();
+    for (const geometry of geometries) geometry.dispose();
+    geometries.clear();
+    material?.dispose();
+    material = null;
+
+    if (!didWarnAboutCreationFailure) {
+      didWarnAboutCreationFailure = true;
+      (options.warn ?? console.warn)('[F1 airflow] Disabled after resource allocation failed.', error);
+    }
+
+    return {
+      group,
+      material: null,
+      update: () => {},
+      dispose: () => {},
+    };
   }
 
+  const activeMaterial = material;
   let disposed = false;
   return {
     group,
-    material,
+    material: activeMaterial,
     update: ({ time, holdIntensity, reducedMotion }) => {
-      if (!reducedMotion) material.uniforms.uTime.value = time;
-      material.uniforms.uOpacity.value = THREE.MathUtils.clamp(holdIntensity, 0, 1);
+      const opacity = THREE.MathUtils.clamp(holdIntensity, 0, 1);
+      group.visible = opacity > AIRFLOW_VISIBILITY_THRESHOLD;
+      if (!reducedMotion) activeMaterial.uniforms.uTime.value = time;
+      activeMaterial.uniforms.uOpacity.value = opacity;
     },
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      group.visible = false;
+      group.clear();
       for (const geometry of geometries) geometry.dispose();
-      material.dispose();
+      geometries.clear();
+      activeMaterial.dispose();
     },
   };
 };

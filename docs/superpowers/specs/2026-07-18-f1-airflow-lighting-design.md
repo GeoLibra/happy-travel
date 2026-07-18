@@ -23,7 +23,7 @@ The curves form three families:
 2. Mid paths follow the nose, suspension, sidepods, and rear wing.
 3. High paths arc over the cockpit and halo before tapering behind the car.
 
-All tubes share one additive `ShaderMaterial`. The vertex shader passes longitudinal UVs; the fragment shader combines a soft white-blue core, a moving dashed phase, and edge falloff. Uniforms control time, opacity, speed, and intensity. Geometry is never rebuilt in the render loop. Bloom supplies the outer glow.
+All tubes share one additive `ShaderMaterial`. The vertex shader passes longitudinal UVs; the fragment shader combines a soft white-blue core, a moving dashed phase, and edge falloff. Uniforms control time, opacity, speed, and intensity. Geometry is never rebuilt in the render loop. In the current renderer, the additive emissive core supplies the perceived outer glow; no post-processing bloom pass is required.
 
 Desktop uses 14 paths. The low-power tier uses 8 paths and fewer radial segments. Airflow materials disable depth writes but retain depth testing so portions correctly disappear behind the car.
 
@@ -41,7 +41,7 @@ The lighting rig uses three deliberate sources:
 - Two cool rim lights define tire shoulders, suspension arms, front wing edges, and rear silhouette.
 - A weak frontal fill preserves livery color and carbon-fiber detail while keeping the scene predominantly dark.
 
-Existing HDR/environment lighting remains the base reflection source. Exposure and bloom are tuned conservatively so white airflow cores and headlights retain detail. Holding may raise the key and rim intensities slightly, driven by `holdIntensity`, but the lighting never flashes abruptly.
+Existing HDR/environment lighting remains the base reflection source. Exposure and additive airflow intensity are tuned conservatively so white airflow cores and headlights retain detail. Holding may raise the key and rim intensities slightly, driven by `holdIntensity`, but the lighting never flashes abruptly.
 
 ## Floor Reflection
 

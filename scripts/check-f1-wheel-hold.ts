@@ -23,6 +23,13 @@ assert.equal(wheel.rotation.x, 1.25);
 assert.equal(wheel.rotation.y, 0.2);
 assert.equal(wheel.rotation.z, 0.3);
 
+const reducedMotionState = createF1WheelMotionState();
+for (let i = 0; i < 120; i++) {
+  stepF1WheelMotion(reducedMotionState, true, 1 / 60, true);
+}
+assert.equal(reducedMotionState.velocity, 0, 'reduced-motion hold must keep wheel velocity at zero');
+assert.equal(reducedMotionState.angle, 0, 'reduced-motion hold must keep wheel angle at zero');
+
 const particleBackgroundSource = readFileSync(
   new URL('../src/components/ParticleBackground.tsx', import.meta.url),
   'utf8',

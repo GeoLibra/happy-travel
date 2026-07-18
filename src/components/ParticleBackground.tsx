@@ -9,7 +9,7 @@ import { HologramShaderUniforms, applyHologramMaterial, revertHologramMaterial }
 import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '../lib/f1-motion';
 import { createF1ExplodedParts, resolveF1WheelNodes, updateF1ExplodedParts, type F1ExplodedPart } from '../lib/f1-model';
 import { applyF1WheelAngle, createF1WheelMotionState, stepF1WheelMotion } from '../lib/f1-wheel-motion';
-import { createF1Airflow } from './effects/f1Airflow';
+import { advanceF1AirflowTime, createF1Airflow } from './effects/f1Airflow';
 import { createF1StudioLighting } from './effects/f1StudioLighting';
 import { createStudioReflection } from './effects/studioReflection';
 
@@ -507,6 +507,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
     // ── Animation Loop ──
     const timer = new THREE.Timer();
+    let airflowTime = 0;
     let frameId = 0;
 
     const animate = (timestamp: number) => {
@@ -515,7 +516,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
       timer.update(timestamp);
       const time = timer.getElapsed();
-      const delta = Math.min(timer.getDelta(), 0.1);
+      const delta = Math.min(Math.max(timer.getDelta(), 0), 0.1);
+      airflowTime = advanceF1AirflowTime(airflowTime, delta);
 
       const s = stateRef.current;
       const targetRacingSpeed = getTargetSpeed(s.progress, s.isPressing);
@@ -523,7 +525,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       const racingSpeed = racingMotion.speed;
       stepF1WheelMotion(wheelMotion, s.isPressing, delta, prefersReducedMotion);
       airflow.update({
-        time,
+        time: airflowTime,
         holdIntensity: wheelMotion.holdIntensity,
         reducedMotion: prefersReducedMotion,
       });
