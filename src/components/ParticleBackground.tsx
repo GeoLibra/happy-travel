@@ -7,7 +7,7 @@ import { DEFAULT_FORCE_FIELD_PARAMS } from './effects/forceField';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { HologramShaderUniforms, applyHologramMaterial, revertHologramMaterial } from './hologram/HologramEffect';
 import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '../lib/f1-motion';
-import { resolveF1WheelNodes } from '../lib/f1-model';
+import { createF1ExplodedParts, resolveF1WheelNodes, updateF1ExplodedParts, type F1ExplodedPart } from '../lib/f1-model';
 
 interface ParticleBackgroundProps {
   isPressing: boolean;
@@ -15,6 +15,7 @@ interface ParticleBackgroundProps {
   audioRef?: React.RefObject<HTMLAudioElement | null>;
   loadedModel?: THREE.Group | null;
   onCarClick?: () => void;
+  exploded?: boolean;
 }
 
 const COLORS = {
@@ -27,13 +28,14 @@ const COLORS = {
 const SPEED_LINE_COUNT = 100;
 const CPU_PARTICLE_COUNT = 1000;
 
-const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel, onCarClick }) => {
+const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel, onCarClick, exploded = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Track state in ref to avoid re-triggering the animation loop closure
   const stateRef = useRef({
     isPressing,
     progress,
+    exploded,
     explosionTime: 0,
     mouse: { x: 0, y: 0, targetX: 0, targetY: 0 },
     baseUniforms: {
@@ -53,6 +55,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
   useEffect(() => {
     stateRef.current.isPressing = isPressing;
   }, [isPressing]);
+
+  useEffect(() => {
+    stateRef.current.exploded = exploded;
+  }, [exploded]);
 
   const modelRef = useRef<THREE.Group | null>(null);
   useEffect(() => {
@@ -91,6 +97,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     renderer.setSize(window.innerWidth, window.innerHeight);
     const pixelRatio = Math.min(window.devicePixelRatio, 2);
     renderer.setPixelRatio(pixelRatio);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.35;
     stateRef.current.baseUniforms.uPixelRatio.value = pixelRatio;
 
     // We will render bgScene first, then scene on top without clearing
@@ -181,20 +189,39 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     }
 
     // ── 3D Lighting for F1 Model ──
-    const ambientLight = new THREE.HemisphereLight(0xffffff, 0x001A30, 0.8);
+    const ambientLight = new THREE.HemisphereLight(0xeaf6ff, 0x17324a, 1.65);
     scene.add(ambientLight);
 
-    const mainLight = new THREE.DirectionalLight(0xFFB800, 1.5);
-    mainLight.position.set(10, 20, 10);
+    // Bright camera-side key light keeps the dark carbon-fibre pieces readable
+    // when they separate and no longer receive light bounced from nearby parts.
+    const mainLight = new THREE.DirectionalLight(0xfff4dc, 3.4);
+    mainLight.position.set(8, 16, 24);
     scene.add(mainLight);
 
-    const rimLight = new THREE.DirectionalLight(0xE10600, 1.0);
+    const fillLight = new THREE.DirectionalLight(0x8bd8ff, 2.25);
+    fillLight.position.set(-18, 8, 16);
+    scene.add(fillLight);
+
+    const lowerFillLight = new THREE.PointLight(0xffc85a, 2.4, 90, 1.4);
+    lowerFillLight.position.set(4, -4, 18);
+    scene.add(lowerFillLight);
+
+    // Core inspection light. It sits at the assembled model's local center and
+    // shines outward as parts separate, revealing the chassis and suspension.
+    const explodedCoreLight = new THREE.PointLight(0x77e7ff, 0.35, 78, 1.15);
+    const explodedCoreAnchor = new THREE.Vector3();
+    const explodedCoreWorldPosition = new THREE.Vector3();
+    scene.add(explodedCoreLight);
+
+    const rimLight = new THREE.DirectionalLight(0xE10600, 1.8);
     rimLight.position.set(-10, 5, -5);
     scene.add(rimLight);
 
     // ── F1 Car 3D Model Integration ──
     let f1CarGroup: THREE.Group | null = null;
     let f1Wheels: THREE.Object3D[] = [];
+    let f1ExplodedParts: F1ExplodedPart[] = [];
+    let explodeAmount = 0;
     let isCarMaterialReplaced = false;
     const f1Motion: F1MotionState = { speed: 0, wheelAngle: 0 };
 
@@ -203,10 +230,17 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       if (!f1CarGroup && modelRef.current) {
         f1CarGroup = modelRef.current;
         f1Wheels = resolveF1WheelNodes(f1CarGroup);
+        f1ExplodedParts = createF1ExplodedParts(f1CarGroup);
         f1CarGroup.scale.set(8, 8, 8);
         f1CarGroup.rotation.y = 0; // Face the camera directly
         f1CarGroup.position.set(0, -10, getF1Depth(0));
         f1CarGroup.visible = false;
+        f1CarGroup.updateMatrixWorld(true);
+
+        const assembledCenterWorld = new THREE.Box3()
+          .setFromObject(f1CarGroup)
+          .getCenter(new THREE.Vector3());
+        explodedCoreAnchor.copy(f1CarGroup.worldToLocal(assembledCenterWorld));
 
         if (!isCarMaterialReplaced) {
             isCarMaterialReplaced = applyHologramMaterial(f1CarGroup);
@@ -468,6 +502,17 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       const targetRacingSpeed = getTargetSpeed(s.progress, s.isPressing);
       stepF1Motion(f1Motion, targetRacingSpeed, delta);
       const racingSpeed = f1Motion.speed;
+
+      const explodeTarget = s.progress >= 100 && s.exploded ? 1 : 0;
+      explodeAmount += (explodeTarget - explodeAmount) * (1 - Math.exp(-delta * 4.2));
+      updateF1ExplodedParts(f1ExplodedParts, explodeAmount, delta);
+      explodedCoreLight.intensity = 0.35 + explodeAmount * 7.15;
+      if (f1CarGroup) {
+        explodedCoreWorldPosition
+          .copy(explodedCoreAnchor)
+          .applyMatrix4(f1CarGroup.matrixWorld);
+        explodedCoreLight.position.copy(explodedCoreWorldPosition);
+      }
 
       for (const wheel of f1Wheels) {
         wheel.rotation.x = f1Motion.wheelAngle;
@@ -767,7 +812,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
   return <div
     ref={containerRef}
-    style={{ position: 'fixed', inset: 0, zIndex: 75, pointerEvents: progress >= 100 ? 'auto' : 'none' }}
+    style={{ position: 'fixed', inset: 0, zIndex: 75, pointerEvents: progress >= 100 ? 'auto' : 'none', cursor: progress >= 100 ? 'grab' : 'default' }}
     onMouseDown={(e) => {
 
     }}

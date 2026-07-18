@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Flag, ArrowRight, Zap, Trophy, Cpu } from 'lucide-react';
 import * as THREE from 'three';
@@ -9,6 +9,8 @@ import ParticleBackground from './ParticleBackground';
 import { loadModelWithCache } from '../lib/model-loader';
 import { ROSE_MODEL_URL } from '../lib/rose-animation';
 import { useI18n } from '../i18n';
+
+const F1_SHOWROOM_MODEL_URL = '/models/red_bull_f1_showroom.glb?v=fixed-front-covers-5';
 
 const StartLights = ({ progress, isPressing }: { progress: number, isPressing: boolean }) => {
   if (!isPressing && progress === 0) return null;
@@ -39,6 +41,9 @@ interface WelcomeProps {
   onEnter: () => void;
 }
 
+const HOLOGRAM_REVEAL_MS = 4600;
+const REASSEMBLY_BEFORE_ENTER_MS = 1600;
+
 const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
@@ -48,7 +53,20 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   const [modelLoading, setModelLoading] = useState(true);
   const [modelProgress, setModelProgress] = useState(0);
   const [loadedModel, setLoadedModel] = useState<THREE.Group | null>(null);
+  const [isCarExploded, setIsCarExploded] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const enterAfterReassembly = useCallback(() => {
+    if (isTransitioning) return;
+
+    setIsTransitioning(true);
+    setIsCarExploded(false);
+    enterTimerRef.current = setTimeout(() => {
+      onEnter();
+    }, REASSEMBLY_BEFORE_ENTER_MS);
+  }, [isTransitioning, onEnter]);
 
   const handleTagClick = () => {
     setSimplyLovely(true);
@@ -68,7 +86,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
     };
 
     Promise.all([
-      loadModelWithCache('/models/red_bull_f1_showroom.glb', (p) => {
+      loadModelWithCache(F1_SHOWROOM_MODEL_URL, (p) => {
         carProg = p;
         updateCombinedProgress();
       }),
@@ -85,6 +103,22 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
     });
 
   }, []);
+
+  useEffect(() => () => {
+    if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (progress < 100 || isTransitioning) return;
+
+    const explodeTimer = setTimeout(() => {
+      setIsCarExploded(true);
+    }, HOLOGRAM_REVEAL_MS);
+
+    return () => {
+      clearTimeout(explodeTimer);
+    };
+  }, [progress, isTransitioning]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -161,6 +195,10 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
         progress={progress}
         audioRef={audioRef}
         loadedModel={loadedModel}
+        exploded={isCarExploded}
+        onCarClick={() => {
+          if (!isTransitioning) setIsCarExploded((value) => !value);
+        }}
       />
 
       <StartLights progress={progress} isPressing={isPressing} />
@@ -318,7 +356,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               }}
               onClick={() => {
                 if (progress >= 100) {
-                  onEnter();
+                  enterAfterReassembly();
                 }
               }}
               className="group relative z-[90] inline-flex items-center justify-center gap-2 px-10 py-4 w-[280px] sm:w-[360px] bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl uppercase tracking-wider transform -skew-x-12 pointer-events-auto cursor-pointer select-none"
@@ -333,7 +371,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   <Zap size={18} className="flex-shrink-0"/>
   <span className="flex-shrink-0">
     {progress >= 100
-      ? "ENTER"
+      ? (isTransitioning ? "REASSEMBLING..." : "ENTER")
       : (isPressing || progress > 0)
       ? `ENGINE STARTING ${progress}%`
       : (modelLoading ? "CALIBRATING..." : "HOLD TO START")}
@@ -347,14 +385,30 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               ref={audioRef}
               src={f1EngineSound}
               preload="auto"
-              onEnded={() => {
-                if (progress >= 100) {
-                  onEnter();
-                }
-              }}
             />
 
             </motion.div>
+
+            {/* Keep this slot mounted so reaching 100% cannot change the
+                centered column's height and make the content jump upward. */}
+            <div className="h-6 sm:h-7 mt-3 flex items-start justify-center pointer-events-none">
+              <motion.p
+                initial={false}
+                animate={{
+                  opacity: progress >= 100 ? 1 : 0,
+                  y: progress >= 100 ? 0 : 8,
+                }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                aria-hidden={progress < 100}
+                className="text-[10px] sm:text-xs font-black tracking-[0.22em] text-[#FFB800] uppercase whitespace-nowrap"
+              >
+                {isTransitioning
+                  ? 'REASSEMBLING BEFORE DEPARTURE'
+                  : isCarExploded
+                    ? 'CLICK CAR TO REASSEMBLE'
+                    : 'CLICK CAR FOR EXPLODED VIEW'}
+              </motion.p>
+            </div>
 
 
             {/* Glitch Overlay & Stats */}
