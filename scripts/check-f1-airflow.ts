@@ -214,3 +214,30 @@ high.dispose();
 low.dispose();
 mid.dispose();
 bounded.dispose();
+
+const lowTierRadii: number[] = [];
+const lowBounded = createF1Airflow('low', {
+  bounds: translatedBounds,
+  createGeometry: (_curve, _tubularSegments, radius) => {
+    lowTierRadii.push(radius);
+    return new THREE.BufferGeometry();
+  },
+});
+assert.equal(lowBounded.group.children.length, 8);
+assert.equal(lowTierRadii.length, 8);
+for (const radius of lowTierRadii) {
+  assertApproximatelyEqual(
+    radius,
+    translatedSize.x * 0.0048,
+    'low-tier bounded airflow radius',
+  );
+}
+assert(lowBounded.material, 'low-tier airflow must expose its shared material');
+assert.equal(lowBounded.material.depthTest, false, 'low-tier airflow must remain readable over the car');
+assert.equal(lowBounded.material.depthWrite, false, 'low-tier airflow must not occlude the car');
+assert.equal(lowBounded.material.polygonOffset, false, 'low-tier airflow does not need a depth bias');
+
+assert(bounded.material, 'high-tier airflow must expose its shared material');
+assert.equal(bounded.material.depthTest, true, 'high-tier airflow depth behavior must remain unchanged');
+assert.equal(bounded.material.polygonOffset, false, 'high-tier airflow appearance must remain unchanged');
+lowBounded.dispose();

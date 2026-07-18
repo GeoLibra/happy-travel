@@ -79,6 +79,10 @@ const pathCountForTier = (tier: AirflowTier): number => {
   return 14;
 };
 
+const radiusScaleForTier = (tier: AirflowTier): number => (
+  tier === 'low' ? 0.0048 : 0.0018
+);
+
 export const createF1Airflow = (
   tier: AirflowTier,
   options: F1AirflowFactoryOptions = {},
@@ -120,7 +124,7 @@ export const createF1Airflow = (
         }
       `,
       transparent: true,
-      depthTest: true,
+      depthTest: tier !== 'low',
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
@@ -132,7 +136,9 @@ export const createF1Airflow = (
         72,
         Math.max(
           0.004,
-          options.bounds ? options.bounds.getSize(new THREE.Vector3()).x * 0.0018 : 0.006,
+          options.bounds
+            ? options.bounds.getSize(new THREE.Vector3()).x * radiusScaleForTier(tier)
+            : tier === 'low' ? 0.01 : 0.006,
         ),
         tier === 'high' ? 5 : 3,
         false,
