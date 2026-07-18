@@ -78,6 +78,33 @@ assert.match(particleBackgroundSource, /reflection\.setReveal\(studioReveal\)/);
 assert.match(particleBackgroundSource, /updateF1ExplodedParts\([\s\S]*?floorY: reflection\.floor\.position\.y/);
 assert.match(
   particleBackgroundSource,
+  /if \(carGesture\.travelPx > CAR_DRAG_TOLERANCE_PX\) \{[\s\S]*?if \(carGesture\.holdStarted\) \{[\s\S]*?stateRef\.current\.carHeld = false;[\s\S]*?carGesture\.startedOnCar = false;[\s\S]*?carGesture\.holdStarted = false;[\s\S]*?controls\.enabled = stateRef\.current\.progress >= 100;/,
+  'dragging beyond tolerance after hold activation must stop the hold and invalidate release toggling',
+);
+assert.match(
+  particleBackgroundSource,
+  /const stoppedPoseSettled =[\s\S]*?if \([\s\S]*?!hasPlacedStudioFloor[\s\S]*?&& stoppedPoseSettled[\s\S]*?\) \{[\s\S]*?reflection\.floor\.position\.y = assembledWorldBounds\.min\.y - 0\.03;[\s\S]*?controls\.target\.copy\(assembledCenter\);[\s\S]*?hasSetOrbitTarget = true;/,
+  'orbit targeting and floor placement must share the final stopped-pose gate',
+);
+assert.equal(
+  particleBackgroundSource.match(/hasSetOrbitTarget = true;/g)?.length,
+  1,
+  'orbit target must only be committed once after the stopped pose settles',
+);
+assert.match(
+  particleBackgroundSource,
+  /const forwardCarPointerCancel = \(\) => \{[\s\S]*?renderer\.domElement\.dispatchEvent\(new PointerEvent\('pointercancel',[\s\S]*?clearCarGesture\(true\);/,
+  'abnormal gesture termination must dispatch pointercancel through the canvas before custom cleanup',
+);
+assert.match(
+  particleBackgroundSource,
+  /const handleCarLostPointerCapture =[\s\S]*?forwardCarPointerCancel\(\);[\s\S]*?const handleWindowBlur = \(\) => forwardCarPointerCancel\(\);/,
+  'lost capture and window blur must share the guarded pointercancel path',
+);
+assert.match(particleBackgroundSource, /role="button"/);
+assert.match(particleBackgroundSource, /aria-pressed=\{exploded\}/);
+assert.match(
+  particleBackgroundSource,
   /applyF1WheelAngle\(f1Wheels, wheelMotion\.angle\);/,
   'ParticleBackground must apply the wheel helper to resolved F1 wheels',
 );

@@ -306,6 +306,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     const raycaster = new THREE.Raycaster();
     const normalizedPointer = new THREE.Vector2();
     let holdTimer: ReturnType<typeof setTimeout> | null = null;
+    let isForwardingPointerCancel = false;
     let carGesture: {
       pointerId: number;
       startedAt: number;
@@ -342,7 +343,15 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         carGesture.travelPx,
         Math.hypot(event.clientX - carGesture.startX, event.clientY - carGesture.startY),
       );
-      if (carGesture.travelPx > CAR_DRAG_TOLERANCE_PX) cancelHoldTimer();
+      if (carGesture.travelPx > CAR_DRAG_TOLERANCE_PX) {
+        cancelHoldTimer();
+        if (carGesture.holdStarted) {
+          stateRef.current.carHeld = false;
+          carGesture.startedOnCar = false;
+          carGesture.holdStarted = false;
+          controls.enabled = stateRef.current.progress >= 100;
+        }
+      }
     };
 
     const raycastHitsCar = (event: PointerEvent): boolean => {
@@ -427,14 +436,35 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     };
 
     const handleCarPointerCancel = (event: PointerEvent) => {
+      if (isForwardingPointerCancel) return;
       if (carGesture?.pointerId === event.pointerId) clearCarGesture(false);
+    };
+
+    const forwardCarPointerCancel = () => {
+      if (!carGesture || isForwardingPointerCancel) return;
+      const cancelledGesture = carGesture;
+      isForwardingPointerCancel = true;
+      try {
+        renderer.domElement.dispatchEvent(new PointerEvent('pointercancel', {
+          bubbles: true,
+          cancelable: false,
+          pointerId: cancelledGesture.pointerId,
+          clientX: cancelledGesture.startX,
+          clientY: cancelledGesture.startY,
+          isPrimary: true,
+        }));
+      } finally {
+        isForwardingPointerCancel = false;
+        clearCarGesture(true);
+      }
     };
 
     const handleCarLostPointerCapture = (event: PointerEvent) => {
-      if (carGesture?.pointerId === event.pointerId) clearCarGesture(false);
+      if (isForwardingPointerCancel) return;
+      if (carGesture?.pointerId === event.pointerId) forwardCarPointerCancel();
     };
 
-    const handleWindowBlur = () => clearCarGesture(true);
+    const handleWindowBlur = () => forwardCarPointerCancel();
 
     // Capture phase lets the tap classifier run before OrbitControls releases
     // its own pointer capture on the same canvas.
@@ -785,16 +815,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       bgCamera.lookAt(0, 0, 0);
 
       if (s.progress >= 100) {
-        if (!hasSetOrbitTarget && f1CarGroup && f1AssembledLocalBounds) {
-          f1CarGroup.updateMatrixWorld(true);
-          const assembledWorldBounds = f1AssembledLocalBounds
-            .clone()
-            .applyMatrix4(f1CarGroup.matrixWorld);
-          const assembledCenter = assembledWorldBounds.getCenter(new THREE.Vector3());
-          assembledCenter.y -= assembledWorldBounds.getSize(new THREE.Vector3()).y * 0.08;
-          controls.target.copy(assembledCenter);
-          hasSetOrbitTarget = true;
-        }
         if (s.carHeld) {
           controls.enabled = false;
         } else {
@@ -898,19 +918,26 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         }
         // When progress >= 100, we just keep the final rotation values intact so it doesn't snap!
 
-        if (
-          !hasPlacedStudioFloor
-          && s.progress >= 100
-          && f1AssembledLocalBounds
+        const stoppedPoseSettled =
+          s.progress >= 100
           && Math.abs(f1CarGroup.position.z - getF1Depth(100)) < 0.05
           && Math.abs(f1CarGroup.scale.x - 12) < 0.02
-          && racingSpeed < 0.01
+          && racingSpeed < 0.01;
+        if (
+          !hasPlacedStudioFloor
+          && !hasSetOrbitTarget
+          && stoppedPoseSettled
+          && f1AssembledLocalBounds
         ) {
           f1CarGroup.updateMatrixWorld(true);
           const assembledWorldBounds = f1AssembledLocalBounds
             .clone()
             .applyMatrix4(f1CarGroup.matrixWorld);
           reflection.floor.position.y = assembledWorldBounds.min.y - 0.03;
+          const assembledCenter = assembledWorldBounds.getCenter(new THREE.Vector3());
+          assembledCenter.y -= assembledWorldBounds.getSize(new THREE.Vector3()).y * 0.08;
+          controls.target.copy(assembledCenter);
+          hasSetOrbitTarget = true;
           hasPlacedStudioFloor = true;
         }
 
@@ -1061,8 +1088,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
   return <div
     ref={containerRef}
+    role="button"
     tabIndex={progress >= 100 ? 0 : -1}
     aria-label="Interactive Formula One showroom car"
+    aria-pressed={exploded}
     onKeyDown={(event) => {
       if (progress >= 100 && (event.key === 'Enter' || event.key === ' ')) {
         event.preventDefault();
