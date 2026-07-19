@@ -28,7 +28,8 @@ export interface StudioReflectionEffect {
   dispose: () => void;
 }
 
-const STUDIO_FLOOR_COLOR = 0x30363d;
+const STUDIO_FLOOR_COLOR = 0xaeb8c4;
+const FALLBACK_FLOOR_ALPHA = 0.12;
 
 const createFloorGeometry = (): THREE.PlaneGeometry => {
   const geometry = new THREE.PlaneGeometry(90, 80);
@@ -37,8 +38,8 @@ const createFloorGeometry = (): THREE.PlaneGeometry => {
 
 const createFallbackMaterial = (): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({
   color: STUDIO_FLOOR_COLOR,
-  metalness: 0.32,
-  roughness: 0.58,
+  metalness: 0.18,
+  roughness: 0.68,
   transparent: true,
   opacity: 0,
   depthWrite: false,
@@ -68,7 +69,7 @@ const createFallbackEffect = (scene: THREE.Scene): StudioReflectionEffect => {
     setReveal: (reveal) => {
       const clampedReveal = THREE.MathUtils.clamp(reveal, 0, 1);
       floor.visible = clampedReveal > 0.001;
-      fallbackMaterial.opacity = clampedReveal;
+      fallbackMaterial.opacity = clampedReveal * FALLBACK_FLOOR_ALPHA;
     },
     render: () => undefined,
     resize: () => undefined,
@@ -132,7 +133,10 @@ const createReflectionMaterial = (
       vec3 reflection = texture2D(uReflection, projectedUv).rgb;
       float roughness = lowFrequencyNoise(vFloorUv * 14.0);
       vec3 roughFloor = uFloorColor * mix(0.86, 1.08, roughness);
-      gl_FragColor = vec4(mix(roughFloor, reflection, 0.32 * inside * uReveal), uReveal);
+      float reflectionMix = 0.46 * inside * uReveal;
+      float reflectionEnergy = max(reflection.r, max(reflection.g, reflection.b));
+      float alpha = uReveal * mix(0.10, 0.30, inside * smoothstep(0.06, 0.55, reflectionEnergy));
+      gl_FragColor = vec4(mix(roughFloor, reflection, reflectionMix), alpha);
       #include <colorspace_fragment>
     }
   `,
@@ -300,7 +304,7 @@ export const createStudioReflection = ({
   const activateFallback = (): void => {
     if (fallbackActive || disposed) return;
     floor.material = runtimeFallbackMaterial;
-    runtimeFallbackMaterial.opacity = currentReveal;
+    runtimeFallbackMaterial.opacity = currentReveal * FALLBACK_FLOOR_ALPHA;
     floor.visible = currentReveal > 0.001;
     fallbackActive = true;
     disposeReflectiveResources();
@@ -314,7 +318,7 @@ export const createStudioReflection = ({
       if (floor.material instanceof THREE.ShaderMaterial) {
         floor.material.uniforms.uReveal.value = currentReveal;
       } else {
-        floor.material.opacity = currentReveal;
+        floor.material.opacity = currentReveal * FALLBACK_FLOOR_ALPHA;
       }
     },
     render: () => {

@@ -29,6 +29,22 @@ for (const axis of ['x', 'y', 'z'] as const) {
 }
 
 const parts = createF1ExplodedParts(root);
+
+const semanticRoot = new THREE.Group();
+const mainBody = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 3));
+const rearBodyAssembly = new THREE.Group();
+rearBodyAssembly.name = 'RearBodyAssembly';
+const rearWing = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 0.4));
+const hardRockPanelGroup = new THREE.Group();
+hardRockPanelGroup.name = 'RearHardRockAeroPanel';
+const hardRockPanel = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.4));
+hardRockPanelGroup.add(hardRockPanel);
+rearBodyAssembly.add(rearWing, hardRockPanelGroup);
+semanticRoot.add(mainBody, rearBodyAssembly);
+const semanticParts = createF1ExplodedParts(semanticRoot);
+assert(semanticParts.some((part) => part.object === rearBodyAssembly));
+assert(!semanticParts.some((part) => part.object === rearWing));
+assert(!semanticParts.some((part) => part.object === hardRockPanel));
 const cachedPartResources = parts.map((part) => {
   const cachedPart = part as typeof part & {
     localCorners?: readonly THREE.Vector3[];

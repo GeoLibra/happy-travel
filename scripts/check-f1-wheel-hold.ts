@@ -118,13 +118,13 @@ assert.match(
 );
 
 const finalStoppedZ = particleBackgroundSource.indexOf(
-  'f1CarGroup.position.z = targetZ;',
+  'dampF1ArrivalValue(f1CarGroup.position.z, targetZ, delta, 8)',
 );
 const finalStoppedY = particleBackgroundSource.indexOf(
-  'f1CarGroup.position.y = s.progress >= 100 ? -10 : -10 + engineVibration;',
+  'dampF1ArrivalValue(f1CarGroup.position.y, targetY, delta, 10)',
 );
 const finalScale = particleBackgroundSource.indexOf(
-  'f1CarGroup.scale.set(targetScale, targetScale, targetScale);',
+  'dampF1ArrivalValue(f1CarGroup.scale.x, targetScale, delta, 8)',
   finalStoppedY,
 );
 const floorPlacement = particleBackgroundSource.indexOf(
@@ -152,7 +152,7 @@ const revealAdvance = particleBackgroundSource.indexOf(
   orbitTargetCommit,
 );
 const stoppedPoseGate = particleBackgroundSource.indexOf(
-  'const stoppedPoseSettled =',
+  '&& arrivalState.ready',
   orbitTargetCommit,
 );
 const orbitInteractionReadyCommit = particleBackgroundSource.indexOf(
@@ -160,11 +160,11 @@ const orbitInteractionReadyCommit = particleBackgroundSource.indexOf(
   stoppedPoseGate,
 );
 
-assert(finalStoppedZ >= 0, 'the first progress-100 frame must commit the final car depth');
-assert(finalStoppedY >= 0, 'the first stopped frame must receive its final assembled Y');
-assert(finalStoppedZ < finalStoppedY, 'final depth must be committed before the final Y/scale transform');
-assert(finalScale > finalStoppedY, 'final scale must be applied after final assembled Y');
-assert(floorPlacement > finalScale, 'floor placement must measure the first final assembled transform');
+assert(finalStoppedZ >= 0, 'the final car depth must be damped instead of snapped');
+assert(finalStoppedY >= 0, 'the final assembled Y must be damped instead of snapped');
+assert(finalStoppedZ < finalStoppedY, 'depth damping must run before final Y/scale damping');
+assert(finalScale > finalStoppedY, 'final scale damping must run after final assembled Y');
+assert(floorPlacement > finalScale, 'floor placement must wait for the settled final transform');
 assert(
   floorPlacementCommit > floorPlacement
     && orbitTargetCopy > floorPlacementCommit
@@ -175,12 +175,17 @@ assert(
 );
 assert(
   stoppedPoseGate > orbitTargetCommit && orbitInteractionReadyCommit > stoppedPoseGate,
-  'user OrbitControls enablement must remain separately gated on settled motion after target setup',
+  'user OrbitControls enablement must remain separately gated on arrival readiness after target setup',
 );
 assert.match(
   particleBackgroundSource,
-  /studioReveal = stepStudioReveal\([\s\S]*?s\.progress >= 100 && hasPlacedStudioFloor && hasSetOrbitTarget,[\s\S]*?delta,[\s\S]*?\);/,
+  /studioReveal = stepStudioReveal\([\s\S]*?arrivalState\.ready && hasPlacedStudioFloor && hasSetOrbitTarget,[\s\S]*?delta,[\s\S]*?\);/,
   'the floor reveal must not advance until final floor placement and camera target are committed',
+);
+assert.match(
+  particleBackgroundSource,
+  /stepF1ArrivalState\(arrivalState, s\.progress >= 100, stoppedPoseSettled, delta\)/,
+  'studio placement must require the shared four-frame settle and hold controller',
 );
 assert.equal(
   particleBackgroundSource.match(/reflection\.floor\.position\.y = assembledWorldBounds\.min\.y - 0\.03;/g)?.length,

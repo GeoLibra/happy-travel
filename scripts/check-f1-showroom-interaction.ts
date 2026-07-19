@@ -27,9 +27,9 @@ assert.equal(
 );
 
 let reveal = 0;
-for (let index = 0; index < 36; index += 1) reveal = stepStudioReveal(reveal, true, 1 / 60);
-assert(reveal > 0.98, 'floor must finish its 600 ms reveal');
-for (let index = 0; index < 36; index += 1) reveal = stepStudioReveal(reveal, false, 1 / 60);
+for (let index = 0; index < 42; index += 1) reveal = stepStudioReveal(reveal, true, 1 / 60);
+assert(reveal > 0.98, 'floor must finish its 700 ms reveal');
+for (let index = 0; index < 42; index += 1) reveal = stepStudioReveal(reveal, false, 1 / 60);
 assert(reveal < 0.02, 'floor must hide before the stopped state');
 
 const base = {

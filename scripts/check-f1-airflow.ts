@@ -21,7 +21,7 @@ interface ShippedGlbJson {
 }
 
 const shippedModelBytes = readFileSync(
-  new URL('../public/models/red_bull_f1_showroom.glb', import.meta.url),
+  new URL('../public/models/red_bull_f1_showroom_v2.glb', import.meta.url),
 );
 assert.equal(
   shippedModelBytes.toString('ascii', 16, 20),
@@ -94,18 +94,18 @@ const compactBounds = new THREE.Box3(
   new THREE.Vector3(2, 1.5, 5),
 );
 const paths = createF1AirflowPaths(compactBounds);
-assert.equal(paths.length, 14);
+assert.equal(paths.length, 20);
 const compactModelFrontNoseZ = compactBounds.max.z;
 const compactModelRearZ = compactBounds.min.z;
 const compactModelLength = compactBounds.max.z - compactBounds.min.z;
 for (const path of paths) {
   assert(
-    path[0].z >= compactModelFrontNoseZ - compactModelLength * 0.07,
-    'paths must begin near the shipped model positive-Z front nose',
+    path[0].z >= compactModelFrontNoseZ + compactModelLength * 0.119,
+    'paths must begin 12% ahead of the shipped model positive-Z front nose',
   );
   assertApproximatelyEqual(
     path.at(-1)!.z,
-    compactModelRearZ - compactModelLength * 0.16,
+    compactModelRearZ - compactModelLength * 0.32,
     'paths must exit behind the shipped model negative-Z rear',
   );
   for (let pointIndex = 1; pointIndex < path.length; pointIndex += 1) {
@@ -123,7 +123,7 @@ const translatedBounds = new THREE.Box3(
   new THREE.Vector3(18, 8, 6),
 );
 const translatedPaths = createF1AirflowPaths(translatedBounds);
-assert.equal(translatedPaths.length, 14);
+assert.equal(translatedPaths.length, 20);
 assertMirroredWithFloorMargin(translatedBounds, translatedPaths);
 const translatedModelFrontNoseZ = translatedBounds.max.z;
 const translatedModelRearZ = translatedBounds.min.z;
@@ -150,18 +150,18 @@ const bounded = createF1Airflow('high', {
     return new THREE.BufferGeometry();
   },
 });
-assert.equal(bounded.group.children.length, 14);
-assert.equal(capturedGeometries.length, 14);
+assert.equal(bounded.group.children.length, 20);
+assert.equal(capturedGeometries.length, 20);
 const translatedSize = translatedBounds.getSize(new THREE.Vector3());
 const translatedFloorMarginY = translatedBounds.min.y + translatedSize.y * 0.12;
 for (const captured of capturedGeometries) {
   assert(
-    captured.start.z >= translatedModelFrontNoseZ - translatedSize.z * 0.07,
-    'bounded curve must start near the supplied positive-Z front nose',
+    captured.start.z >= translatedModelFrontNoseZ + translatedSize.z * 0.119,
+    'bounded curve must start 12% ahead of the supplied positive-Z front nose',
   );
   assertApproximatelyEqual(
     captured.end.z,
-    translatedModelRearZ - translatedSize.z * 0.16,
+    translatedModelRearZ - translatedSize.z * 0.32,
     'bounded curve must end behind the supplied negative-Z rear',
   );
   assert(
@@ -181,7 +181,7 @@ for (const captured of capturedGeometries) {
 }
 
 const high = createF1Airflow('high');
-assert.equal(high.group.children.length, 14);
+assert.equal(high.group.children.length, 20);
 assert.equal(high.group.visible, false, 'airflow must start hidden');
 const materials = new Set(high.group.children.map((child: any) => child.material));
 assert.equal(materials.size, 1);
@@ -219,9 +219,9 @@ assert.equal(high.group.visible, false, 'airflow at the visibility threshold mus
 high.update({ time: 5, holdIntensity: 0.051, reducedMotion: false });
 assert.equal(high.group.visible, true, 'airflow above the visibility threshold must be visible');
 const low = createF1Airflow('low');
-assert.equal(low.group.children.length, 8);
+assert.equal(low.group.children.length, 10);
 const mid = createF1Airflow('mid');
-assert.equal(mid.group.children.length, 11);
+assert.equal(mid.group.children.length, 16);
 
 assert.equal(
   advanceF1AirflowTime(1, 30),
@@ -304,8 +304,8 @@ const lowBounded = createF1Airflow('low', {
     return new THREE.BufferGeometry();
   },
 });
-assert.equal(lowBounded.group.children.length, 8);
-assert.equal(lowTierRadii.length, 8);
+assert.equal(lowBounded.group.children.length, 10);
+assert.equal(lowTierRadii.length, 10);
 for (const radius of lowTierRadii) {
   assertApproximatelyEqual(
     radius,

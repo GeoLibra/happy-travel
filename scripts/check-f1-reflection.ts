@@ -18,8 +18,11 @@ const assertVisibleCharcoal = (color: THREE.Color, label: string): void => {
 
 assert.match(source, /export interface StudioReflectionEffect/);
 assert.match(source, /export const createStudioReflection/);
-assert.match(source, /const STUDIO_FLOOR_COLOR = 0x30363d/);
-assert.match(source, /0\.32 \* inside \* uReveal/);
+assert.match(source, /const STUDIO_FLOOR_COLOR = 0xaeb8c4/);
+assert.match(source, /0\.46 \* inside \* uReveal/);
+assert.match(source, /opacity:\s*0/);
+assert.match(source, /roughness:\s*0\.68/);
+assert.match(source, /const FALLBACK_FLOOR_ALPHA = 0\.12/);
 assert.match(source, /#include <colorspace_fragment>/);
 assert.match(source, /new THREE\.PlaneGeometry\(90, 80\)/);
 assert.match(source, /Math\.ceil\(width \* 0\.5\)/);
@@ -73,7 +76,7 @@ assert.equal(
 );
 fallback.setReveal(0.5);
 assert.equal(fallback.floor.visible, true);
-assert.equal((fallback.floor.material as THREE.MeshStandardMaterial).opacity, 0.5);
+assert.equal((fallback.floor.material as THREE.MeshStandardMaterial).opacity, 0.06);
 fallback.setReveal(0);
 assert.equal(fallback.floor.visible, false);
 assert.match(source, /uReveal/);
@@ -240,7 +243,7 @@ assert.doesNotThrow(() => renderFailure.render());
 assert(renderFailure.floor.material instanceof THREE.MeshStandardMaterial);
 assert.equal(renderFailure.floor.geometry, renderFailureGeometry);
 assert.equal(renderFailure.floor.visible, true);
-assert.equal(renderFailure.floor.material.opacity, 0.5);
+assert.equal(renderFailure.floor.material.opacity, 0.06);
 assert.equal(renderFailureCamera.visible, true);
 assert.equal(targetTransitions.at(-1), null);
 assert.equal(renderTargetDisposals, 2);

@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
 export const F1_WHEEL_NODE_NAMES = [
-  'Wheel_FL',
-  'Wheel_FR',
-  'Wheel_RL',
-  'Wheel_RR',
+  'WheelSpin_FL',
+  'WheelSpin_FR',
+  'WheelSpin_RL',
+  'WheelSpin_RR',
 ] as const;
 
 export const resolveF1WheelNodes = (
@@ -96,6 +96,22 @@ export const getF1LocalBounds = (root: THREE.Object3D): THREE.Box3 => {
   return bounds;
 };
 
+const getObjectLocalBounds = (root: THREE.Object3D): THREE.Box3 => {
+  root.updateMatrixWorld(true);
+  const bounds = new THREE.Box3();
+  const rootWorldInverse = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    object.geometry.computeBoundingBox();
+    if (!object.geometry.boundingBox) return;
+    const meshToRoot = new THREE.Matrix4().copy(rootWorldInverse).multiply(object.matrixWorld);
+    for (const corner of createBoxCorners(object.geometry.boundingBox)) {
+      bounds.expandByPoint(corner.applyMatrix4(meshToRoot));
+    }
+  });
+  return bounds;
+};
+
 /**
  * Captures the model's assembled pose and calculates a stable, parent-local
  * exploded pose for every independently movable mesh node.
@@ -107,17 +123,23 @@ export const createF1ExplodedParts = (root: THREE.Object3D): F1ExplodedPart[] =>
   const rootCenterWorld = rootBox.getCenter(new THREE.Vector3());
   const candidates: THREE.Object3D[] = [];
 
-  root.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    // GLB mesh nodes are the actual independently rendered car parts. Keeping
-    // wrapper transforms untouched also preserves wheel-group animation.
-    candidates.push(object);
-  });
+  const collectCandidates = (object: THREE.Object3D): void => {
+    if (object !== root && object.name === 'RearBodyAssembly') {
+      candidates.push(object);
+      return;
+    }
+    if (object instanceof THREE.Mesh) {
+      candidates.push(object);
+      return;
+    }
+    for (const child of object.children) collectCandidates(child);
+  };
+  collectCandidates(root);
 
   return candidates.map((object, index) => {
-    const mesh = object as THREE.Mesh;
-    mesh.geometry.computeBoundingBox();
-    const localBounds = mesh.geometry.boundingBox?.clone() ?? new THREE.Box3();
+    // Semantic assemblies (notably the rear wing + Hard Rock panel) move as
+    // one exploded-view part; ordinary mesh nodes remain independently movable.
+    const localBounds = getObjectLocalBounds(object);
     const localCorners = createBoxCorners(localBounds);
     const partCenterWorld = new THREE.Box3()
       .setFromObject(object)

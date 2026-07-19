@@ -4,7 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 
 const assets = {
   sourceModel: 'public/models/red_bull_f1_rigged.glb',
-  model: 'public/models/red_bull_f1_showroom.glb',
+  model: 'public/models/red_bull_f1_showroom_v2.glb',
   studio: 'public/environments/ferndale_studio_09_1k.hdr',
   night: 'public/environments/rooftop_night_1k.hdr',
 };
@@ -20,7 +20,7 @@ const sha1 = async (path) => createHash('sha1')
   .update(await readFile(path))
   .digest('hex');
 
-const WHEEL_NODES = ['Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR'];
+const PIVOT_NODES = ['WheelPivot_FL', 'WheelPivot_FR', 'WheelPivot_RL', 'WheelPivot_RR'];
 
 const normalizedLocalTransform = (node) => {
   if (node.matrix) return node.matrix;
@@ -72,20 +72,12 @@ const assertSameTransform = (name, sourceNode, optimizedNode) => {
 };
 
 const assertWheelPivotContract = (source, optimized) => {
-  const sourceParents = parentNames(source);
-  const optimizedParents = parentNames(optimized);
-
-  for (const name of WHEEL_NODES) {
+  for (const name of PIVOT_NODES) {
     const sourceIndex = source.nodes.findIndex((node) => node.name === name);
     const optimizedIndex = optimized.nodes.findIndex((node) => node.name === name);
     assert.notEqual(sourceIndex, -1, `Source is missing required node: ${name}`);
     assert.notEqual(optimizedIndex, -1, `Missing required node: ${name}`);
     assertSameTransform(name, source.nodes[sourceIndex], optimized.nodes[optimizedIndex]);
-    assert.deepEqual(
-      optimizedParents.get(optimizedIndex),
-      sourceParents.get(sourceIndex),
-      `${name} parent relationship changed`,
-    );
   }
 };
 
@@ -97,7 +89,7 @@ const gltf = await parseGlbJson(assets.model);
 const airflowCheckSource = await readFile('scripts/check-f1-airflow.ts', 'utf8');
 assert.match(
   airflowCheckSource,
-  /public\/models\/red_bull_f1_showroom\.glb/,
+  /public\/models\/red_bull_f1_showroom_v2\.glb/,
   'the airflow check must read the real shipped showroom GLB',
 );
 for (const pivotName of ['WheelPivot_FL', 'WheelPivot_FR', 'WheelPivot_RL', 'WheelPivot_RR']) {
@@ -108,27 +100,28 @@ for (const pivotName of ['WheelPivot_FL', 'WheelPivot_FR', 'WheelPivot_RL', 'Whe
   );
 }
 const names = new Set(gltf.nodes.map((node) => node.name));
-for (const name of ['F1_Car', 'Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR']) {
+for (const name of [
+  'F1_Car',
+  'WheelSpin_FL',
+  'WheelSpin_FR',
+  'WheelSpin_RL',
+  'WheelSpin_RR',
+  'WheelStatic_FL',
+  'WheelStatic_FR',
+  'WheelStatic_RL',
+  'WheelStatic_RR',
+  'RearBodyAssembly',
+  'RearHardRockAeroPanel',
+]) {
   assert.ok(names.has(name), `Missing required node: ${name}`);
 }
 
 const mutatedTransform = structuredClone(sourceGltf);
-mutatedTransform.nodes.find((node) => node.name === 'Wheel_FL').translation = [0.01, 0, 0];
+mutatedTransform.nodes.find((node) => node.name === 'WheelPivot_FL').translation = [0.01, 0, 0];
 assert.throws(
   () => assertWheelPivotContract(sourceGltf, mutatedTransform),
-  /Wheel_FL local transform changed/,
+  /WheelPivot_FL local transform changed/,
 );
-
-const mutatedParent = structuredClone(sourceGltf);
-const wheelFlIndex = mutatedParent.nodes.findIndex((node) => node.name === 'Wheel_FL');
-const oldParent = mutatedParent.nodes.find((node) => node.children?.includes(wheelFlIndex));
-oldParent.children = oldParent.children.filter((child) => child !== wheelFlIndex);
-mutatedParent.nodes.find((node) => node.name === 'WheelPivot_FR').children.push(wheelFlIndex);
-assert.throws(
-  () => assertWheelPivotContract(sourceGltf, mutatedParent),
-  /Wheel_FL parent relationship changed/,
-);
-
 assertWheelPivotContract(sourceGltf, gltf);
 
 assert.equal(await sha1(assets.studio), '300723e57b930413fa3e493033033713f911dd18');

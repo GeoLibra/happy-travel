@@ -1,4 +1,4 @@
-export const STUDIO_REVEAL_MS = 600;
+export const STUDIO_REVEAL_MS = 700;
 export const CAR_HOLD_DELAY_MS = 260;
 export const CAR_DRAG_TOLERANCE_PX = 8;
 
