@@ -8,6 +8,11 @@ const REQUIRED_HARD_ROCK_COVERS = [
   'FrontHardRockWheelCover_FL',
   'FrontHardRockWheelCover_FR',
 ];
+const REQUIRED_HARD_ROCK_INNER_SHROUDS = [
+  'FrontHardRockInnerShroud_FL',
+  'FrontHardRockInnerShroud_FR',
+];
+const requireInnerShrouds = process.argv.includes('--require-inner-shrouds');
 
 const readGlbJson = (filePath) => {
   const bytes = readFileSync(filePath);
@@ -59,6 +64,7 @@ const verify = (filePath) => {
     'RearBodyAssembly',
     'RearHardRockAeroPanel',
     ...REQUIRED_HARD_ROCK_COVERS,
+    ...(requireInnerShrouds ? REQUIRED_HARD_ROCK_INNER_SHROUDS : []),
   ]) {
     assert.ok(indexByName.has(name), `Missing required node: ${name}`);
   }
@@ -106,12 +112,31 @@ const verify = (filePath) => {
     }
   }
 
-  console.log('PASS: semantic F1 wheel and Hard Rock cover hierarchy');
+  if (requireInnerShrouds) {
+    for (const shroudName of REQUIRED_HARD_ROCK_INNER_SHROUDS) {
+      const shroudIndex = indexByName.get(shroudName);
+      assert.ok(
+        isDescendant(shroudIndex, rearPanelIndex),
+        `${shroudName} must move with the Hard Rock body panel assembly`,
+      );
+      for (const spinName of REQUIRED_SPINS) {
+        assert.equal(
+          isDescendant(shroudIndex, indexByName.get(spinName)),
+          false,
+          `${shroudName} must stay fixed while ${spinName} rotates`,
+        );
+      }
+    }
+  }
+
+  console.log('PASS: semantic F1 wheel and Hard Rock aero hierarchy');
 };
 
 const filePath = process.argv[2];
 if (!filePath) {
-  console.error('Usage: node scripts/verify-f1-showroom-v2.mjs <model.glb>');
+  console.error(
+    'Usage: node scripts/verify-f1-showroom-v2.mjs <model.glb> [--require-inner-shrouds]',
+  );
   process.exit(2);
 }
 

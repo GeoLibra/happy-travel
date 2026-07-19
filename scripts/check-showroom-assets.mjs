@@ -4,7 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 
 const assets = {
   sourceModel: 'public/models/red_bull_f1_rigged.glb',
-  model: 'public/models/red_bull_f1_showroom_v3.glb',
+  model: 'public/models/red_bull_f1_showroom_v4.glb',
   studio: 'public/environments/ferndale_studio_09_1k.hdr',
   night: 'public/environments/rooftop_night_1k.hdr',
 };
@@ -87,10 +87,22 @@ assert.ok(modelStat.size <= 15 * 1024 * 1024, `Showroom GLB is ${modelStat.size}
 const sourceGltf = await parseGlbJson(assets.sourceModel);
 const gltf = await parseGlbJson(assets.model);
 const airflowCheckSource = await readFile('scripts/check-f1-airflow.ts', 'utf8');
+const welcomeSource = await readFile('src/components/WelcomePage.tsx', 'utf8');
+const showroomAssetsSource = await readFile('src/components/showroom/showroom-assets.ts', 'utf8');
 assert.match(
   airflowCheckSource,
-  /public\/models\/red_bull_f1_showroom_v3\.glb/,
+  /public\/models\/red_bull_f1_showroom_v4\.glb/,
   'the airflow check must read the real shipped showroom GLB',
+);
+assert.match(
+  welcomeSource,
+  /\/models\/red_bull_f1_showroom_v4\.glb\?v=hard-rock-inner-shrouds-1/,
+  'the welcome scene must load the versioned v4 showroom GLB',
+);
+assert.match(
+  showroomAssetsSource,
+  /\/models\/red_bull_f1_showroom_v4\.glb/,
+  'the showroom asset registry must expose the v4 showroom GLB',
 );
 for (const pivotName of ['WheelPivot_FL', 'WheelPivot_FR', 'WheelPivot_RL', 'WheelPivot_RR']) {
   assert.match(
@@ -114,6 +126,8 @@ for (const name of [
   'RearHardRockAeroPanel',
   'FrontHardRockWheelCover_FL',
   'FrontHardRockWheelCover_FR',
+  'FrontHardRockInnerShroud_FL',
+  'FrontHardRockInnerShroud_FR',
 ]) {
   assert.ok(names.has(name), `Missing required node: ${name}`);
 }

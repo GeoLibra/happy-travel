@@ -18,6 +18,7 @@
     "check:showroom-assets": "node scripts/check-showroom-assets.mjs",
     "check:f1-showroom-v2": "node scripts/verify-f1-showroom-v2.mjs public/models/red_bull_f1_showroom_v3.glb",
     "check:f1-showroom-v3": "node scripts/verify-f1-showroom-v2.mjs public/models/red_bull_f1_showroom_v3.glb",
+    "check:f1-showroom-v4": "node scripts/verify-f1-showroom-v2.mjs public/models/red_bull_f1_showroom_v4.glb --require-inner-shrouds",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
