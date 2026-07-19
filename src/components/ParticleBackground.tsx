@@ -28,6 +28,9 @@ import {
 import { advanceF1AirflowTime, createF1Airflow } from './effects/f1Airflow';
 import { createF1StudioLighting } from './effects/f1StudioLighting';
 import { createStudioReflection } from './effects/studioReflection';
+import { CPU_PARTICLE_COUNT, SPEED_LINE_COUNT, TOTAL_LINES } from './showroom/showroom-constants';
+import { createCpuParticleField, createSpeedLineField, createTrailField } from './showroom/showroom-particles';
+import { createShowroomTrack } from './showroom/showroom-track';
 
 interface ParticleBackgroundProps {
   isPressing: boolean;
@@ -38,16 +41,6 @@ interface ParticleBackgroundProps {
   onCarManualInteraction?: () => void;
   exploded?: boolean;
 }
-
-const COLORS = {
-  red: new THREE.Color('#E10600'),
-  yellow: new THREE.Color('#FFB800'),
-  white: new THREE.Color('#ffffff'),
-  navy: new THREE.Color('#001A30'),
-};
-
-const SPEED_LINE_COUNT = 100;
-const CPU_PARTICLE_COUNT = 1000;
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
   isPressing,
@@ -176,73 +169,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     let audioConnected = false;
 
     // ── CPU Fallback Floating Particles ──
-    let cpuParticles: THREE.Points | null = null;
-    let particlePhases: Float32Array | null = null;
-
+    let cpuParticleField: ReturnType<typeof createCpuParticleField> | null = null;
     if (!useGPU) {
-
-      const pGeometry = new THREE.BufferGeometry();
-      const pPositions = new Float32Array(CPU_PARTICLE_COUNT * 3);
-      const pColors = new Float32Array(CPU_PARTICLE_COUNT * 3);
-      const pSizes = new Float32Array(CPU_PARTICLE_COUNT);
-      particlePhases = new Float32Array(CPU_PARTICLE_COUNT);
-
-      const colorOptions = [COLORS.red, COLORS.yellow, COLORS.white, COLORS.white];
-
-      for (let i = 0; i < CPU_PARTICLE_COUNT; i++) {
-        const i3 = i * 3;
-        pPositions[i3] = (Math.random() - 0.5) * 200;
-        pPositions[i3 + 1] = (Math.random() - 0.5) * 150;
-        pPositions[i3 + 2] = (Math.random() - 0.5) * 160;
-
-        const c = colorOptions[Math.floor(Math.random() * colorOptions.length)];
-        pColors[i3] = c.r; pColors[i3 + 1] = c.g; pColors[i3 + 2] = c.b;
-
-        pSizes[i] = Math.random() * 2.5 + 0.5;
-        particlePhases[i] = Math.random() * Math.PI * 2;
-      }
-
-      pGeometry.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
-      pGeometry.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
-      pGeometry.setAttribute('size', new THREE.BufferAttribute(pSizes, 1));
-
-      const pMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-          uTime: { value: 0 },
-          uPixelRatio: { value: pixelRatio },
-        },
-        vertexShader: `
-          attribute float size;
-          attribute vec3 color;
-          uniform float uTime;
-          uniform float uPixelRatio;
-          varying vec3 vColor;
-          varying float vAlpha;
-          void main() {
-            vColor = color;
-            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-            float dist = length(mvPosition.xyz);
-          vAlpha = smoothstep(80.0, 20.0, dist) * 0.8;
-            gl_PointSize = size * uPixelRatio * (50.0 / -mvPosition.z);
-            gl_Position = projectionMatrix * mvPosition;
-          }
-        `,
-        fragmentShader: `
-          varying vec3 vColor;
-          varying float vAlpha;
-          void main() {
-            float d = length(gl_PointCoord - vec2(0.5));
-            if (d > 0.5) discard;
-            gl_FragColor = vec4(vColor, vec3(pow(1.0 - smoothstep(0.0, 0.5, d), 1.5)) * vAlpha);
-          }
-        `,
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      });
-
-      cpuParticles = new THREE.Points(pGeometry, pMaterial);
-      bgScene.add(cpuParticles);
+      cpuParticleField = createCpuParticleField(pixelRatio);
+      bgScene.add(cpuParticleField.points);
     }
 
     // ── 3D Lighting for F1 Model ──
@@ -558,226 +488,18 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     window.addEventListener('blur', handleWindowBlur);
 
     // ── High-Fidelity Speed Trails (Shader Lines) ──
-    const TRAIL_COUNT = 15;
-    const trailSegments = 20;
-    const trailGeometry = new THREE.BufferGeometry();
-    const trailPosAttrib = new Float32Array(TRAIL_COUNT * trailSegments * 3);
-    const trailColorAttrib = new Float32Array(TRAIL_COUNT * trailSegments * 3);
-    const trailAlphaAttrib = new Float32Array(TRAIL_COUNT * trailSegments);
-
-    for(let i=0; i<TRAIL_COUNT; i++) {
-        const color = Math.random() < 0.4 ? COLORS.red : Math.random() < 0.7 ? COLORS.yellow : COLORS.white;
-        for(let j=0; j<trailSegments; j++) {
-            const idx = (i * trailSegments + j);
-            trailColorAttrib[idx * 3] = color.r;
-            trailColorAttrib[idx * 3 + 1] = color.g;
-            trailColorAttrib[idx * 3 + 2] = color.b;
-            trailAlphaAttrib[idx] = 1.0 - (j / trailSegments);
-        }
-    }
-
-    trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPosAttrib, 3));
-    trailGeometry.setAttribute('color', new THREE.BufferAttribute(trailColorAttrib, 3));
-    trailGeometry.setAttribute('alpha', new THREE.BufferAttribute(trailAlphaAttrib, 1));
-
-    const trailMaterial = new THREE.ShaderMaterial({
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      vertexShader: `
-        attribute vec3 color;
-        attribute float alpha;
-        varying float vAlpha;
-        varying vec3 vColor;
-        void main() {
-          vAlpha = alpha;
-          vColor = color;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        varying float vAlpha;
-        varying vec3 vColor;
-        void main() {
-          gl_FragColor = vec4(vColor, vAlpha * 0.6);
-        }
-      `
-    });
+    const trailField = createTrailField();
 
     // ── Cyberpunk Speed Hairlines (Fine Ground Lines & Sides) ──
-    const HAIRLINE_COUNT = 3000; // Extremely dense to form a solid road
-    const SIDE_LINE_COUNT = 400; // Vertical lines on the edges
-    const TOTAL_LINES = HAIRLINE_COUNT + SIDE_LINE_COUNT;
-
-    // Base geometry: simple thin plane. We will scale it in instanceMatrix.
-    const hairGeo = new THREE.PlaneGeometry(1, 1);
-    // Move pivot to front edge so they scale from camera outwards nicely
-    hairGeo.translate(0, 0, -0.5);
-
-    const hairMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.9,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide
-    });
-
-    const hairMesh = new THREE.InstancedMesh(hairGeo, hairMat, TOTAL_LINES);
-
-    // The road needs to stay locked to the car's bottom, no matter the progress
-    hairMesh.position.y = -10.05;
-
-    const hairData: { x: number, y: number, z: number, speedMultiplier: number, length: number, width: number, isVertical: boolean }[] = [];
-    const dummyHair = new THREE.Object3D();
-
-    for (let i = 0; i < TOTAL_LINES; i++) {
-        const isVertical = i >= HAIRLINE_COUNT;
-
-        let x, y, z;
-        let c: THREE.Color;
-        const rng = Math.random();
-
-        if (!isVertical) {
-            // -- GROUND LINES --
-            // Spread X: concentrated in the center, tapering out. Range ~[-35, 35]
-            const xDist = (Math.pow(Math.random(), 3.0) * 45);
-            x = Math.random() < 0.5 ? xDist : -xDist;
-            y = 0; // Flat on the road
-
-            // Strict color matching based on the reference image
-            if (Math.abs(x) < 4) {
-                 // Center track: Bright exhaust lines. Mostly fine white, some bright blue/purple hues
-                 c = rng > 0.95 ? new THREE.Color('#d4e4ff') : COLORS.white;
-            } else if (x < -2) {
-                // Left side: Icy cyan blue to deep blue
-                c = new THREE.Color().lerpColors(new THREE.Color('#00ccff'), new THREE.Color('#0033cc'), Math.abs(x)/45);
-            } else if (x > 2) {
-                // Right side: Bright magenta to deep purple
-                c = new THREE.Color().lerpColors(new THREE.Color('#e040fb'), new THREE.Color('#651fff'), Math.abs(x)/45);
-            } else {
-                 c = COLORS.white;
-            }
-        } else {
-            // -- SIDE WALL LINES --
-            // Like a U-shaped half-pipe. They run parallel to the road (pointing down Z),
-            // but their positions curve up the side walls.
-            const wallCurveX = 30 + Math.random() * 25; // How far out they are (X)
-            x = Math.random() < 0.5 ? wallCurveX : -wallCurveX;
-            // Curve up into the sky. The further out (X), the higher (Y)
-            const curveFactor = Math.abs(x) - 30; // 0 to 25
-            y = Math.pow(Math.random(), 2.0) * (curveFactor * 8);
-
-            if (x < 0) {
-                 // Left wall: deep blue
-                 c = new THREE.Color().lerpColors(new THREE.Color('#0055ff'), new THREE.Color('#001155'), y/200);
-            } else {
-                 // Right wall: deep purple
-                 c = new THREE.Color().lerpColors(new THREE.Color('#9900ff'), new THREE.Color('#220044'), y/200);
-            }
-        }
-
-        z = (Math.random() - 0.5) * 800; // Deep back to right behind camera
-
-        // Variance
-        // Very long lines to create continuous feel without gaps
-        const length = 100 + Math.random() * 300;
-
-        // Fine hairlines: mostly very thin, rarely thick
-        let width;
-        if (!isVertical && Math.abs(x) < 3 && rng > 0.98) {
-             width = 1.0 + Math.random() * 1.5; // Rare thick center glowing lines
-        } else {
-             width = 0.05 + Math.random() * 0.4;
-        }
-
-        const speedMultiplier = 0.5 + Math.random() * 0.8;
-
-        // Apply
-        dummyHair.position.set(x, y, z);
-
-        // ALL lines point straight forward along the Z axis (parallel to the ground)!
-        dummyHair.rotation.set(-Math.PI / 2, 0, 0);
-
-        // If it's a wall line, we tilt its face towards the camera (rotating around its roll axis, which is now World Z)
-        if (isVertical) {
-             const faceAngle = Math.atan2(y + 10, Math.abs(x));
-             dummyHair.rotateY(x < 0 ? -faceAngle : faceAngle);
-        }
-
-        dummyHair.scale.set(width, length, 1);
-        dummyHair.updateMatrix();
-        hairMesh.setMatrixAt(i, dummyHair.matrix);
-        hairMesh.setColorAt(i, c);
-
-        hairData.push({ x, y, z, speedMultiplier, length, width, isVertical });
-    }
-    hairMesh.instanceMatrix.needsUpdate = true;
-    if (hairMesh.instanceColor) hairMesh.instanceColor.needsUpdate = true;
-
+    const showroomTrack = createShowroomTrack();
+    const { mesh: hairMesh, data: hairData, scratch: dummyHair, material: hairMat } = showroomTrack;
     bgScene.add(hairMesh);
 
     // ── Speed Lines (CPU-driven, low cost) ──
-    const lineGeometry = new THREE.BufferGeometry();
-    const lPositions = new Float32Array(SPEED_LINE_COUNT * 3);
-    const lSpeeds = new Float32Array(SPEED_LINE_COUNT);
-    const lColors = new Float32Array(SPEED_LINE_COUNT * 3);
-    const lSizes = new Float32Array(SPEED_LINE_COUNT);
-
-    for (let i = 0; i < SPEED_LINE_COUNT; i++) {
-      const i3 = i * 3;
-      lPositions[i3] = (Math.random() - 0.5) * 100;
-      lPositions[i3 + 1] = (Math.random() - 0.5) * 60;
-      lPositions[i3 + 2] = Math.random() * -100;
-      lSpeeds[i] = Math.random() * 0.8 + 0.3;
-
-      const color = Math.random() < 0.3 ? COLORS.red : Math.random() < 0.5 ? COLORS.yellow : COLORS.white;
-      lColors[i3] = color.r; lColors[i3 + 1] = color.g; lColors[i3 + 2] = color.b;
-
-      lSizes[i] = Math.random() * 3 + 1;
-    }
-
-    lineGeometry.setAttribute('position', new THREE.BufferAttribute(lPositions, 3));
-    lineGeometry.setAttribute('color', new THREE.BufferAttribute(lColors, 3));
-    lineGeometry.setAttribute('size', new THREE.BufferAttribute(lSizes, 1));
-
-    const lineMaterial = new THREE.ShaderMaterial({
-      uniforms: { uPixelRatio: { value: pixelRatio }, uOpacity: { value: 1.0 } },
-      vertexShader: `
-        attribute float size;
-        attribute vec3 color;
-        uniform float uPixelRatio;
-        varying vec3 vColor;
-        varying float vAlpha;
-        void main() {
-          vColor = color;
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          float depth = -mvPosition.z;
-          vAlpha = smoothstep(100.0, 10.0, depth) * 0.7;
-          gl_PointSize = size * uPixelRatio * (80.0 / depth);
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        varying vec3 vColor;
-        varying float vAlpha;
-        uniform float uOpacity;
-        void main() {
-          vec2 uv = gl_PointCoord - vec2(0.5);
-          float d = length(vec2(uv.x * 0.3, uv.y));
-          if (d > 0.5) discard;
-          gl_FragColor = vec4(vColor, vec3(pow(1.0 - smoothstep(0.0, 0.5, d), 2.0)) * vAlpha * uOpacity);
-        }
-      `,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-
-    const speedLines = new THREE.Points(lineGeometry, lineMaterial);
-    speedLines.visible = false; // Hidden initially
+    const speedLineField = createSpeedLineField();
+    const { points: speedLines, geometry: lineGeometry, positions: lPositions, speeds: lSpeeds, material: lineMaterial } = speedLineField;
+    lineMaterial.uniforms.uPixelRatio.value = pixelRatio;
     bgScene.add(speedLines);
-
 
     // ── Animation Loop ──
     const timer = new THREE.Timer();
@@ -903,7 +625,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
 
       // ── Update Particles ──
       // Original CPU fallback loop restored for floating particles
-      if (cpuParticles && particlePhases) {
+      if (cpuParticleField) {
+        const { points: cpuParticles, phases: particlePhases } = cpuParticleField;
         const pArr = cpuParticles.geometry.attributes.position.array as Float32Array;
 
         for (let i = 0; i < CPU_PARTICLE_COUNT; i++) {
@@ -1063,51 +786,39 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       }
 
       // ── Update Hairline Road & Speed Lines Fading ──
-
       // The environment fades with the same damped speed as the wheels, so
       // completion settles instead of snapping at 100%.
       const trackOpacity = Math.min(1, racingSpeed * 1.2);
-
       // We no longer toggle visibility, we use smooth opacity so they fade out naturally
       // Update shader uniforms for hairMat
-        
-        
-        hairMat.opacity = trackOpacity * 0.18;
+      hairMat.opacity = trackOpacity * 0.18;
       lineMaterial.uniforms.uOpacity.value = trackOpacity * 0.55;
-
       // Accelerate rapidly if pressing OR if progress is auto-completing (s.progress >= 30)
       const isTunnelMovingInward = racingSpeed > 0.001;
       const roadSpeed = 18 + Math.pow(racingSpeed, 1.35) * 1100;
-
       // Only update positions if they are actually visible (optimization)
       if (trackOpacity > 0) {
         for (let i = 0; i < TOTAL_LINES; i++) {
             const data = hairData[i];
-
             if (isTunnelMovingInward) {
                 // Rush the road toward the viewer while the car stays framed.
                 data.z += roadSpeed * data.speedMultiplier * delta;
-
                 if (data.z > 150) {
                     data.z = -600 - Math.random() * 200;
                 }
             } else {
                 // Default: Normal chill driving forward, lines come AT you slowly
                 data.z += 18 * data.speedMultiplier * delta;
-
                 if (data.z > 150) {
                     data.z = -600 - Math.random() * 200; // spawn far back
                 }
             }
-
             dummyHair.position.set(data.x, data.y, data.z);
-
             dummyHair.rotation.set(-Math.PI / 2, 0, 0);
             if (data.isVertical) {
                const faceAngle = Math.atan2(data.y + 10, Math.abs(data.x));
                dummyHair.rotateY(data.x < 0 ? -faceAngle : faceAngle);
             }
-
             dummyHair.scale.set(data.width, data.length, 1);
             dummyHair.updateMatrix();
             hairMesh.setMatrixAt(i, dummyHair.matrix);
@@ -1175,16 +886,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       // godRays.dispose();
       // audioVisualizer.dispose();
 
-      hairGeo.dispose();
-      hairMat.dispose();
-      lineGeometry.dispose();
-      lineMaterial.dispose();
-      trailGeometry.dispose();
-      trailMaterial.dispose();
-      if (cpuParticles) {
-        cpuParticles.geometry.dispose();
-        (cpuParticles.material as THREE.Material).dispose();
-      }
+      showroomTrack.dispose();
+      speedLineField.dispose();
+      trailField.dispose();
+      cpuParticleField?.dispose();
 
       if (airflow) {
         airflow.group.removeFromParent();
