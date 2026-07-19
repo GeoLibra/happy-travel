@@ -225,7 +225,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         f1CarGroup = modelRef.current;
         f1Wheels = resolveF1WheelNodes(f1CarGroup);
         f1ExplodedParts = createF1ExplodedParts(f1CarGroup);
-        f1CarGroup.scale.set(8, 8, 8);
+        const initialScale = window.innerWidth < 640 ? 6 : 8;
+        f1CarGroup.scale.setScalar(initialScale);
         f1CarGroup.rotation.y = 0; // Face the camera directly
         f1CarGroup.position.set(0, -10, getF1Depth(0));
         f1CarGroup.visible = false;
@@ -691,8 +692,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         const targetY = s.progress >= 100 ? -10 : -10 + engineVibration;
         f1CarGroup.position.y = dampF1ArrivalValue(f1CarGroup.position.y, targetY, delta, 10);
 
-        // Scale: Grow to a balanced size
-        const targetScale = 8 + (progressFactor * 4); // Final scale 12
+        // Keep the physically wider native RB20 inside narrow viewports while
+        // preserving the established desktop framing.
+        const finalScale = window.innerWidth < 640 ? 9 : 12;
+        const targetScale = finalScale * (2 / 3 + progressFactor / 3);
         const settledScale = dampF1ArrivalValue(f1CarGroup.scale.x, targetScale, delta, 8);
         f1CarGroup.scale.setScalar(settledScale);
 
@@ -728,7 +731,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
           s.progress >= 100
           && Math.abs(f1CarGroup.position.z - getF1Depth(100)) < 0.05
           && Math.abs(f1CarGroup.position.y + 10) < 0.015
-          && Math.abs(f1CarGroup.scale.x - 12) < 0.02
+          && Math.abs(f1CarGroup.scale.x - finalScale) < 0.02
           && racingSpeed < 0.01;
         stepF1ArrivalState(arrivalState, s.progress >= 100, stoppedPoseSettled, delta);
 

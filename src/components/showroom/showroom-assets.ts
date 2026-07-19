@@ -1,5 +1,5 @@
 export const SHOWROOM_ASSETS = {
-  car: '/models/red_bull_f1_showroom_v4.glb',
+  car: '/models/2024_redbull_rb20_showroom_v5.glb',
   studioHdr: '/environments/ferndale_studio_09_1k.hdr',
   nightHdr: '/environments/rooftop_night_1k.hdr',
 } as const;

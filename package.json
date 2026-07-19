@@ -21,6 +21,7 @@
     "check:f1-showroom-v2": "node scripts/verify-f1-showroom-v2.mjs public/models/red_bull_f1_showroom_v3.glb",
     "check:f1-showroom-v3": "node scripts/verify-f1-showroom-v2.mjs public/models/red_bull_f1_showroom_v3.glb",
     "check:f1-showroom-v4": "node scripts/verify-f1-showroom-v2.mjs public/models/red_bull_f1_showroom_v4.glb --require-inner-shrouds",
+    "check:f1-showroom-v5": "node scripts/verify-rb20-showroom-v5.mjs public/models/2024_redbull_rb20_showroom_v5.glb",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

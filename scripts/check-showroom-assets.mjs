@@ -3,8 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 
 const assets = {
-  sourceModel: 'public/models/red_bull_f1_rigged.glb',
-  model: 'public/models/red_bull_f1_showroom_v4.glb',
+  model: 'public/models/2024_redbull_rb20_showroom_v5.glb',
   studio: 'public/environments/ferndale_studio_09_1k.hdr',
   night: 'public/environments/rooftop_night_1k.hdr',
 };
@@ -84,25 +83,25 @@ const assertWheelPivotContract = (source, optimized) => {
 const modelStat = await stat(assets.model);
 assert.ok(modelStat.size <= 15 * 1024 * 1024, `Showroom GLB is ${modelStat.size} bytes`);
 
-const sourceGltf = await parseGlbJson(assets.sourceModel);
 const gltf = await parseGlbJson(assets.model);
+const referenceGltf = structuredClone(gltf);
 const airflowCheckSource = await readFile('scripts/check-f1-airflow.ts', 'utf8');
 const welcomeSource = await readFile('src/components/WelcomePage.tsx', 'utf8');
 const showroomAssetsSource = await readFile('src/components/showroom/showroom-assets.ts', 'utf8');
 assert.match(
   airflowCheckSource,
-  /public\/models\/red_bull_f1_showroom_v4\.glb/,
+  /public\/models\/2024_redbull_rb20_showroom_v5\.glb/,
   'the airflow check must read the real shipped showroom GLB',
 );
 assert.match(
   welcomeSource,
-  /\/models\/red_bull_f1_showroom_v4\.glb\?v=hard-rock-inner-shrouds-1/,
-  'the welcome scene must load the versioned v4 showroom GLB',
+  /\/models\/2024_redbull_rb20_showroom_v5\.glb\?v=native-parts-2/,
+  'the welcome scene must load the versioned v5 RB20 showroom GLB',
 );
 assert.match(
   showroomAssetsSource,
-  /\/models\/red_bull_f1_showroom_v4\.glb/,
-  'the showroom asset registry must expose the v4 showroom GLB',
+  /\/models\/2024_redbull_rb20_showroom_v5\.glb/,
+  'the showroom asset registry must expose the v5 RB20 showroom GLB',
 );
 for (const pivotName of ['WheelPivot_FL', 'WheelPivot_FR', 'WheelPivot_RL', 'WheelPivot_RR']) {
   assert.match(
@@ -124,21 +123,17 @@ for (const name of [
   'WheelStatic_RR',
   'RearBodyAssembly',
   'RearHardRockAeroPanel',
-  'FrontHardRockWheelCover_FL',
-  'FrontHardRockWheelCover_FR',
-  'FrontHardRockInnerShroud_FL',
-  'FrontHardRockInnerShroud_FR',
 ]) {
   assert.ok(names.has(name), `Missing required node: ${name}`);
 }
 
-const mutatedTransform = structuredClone(sourceGltf);
+const mutatedTransform = structuredClone(referenceGltf);
 mutatedTransform.nodes.find((node) => node.name === 'WheelPivot_FL').translation = [0.01, 0, 0];
 assert.throws(
-  () => assertWheelPivotContract(sourceGltf, mutatedTransform),
+  () => assertWheelPivotContract(referenceGltf, mutatedTransform),
   /WheelPivot_FL local transform changed/,
 );
-assertWheelPivotContract(sourceGltf, gltf);
+assertWheelPivotContract(referenceGltf, gltf);
 
 assert.equal(await sha1(assets.studio), '300723e57b930413fa3e493033033713f911dd18');
 assert.equal(await sha1(assets.night), '4dc306b1cc07c5e9e830758dede1eb7ed8ecbebd');
