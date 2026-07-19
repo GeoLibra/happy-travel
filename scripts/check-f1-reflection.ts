@@ -27,8 +27,12 @@ assert.match(source, /mix\(0\.08, 0\.64, reflectionMask\)/);
 assert.match(source, /smoothstep\(0\.015, 0\.22, reflectionEnergy\)/);
 assert.match(source, /#include <colorspace_fragment>/);
 assert.match(source, /new THREE\.PlaneGeometry\(90, 80\)/);
-assert.match(source, /Math\.ceil\(width \* 0\.5\)/);
-assert.match(source, /Math\.ceil\(height \* 0\.5\)/);
+assert.equal(source.match(/Math\.ceil\(width \* 0\.75\)/g)?.length, 2);
+assert.equal(source.match(/Math\.ceil\(height \* 0\.75\)/g)?.length, 2);
+assert.doesNotMatch(source, /Math\.ceil\((?:width|height) \* 0\.5\)/);
+assert.match(source, /texture2D\(uInput, vUv\) \* 0\.56/);
+assert.match(source, /uDirection \* 1\.0\) \* 0\.18/g);
+assert.match(source, /uDirection \* 2\.4\) \* 0\.04/g);
 assert.match(source, /tier === 'fallback'/);
 
 const fallbackBranch = source.indexOf("if (tier === 'fallback')");
@@ -50,8 +54,8 @@ const verticalPass = source.indexOf('renderer.setRenderTarget(targetA)', horizon
 assert(horizontalPass > reflectionRender);
 assert(verticalPass > horizontalPass);
 assert.equal(source.match(/renderer\.render\(blurScene, blurCamera\)/g)?.length, 2);
-assert.match(source, /targetA\.setSize\(halfWidth, halfHeight\)/);
-assert.match(source, /targetB\.setSize\(halfWidth, halfHeight\)/);
+assert.match(source, /targetA\.setSize\(reflectionWidth, reflectionHeight\)/);
+assert.match(source, /targetB\.setSize\(reflectionWidth, reflectionHeight\)/);
 assert.match(source, /if \(disposed\) return/);
 
 const reflectiveRender = source.indexOf('render: () => {', targetAllocation);

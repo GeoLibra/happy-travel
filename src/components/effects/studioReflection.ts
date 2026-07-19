@@ -168,11 +168,11 @@ const createBlurMaterial = (
     varying vec2 vUv;
 
     void main() {
-      vec4 color = texture2D(uInput, vUv) * 0.2270270270;
-      color += texture2D(uInput, vUv + uDirection * 1.3846153846) * 0.3162162162;
-      color += texture2D(uInput, vUv - uDirection * 1.3846153846) * 0.3162162162;
-      color += texture2D(uInput, vUv + uDirection * 3.2307692308) * 0.0702702703;
-      color += texture2D(uInput, vUv - uDirection * 3.2307692308) * 0.0702702703;
+      vec4 color = texture2D(uInput, vUv) * 0.56;
+      color += texture2D(uInput, vUv + uDirection * 1.0) * 0.18;
+      color += texture2D(uInput, vUv - uDirection * 1.0) * 0.18;
+      color += texture2D(uInput, vUv + uDirection * 2.4) * 0.04;
+      color += texture2D(uInput, vUv - uDirection * 2.4) * 0.04;
       gl_FragColor = color;
     }
   `,
@@ -198,8 +198,8 @@ export const createStudioReflection = ({
 
   const width = viewport.width;
   const height = viewport.height;
-  const halfWidth = Math.ceil(width * 0.5);
-  const halfHeight = Math.ceil(height * 0.5);
+  const reflectionWidth = Math.ceil(width * 0.75);
+  const reflectionHeight = Math.ceil(height * 0.75);
   const targetOptions: THREE.RenderTargetOptions = {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
@@ -237,8 +237,8 @@ export const createStudioReflection = ({
 
   try {
     floorGeometry = createFloorGeometry();
-    targetA = renderTargetFactory(halfWidth, halfHeight, targetOptions);
-    targetB = renderTargetFactory(halfWidth, halfHeight, targetOptions);
+    targetA = renderTargetFactory(reflectionWidth, reflectionHeight, targetOptions);
+    targetB = renderTargetFactory(reflectionWidth, reflectionHeight, targetOptions);
     targetA.texture.name = 'StudioReflection.SceneAndBlur';
     targetB.texture.name = 'StudioReflection.BlurIntermediate';
 
@@ -263,8 +263,8 @@ export const createStudioReflection = ({
       0, 0, 0, 1,
     );
 
-    horizontalDirection = new THREE.Vector2(1 / halfWidth, 0);
-    verticalDirection = new THREE.Vector2(0, 1 / halfHeight);
+    horizontalDirection = new THREE.Vector2(1 / reflectionWidth, 0);
+    verticalDirection = new THREE.Vector2(0, 1 / reflectionHeight);
     horizontalBlurMaterial = createBlurMaterial(targetA.texture, horizontalDirection);
     verticalBlurMaterial = createBlurMaterial(targetB.texture, verticalDirection);
     fullscreenGeometry = new THREE.PlaneGeometry(2, 2);
@@ -396,12 +396,12 @@ export const createStudioReflection = ({
     },
     resize: (width, height) => {
       if (disposed || fallbackActive) return;
-      const halfWidth = Math.ceil(width * 0.5);
-      const halfHeight = Math.ceil(height * 0.5);
-      targetA.setSize(halfWidth, halfHeight);
-      targetB.setSize(halfWidth, halfHeight);
-      horizontalDirection.set(1 / halfWidth, 0);
-      verticalDirection.set(0, 1 / halfHeight);
+      const reflectionWidth = Math.ceil(width * 0.75);
+      const reflectionHeight = Math.ceil(height * 0.75);
+      targetA.setSize(reflectionWidth, reflectionHeight);
+      targetB.setSize(reflectionWidth, reflectionHeight);
+      horizontalDirection.set(1 / reflectionWidth, 0);
+      verticalDirection.set(0, 1 / reflectionHeight);
     },
     dispose: () => {
       if (disposed) return;
