@@ -307,7 +307,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
               onClick={handleTagClick}
-              className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-sm bg-[#E10600] text-white text-xs sm:text-sm font-bold tracking-[0.2em] mb-3 sm:mb-6 landscape:mb-2 shadow-[0_0_15px_rgba(225,6,0,0.5)] transform -skew-x-12 cursor-pointer active:scale-95 transition-transform pointer-events-auto"
+              className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-sm bg-[#E10600] text-white text-xs sm:text-sm font-bold tracking-[0.2em] mb-3 sm:mb-6 landscape:mb-2 shadow-[0_0_15px_rgba(225,6,0,0.5)] transform -skew-x-12 cursor-pointer active:scale-95 transition-transform pointer-events-auto select-none"
             >
               <Flag size={14} className="skew-x-12" />
               <span className="skew-x-12">RACE WEEKEND</span>
