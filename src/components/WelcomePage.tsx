@@ -184,12 +184,14 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-hidden font-sans overscroll-none touch-none"
+      className="fixed inset-0 z-50 overflow-hidden font-sans overscroll-none select-none touch-none"
       style={{
         backgroundImage: `url(${bgImage})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
+        backgroundRepeat: 'no-repeat',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
 

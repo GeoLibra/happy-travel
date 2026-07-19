@@ -34,6 +34,16 @@ assert.match(
   'underlying welcome controls must be resolved from the real layered DOM',
 );
 assert.match(source, /data-f1-welcome-action="enter"/);
+assert.match(
+  source,
+  /className="[^"]*select-none[^"]*touch-none[^"]*"/,
+  'the entire welcome scene must opt out of native text selection during a car hold',
+);
+assert.match(
+  source,
+  /WebkitTouchCallout:\s*'none'/,
+  'iOS must not show its native long-press callout over the showroom',
+);
 assert.match(source, /z-\[70\][^\n]*StartLights|StartLights[\s\S]*?z-\[70\]/);
 assert.match(source, /z-\[100\]/, 'intentional modal overlays may remain above the car');
 assert.match(source, /z-\[110\]/, 'the blocking loader must remain above the car');
@@ -85,6 +95,11 @@ assert.match(
 );
 assert.doesNotMatch(source, /\{\/\* Exploded view toggle \*\/\}/);
 assert.doesNotMatch(source, /CLICK CAR TO REASSEMBLE/);
+assert.match(
+  particleSource,
+  /tier:\s*prefersReducedMotion\s*\?\s*'fallback'\s*:\s*'reflective'/,
+  'mobile viewports must retain the reflective tier unless reduced motion is requested',
+);
 
 type FakeTimer = number;
 

@@ -151,14 +151,14 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     container.appendChild(renderer.domElement);
 
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const usesLowPowerEffects = prefersReducedMotion || window.innerWidth < 768;
+    const usesLowPowerAirflow = prefersReducedMotion || window.innerWidth < 768;
     const studioLighting = createF1StudioLighting(scene);
     const reflection = createStudioReflection({
       renderer,
       scene,
       camera,
       viewport: { width: window.innerWidth, height: window.innerHeight },
-      tier: usesLowPowerEffects ? 'fallback' : 'reflective',
+      tier: prefersReducedMotion ? 'fallback' : 'reflective',
     });
     reflection.floor.position.y = -10.1;
     let airflow: ReturnType<typeof createF1Airflow> | null = null;
@@ -312,7 +312,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
             isCarMaterialReplaced = applyHologramMaterial(f1CarGroup);
         }
 
-        airflow = createF1Airflow(usesLowPowerEffects ? 'low' : 'high', {
+        airflow = createF1Airflow(usesLowPowerAirflow ? 'low' : 'high', {
           bounds: f1AssembledLocalBounds,
         });
         f1CarGroup.add(airflow.group);
