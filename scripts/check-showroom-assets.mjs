@@ -4,7 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 
 const assets = {
   sourceModel: 'public/models/red_bull_f1_rigged.glb',
-  model: 'public/models/red_bull_f1_showroom_v2.glb',
+  model: 'public/models/red_bull_f1_showroom_v3.glb',
   studio: 'public/environments/ferndale_studio_09_1k.hdr',
   night: 'public/environments/rooftop_night_1k.hdr',
 };
@@ -89,7 +89,7 @@ const gltf = await parseGlbJson(assets.model);
 const airflowCheckSource = await readFile('scripts/check-f1-airflow.ts', 'utf8');
 assert.match(
   airflowCheckSource,
-  /public\/models\/red_bull_f1_showroom_v2\.glb/,
+  /public\/models\/red_bull_f1_showroom_v3\.glb/,
   'the airflow check must read the real shipped showroom GLB',
 );
 for (const pivotName of ['WheelPivot_FL', 'WheelPivot_FR', 'WheelPivot_RL', 'WheelPivot_RR']) {
@@ -112,6 +112,8 @@ for (const name of [
   'WheelStatic_RR',
   'RearBodyAssembly',
   'RearHardRockAeroPanel',
+  'FrontHardRockWheelCover_FL',
+  'FrontHardRockWheelCover_FR',
 ]) {
   assert.ok(names.has(name), `Missing required node: ${name}`);
 }

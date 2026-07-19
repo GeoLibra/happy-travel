@@ -4,6 +4,10 @@ import { readFileSync } from 'node:fs';
 const REQUIRED_PIVOTS = ['WheelPivot_FL', 'WheelPivot_FR', 'WheelPivot_RL', 'WheelPivot_RR'];
 const REQUIRED_SPINS = ['WheelSpin_FL', 'WheelSpin_FR', 'WheelSpin_RL', 'WheelSpin_RR'];
 const REQUIRED_STATICS = ['WheelStatic_FL', 'WheelStatic_FR', 'WheelStatic_RL', 'WheelStatic_RR'];
+const REQUIRED_HARD_ROCK_COVERS = [
+  'FrontHardRockWheelCover_FL',
+  'FrontHardRockWheelCover_FR',
+];
 
 const readGlbJson = (filePath) => {
   const bytes = readFileSync(filePath);
@@ -54,6 +58,7 @@ const verify = (filePath) => {
     ...REQUIRED_STATICS,
     'RearBodyAssembly',
     'RearHardRockAeroPanel',
+    ...REQUIRED_HARD_ROCK_COVERS,
   ]) {
     assert.ok(indexByName.has(name), `Missing required node: ${name}`);
   }
@@ -86,8 +91,22 @@ const verify = (filePath) => {
       `rear Hard Rock panel must not rotate with ${spinName}`,
     );
   }
+  for (const coverName of REQUIRED_HARD_ROCK_COVERS) {
+    const coverIndex = indexByName.get(coverName);
+    assert.ok(
+      isDescendant(coverIndex, rearPanelIndex),
+      `${coverName} must move with the Hard Rock body panel assembly`,
+    );
+    for (const spinName of REQUIRED_SPINS) {
+      assert.equal(
+        isDescendant(coverIndex, indexByName.get(spinName)),
+        false,
+        `${coverName} must not rotate with ${spinName}`,
+      );
+    }
+  }
 
-  console.log('PASS: semantic F1 wheel and rear-panel hierarchy');
+  console.log('PASS: semantic F1 wheel and Hard Rock cover hierarchy');
 };
 
 const filePath = process.argv[2];

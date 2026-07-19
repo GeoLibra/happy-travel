@@ -19,10 +19,12 @@ const assertVisibleCharcoal = (color: THREE.Color, label: string): void => {
 assert.match(source, /export interface StudioReflectionEffect/);
 assert.match(source, /export const createStudioReflection/);
 assert.match(source, /const STUDIO_FLOOR_COLOR = 0xaeb8c4/);
-assert.match(source, /0\.46 \* inside \* uReveal/);
+assert.match(source, /0\.72 \* inside \* uReveal/);
 assert.match(source, /opacity:\s*0/);
 assert.match(source, /roughness:\s*0\.68/);
 assert.match(source, /const FALLBACK_FLOOR_ALPHA = 0\.12/);
+assert.match(source, /mix\(0\.08, 0\.64, reflectionMask\)/);
+assert.match(source, /smoothstep\(0\.015, 0\.22, reflectionEnergy\)/);
 assert.match(source, /#include <colorspace_fragment>/);
 assert.match(source, /new THREE\.PlaneGeometry\(90, 80\)/);
 assert.match(source, /Math\.ceil\(width \* 0\.5\)/);

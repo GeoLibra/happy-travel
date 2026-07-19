@@ -131,21 +131,17 @@ const floorPlacement = particleBackgroundSource.indexOf(
   'reflection.floor.position.y = assembledWorldBounds.min.y - 0.03;',
   finalScale,
 );
-const floorPlacementCommit = particleBackgroundSource.indexOf(
-  'hasPlacedStudioFloor = true;',
-  floorPlacement,
-);
-const orbitTargetCopy = particleBackgroundSource.indexOf(
-  'controls.target.copy(assembledCenter);',
-  floorPlacementCommit,
-);
-const orbitTargetUpdate = particleBackgroundSource.indexOf(
-  'controls.update();',
-  orbitTargetCopy,
+const progressiveCameraTarget = particleBackgroundSource.indexOf(
+  'controls.target.lerpVectors(',
+  finalScale,
 );
 const orbitTargetCommit = particleBackgroundSource.indexOf(
   'hasSetOrbitTarget = true;',
-  orbitTargetUpdate,
+  progressiveCameraTarget,
+);
+const floorPlacementCommit = particleBackgroundSource.indexOf(
+  'hasPlacedStudioFloor = true;',
+  floorPlacement,
 );
 const revealAdvance = particleBackgroundSource.indexOf(
   'studioReveal = stepStudioReveal(',
@@ -164,14 +160,15 @@ assert(finalStoppedZ >= 0, 'the final car depth must be damped instead of snappe
 assert(finalStoppedY >= 0, 'the final assembled Y must be damped instead of snapped');
 assert(finalStoppedZ < finalStoppedY, 'depth damping must run before final Y/scale damping');
 assert(finalScale > finalStoppedY, 'final scale damping must run after final assembled Y');
-assert(floorPlacement > finalScale, 'floor placement must wait for the settled final transform');
 assert(
-  floorPlacementCommit > floorPlacement
-    && orbitTargetCopy > floorPlacementCommit
-    && orbitTargetUpdate > orbitTargetCopy
-    && orbitTargetCommit > orbitTargetUpdate
-    && revealAdvance > orbitTargetCommit,
-  'floor placement and the final camera target update must both commit before positive reveal',
+  progressiveCameraTarget > finalScale && progressiveCameraTarget < orbitTargetCommit,
+  'camera target must blend during arrival before the studio floor is committed',
+);
+assert(
+  floorPlacement > orbitTargetCommit
+    && floorPlacementCommit > floorPlacement
+    && revealAdvance > floorPlacementCommit,
+  'the final camera target and floor placement must both commit before positive reveal',
 );
 assert(
   stoppedPoseGate > orbitTargetCommit && orbitInteractionReadyCommit > stoppedPoseGate,
@@ -196,6 +193,12 @@ assert.equal(
   particleBackgroundSource.match(/hasSetOrbitTarget = true;/g)?.length,
   1,
   'orbit target must only be committed once before the reveal starts',
+);
+const floorCommitBlock = particleBackgroundSource.slice(floorPlacement, revealAdvance);
+assert.doesNotMatch(
+  floorCommitBlock,
+  /controls\.target\.(copy|set|lerp)|controls\.update\(\)/,
+  'floor appearance must not mutate the camera target and move the stopped car',
 );
 assert.match(
   particleBackgroundSource,

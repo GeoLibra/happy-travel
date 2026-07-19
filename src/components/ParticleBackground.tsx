@@ -7,7 +7,12 @@ import { DEFAULT_FORCE_FIELD_PARAMS } from './effects/forceField';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { HologramShaderUniforms, applyHologramMaterial, revertHologramMaterial } from './hologram/HologramEffect';
 import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '../lib/f1-motion';
-import { createF1ArrivalState, dampF1ArrivalValue, stepF1ArrivalState } from '../lib/f1-arrival-motion';
+import {
+  createF1ArrivalState,
+  dampF1ArrivalValue,
+  getF1ArrivalCameraBlend,
+  stepF1ArrivalState,
+} from '../lib/f1-arrival-motion';
 import { createF1ExplodedParts, getF1LocalBounds, resolveF1WheelNodes, updateF1ExplodedParts, type F1ExplodedPart } from '../lib/f1-model';
 import { applyF1WheelAngle, createF1WheelMotionState, stepF1WheelMotion } from '../lib/f1-wheel-motion';
 import {
@@ -280,6 +285,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     const assembledWorldBounds = new THREE.Box3();
     const assembledCenter = new THREE.Vector3();
     const assembledSize = new THREE.Vector3();
+    const neutralCameraTarget = new THREE.Vector3();
     let isCarMaterialReplaced = false;
     const racingMotion: F1MotionState = { speed: 0, wheelAngle: 0 };
 
@@ -980,6 +986,22 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         }
         // When progress >= 100, we just keep the final rotation values intact so it doesn't snap!
 
+        if (f1AssembledLocalBounds) {
+          f1CarGroup.updateMatrixWorld(true);
+          assembledWorldBounds
+            .copy(f1AssembledLocalBounds)
+            .applyMatrix4(f1CarGroup.matrixWorld);
+          assembledWorldBounds.getCenter(assembledCenter);
+          assembledWorldBounds.getSize(assembledSize);
+          assembledCenter.y -= assembledSize.y * 0.08;
+          controls.target.lerpVectors(
+            neutralCameraTarget,
+            assembledCenter,
+            getF1ArrivalCameraBlend(s.progress),
+          );
+          if (!isOrbitInteractionReady) camera.lookAt(controls.target);
+        }
+
         const stoppedPoseSettled =
           s.progress >= 100
           && Math.abs(f1CarGroup.position.z - getF1Depth(100)) < 0.05
@@ -988,20 +1010,13 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
           && racingSpeed < 0.01;
         stepF1ArrivalState(arrivalState, s.progress >= 100, stoppedPoseSettled, delta);
 
-        if (!hasPlacedStudioFloor && arrivalState.ready && f1AssembledLocalBounds) {
-          f1CarGroup.updateMatrixWorld(true);
-          assembledWorldBounds
-            .copy(f1AssembledLocalBounds)
-            .applyMatrix4(f1CarGroup.matrixWorld);
+        if (!hasSetOrbitTarget && arrivalState.ready) {
+          hasSetOrbitTarget = true;
+        }
+
+        if (!hasPlacedStudioFloor && hasSetOrbitTarget && f1AssembledLocalBounds) {
           reflection.floor.position.y = assembledWorldBounds.min.y - 0.03;
           hasPlacedStudioFloor = true;
-
-          assembledWorldBounds.getCenter(assembledCenter);
-          assembledWorldBounds.getSize(assembledSize);
-          assembledCenter.y -= assembledSize.y * 0.08;
-          controls.target.copy(assembledCenter);
-          controls.update();
-          hasSetOrbitTarget = true;
         }
 
         if (

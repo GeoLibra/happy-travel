@@ -1,6 +1,13 @@
 export const ARRIVAL_SETTLED_FRAMES = 4;
 export const ARRIVAL_HOLD_MS = 120;
 
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+
+export const getF1ArrivalCameraBlend = (progress: number): number => {
+  const t = clamp01((progress - 82) / 18);
+  return t * t * (3 - 2 * t);
+};
+
 export interface F1ArrivalState {
   settledFrames: number;
   holdSeconds: number;

@@ -1,4 +1,4 @@
-"""Rebuild semantic F1 wheel assemblies and rear aero-panel ownership.
+"""Rebuild semantic F1 wheel assemblies and Hard Rock panel ownership.
 
 Run with Blender 5.1+ in background mode. The accepted source GLB is read-only;
 the script writes a versioned uncompressed intermediate for later optimization.
@@ -17,7 +17,7 @@ from mathutils import Matrix, Vector
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_GLB = PROJECT_ROOT / "public/models/red_bull_f1_rigged.glb"
-OUTPUT_UNCOMPRESSED_GLB = PROJECT_ROOT / "public/models/red_bull_f1_showroom_v2-uncompressed.glb"
+OUTPUT_UNCOMPRESSED_GLB = PROJECT_ROOT / "public/models/red_bull_f1_showroom_v3-uncompressed.glb"
 
 # side sign, longitudinal center, vertical center, visible tire radius
 WHEELS = {
@@ -125,6 +125,23 @@ def is_hard_rock_panel_component(points: list[Vector], wheel_key: str) -> bool:
         and max(radii) >= radius * 0.98
         and max(point.z for point in points) >= center_z + radius * 0.32
         and coverage < 0.46
+    )
+
+
+def is_front_hard_rock_cover_component(points: list[Vector], wheel_key: str) -> bool:
+    """Select the outboard wheel-cover disc that visually pairs with the upper panel."""
+    if wheel_key not in {"FL", "FR"} or len(points) < 200:
+        return False
+    side, center_y, center_z, radius = WHEELS[wheel_key]
+    outboard = [point.x * side for point in points]
+    radii = [math.hypot(point.y - center_y, point.z - center_z) for point in points]
+    coverage = angular_coverage(points, center_y, center_z)
+    return (
+        min(outboard) >= 0.60
+        and max(outboard) - min(outboard) <= 0.05
+        and min(radii) >= radius * 0.78
+        and max(radii) <= radius * 0.90
+        and coverage >= 0.90
     )
 
 
@@ -246,19 +263,35 @@ def rebuild_semantic_wheels(
     rotating: dict[str, list[bpy.types.Object]] = {key: [] for key in WHEELS}
     stationary: dict[str, list[bpy.types.Object]] = {key: [] for key in WHEELS}
     hard_rock_panels: list[bpy.types.Object] = []
+    hard_rock_covers: list[bpy.types.Object] = []
     rear_body_parts: list[bpy.types.Object] = []
 
     for key, wheel in existing_wheels.items():
         assert wheel is not None
         panel_indices: list[int] = []
+        cover_indices: list[int] = []
         for component in connected_components(wheel.data):
             points = world_points(wheel, component)
             if is_hard_rock_panel_component(points, key):
                 panel_indices.extend(component)
+            elif is_front_hard_rock_cover_component(points, key):
+                cover_indices.extend(component)
+        if panel_indices or cover_indices:
+            create_extraction_groups(wheel, {
+                "rear_hard_rock": panel_indices,
+                "front_hard_rock_cover": cover_indices,
+            })
         if panel_indices:
-            create_extraction_groups(wheel, {"rear_hard_rock": panel_indices})
             hard_rock_panels.append(
                 separate_group(wheel, "Extract_rear_hard_rock", f"RearHardRockAeroPanel_{key}")
+            )
+        if cover_indices:
+            hard_rock_covers.append(
+                separate_group(
+                    wheel,
+                    "Extract_front_hard_rock_cover",
+                    f"FrontHardRockWheelCover_{key}",
+                )
             )
         wheel.name = f"WheelSpinGeometry_{key}"
         rotating[key].append(wheel)
@@ -312,24 +345,31 @@ def rebuild_semantic_wheels(
         create_wheel_hierarchy(key, rotating[key], stationary[key])
     print("Semantic rotating vertex totals:", totals)
     print("Rear body semantic mesh count:", len(rear_body_parts))
-    return {"panels": hard_rock_panels, "rear_body": rear_body_parts}
+    return {
+        "panels": hard_rock_panels,
+        "covers": hard_rock_covers,
+        "rear_body": rear_body_parts,
+    }
 
 
 def extract_rear_hard_rock_panel(
     root: bpy.types.Object,
     panel_meshes: list[bpy.types.Object],
+    cover_meshes: list[bpy.types.Object],
     rear_body_meshes: list[bpy.types.Object],
 ) -> bpy.types.Object:
     if len(panel_meshes) != 2:
         raise RuntimeError(f"Expected two symmetric Hard Rock aero panels, got {len(panel_meshes)}")
+    if len(cover_meshes) != 2:
+        raise RuntimeError(f"Expected two symmetric Hard Rock wheel covers, got {len(cover_meshes)}")
     rear_body = create_identity_group("RearBodyAssembly", root)
     rear_body["semantic_role"] = "rear_body_explosion_group"
     for rear_body_mesh in rear_body_meshes:
         parent_preserving_world(rear_body_mesh, rear_body)
     panel_group = create_identity_group("RearHardRockAeroPanel", rear_body)
-    panel_group["semantic_role"] = "rear_body_aero_panel"
-    for panel in panel_meshes:
-        parent_preserving_world(panel, panel_group)
+    panel_group["semantic_role"] = "hard_rock_body_panel_assembly"
+    for panel_part in [*panel_meshes, *cover_meshes]:
+        parent_preserving_world(panel_part, panel_group)
     return panel_group
 
 
@@ -365,6 +405,10 @@ def validate_scene_contract() -> None:
     rear_body = bpy.data.objects.get("RearBodyAssembly")
     if panel is None or rear_body is None or panel.parent != rear_body:
         raise RuntimeError("Rear Hard Rock panel hierarchy is invalid")
+    for cover_name in ("FrontHardRockWheelCover_FL", "FrontHardRockWheelCover_FR"):
+        cover = bpy.data.objects.get(cover_name)
+        if cover is None or not is_descendant(cover, panel):
+            raise RuntimeError(f"{cover_name} must follow the Hard Rock panel assembly")
     if not any(obj.type == "MESH" and not is_descendant(obj, panel) for obj in rear_body.children_recursive):
         raise RuntimeError("RearBodyAssembly must contain rear-wing geometry outside the panel group")
     for key in WHEELS:
@@ -378,7 +422,18 @@ def validate_scene_contract() -> None:
         if is_descendant(panel, spin):
             raise RuntimeError(f"Rear Hard Rock panel is inside WheelSpin_{key}")
 
-        protected = [obj for obj in static.children_recursive] + [panel]
+        for obj in spin.children_recursive:
+            if obj.type != "MESH":
+                continue
+            for component in connected_components(obj.data):
+                if is_front_hard_rock_cover_component(world_points(obj, component), key):
+                    raise RuntimeError(f"Hard Rock wheel cover geometry remains inside WheelSpin_{key}")
+
+        protected = [
+            *static.children_recursive,
+            panel,
+            *panel.children_recursive,
+        ]
         before = {obj.name: obj.matrix_world.copy() for obj in protected}
         old_rotation = spin.rotation_euler.copy()
         spin.rotation_euler.x += math.pi / 2
@@ -433,13 +488,14 @@ def main() -> None:
     rear_panel = extract_rear_hard_rock_panel(
         root,
         rebuild_result["panels"],
+        rebuild_result["covers"],
         rebuild_result["rear_body"],
     )
     if rear_panel.name != "RearHardRockAeroPanel":
         raise RuntimeError("Rear Hard Rock panel naming contract failed")
     validate_scene_contract()
     export_glb(OUTPUT_UNCOMPRESSED_GLB)
-    print(f"F1 showroom v2 export complete: {OUTPUT_UNCOMPRESSED_GLB}")
+    print(f"F1 showroom v3 export complete: {OUTPUT_UNCOMPRESSED_GLB}")
 
 
 if __name__ == "__main__":

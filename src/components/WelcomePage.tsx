@@ -11,7 +11,7 @@ import { ROSE_MODEL_URL } from '../lib/rose-animation';
 import { markF1ManualInteraction } from '../lib/f1-showroom-interaction';
 import { useI18n } from '../i18n';
 
-const F1_SHOWROOM_MODEL_URL = '/models/red_bull_f1_showroom_v2.glb?v=semantic-wheels-3';
+const F1_SHOWROOM_MODEL_URL = '/models/red_bull_f1_showroom_v3.glb?v=hard-rock-covers-2';
 
 const StartLights = ({ progress, isPressing }: { progress: number, isPressing: boolean }) => {
   if (!isPressing && progress === 0) return null;

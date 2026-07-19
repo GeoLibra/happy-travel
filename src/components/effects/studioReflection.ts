@@ -133,9 +133,10 @@ const createReflectionMaterial = (
       vec3 reflection = texture2D(uReflection, projectedUv).rgb;
       float roughness = lowFrequencyNoise(vFloorUv * 14.0);
       vec3 roughFloor = uFloorColor * mix(0.86, 1.08, roughness);
-      float reflectionMix = 0.46 * inside * uReveal;
+      float reflectionMix = 0.72 * inside * uReveal;
       float reflectionEnergy = max(reflection.r, max(reflection.g, reflection.b));
-      float alpha = uReveal * mix(0.10, 0.30, inside * smoothstep(0.06, 0.55, reflectionEnergy));
+      float reflectionMask = inside * smoothstep(0.015, 0.22, reflectionEnergy);
+      float alpha = uReveal * mix(0.08, 0.64, reflectionMask);
       gl_FragColor = vec4(mix(roughFloor, reflection, reflectionMix), alpha);
       #include <colorspace_fragment>
     }

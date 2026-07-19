@@ -21,7 +21,7 @@ interface ShippedGlbJson {
 }
 
 const shippedModelBytes = readFileSync(
-  new URL('../public/models/red_bull_f1_showroom_v2.glb', import.meta.url),
+  new URL('../public/models/red_bull_f1_showroom_v3.glb', import.meta.url),
 );
 assert.equal(
   shippedModelBytes.toString('ascii', 16, 20),
