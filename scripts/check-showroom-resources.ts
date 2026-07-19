@@ -8,6 +8,65 @@ import {
 } from '../src/components/showroom/showroom-particles';
 import { createShowroomTrack } from '../src/components/showroom/showroom-track';
 
+const assertSetupFailureDisposal = (
+  label: string,
+  failureCheckpoint: string,
+  expectedMaterialDisposals: number,
+  create: (onSetupCheckpoint: (checkpoint: string) => void) => unknown,
+): void => {
+  const setupError = new Error(`${label} ${failureCheckpoint} injected setup failure`);
+  let geometryDisposals = 0;
+  let materialDisposals = 0;
+  const originalGeometryDispose = THREE.BufferGeometry.prototype.dispose;
+  const originalMaterialDispose = THREE.Material.prototype.dispose;
+
+  THREE.BufferGeometry.prototype.dispose = function disposeInjectedGeometry(): void {
+    geometryDisposals += 1;
+  };
+  THREE.Material.prototype.dispose = function disposeInjectedMaterial(): void {
+    materialDisposals += 1;
+  };
+
+  try {
+    assert.throws(
+      () => create((checkpoint) => {
+        if (checkpoint === failureCheckpoint) throw setupError;
+      }),
+      (error) => error === setupError,
+      `${label} must rethrow the original ${failureCheckpoint} error`,
+    );
+  } finally {
+    THREE.BufferGeometry.prototype.dispose = originalGeometryDispose;
+    THREE.Material.prototype.dispose = originalMaterialDispose;
+  }
+
+  assert.equal(
+    geometryDisposals,
+    1,
+    `${label} must dispose partial geometry after ${failureCheckpoint}`,
+  );
+  assert.equal(
+    materialDisposals,
+    expectedMaterialDisposals,
+    `${label} must dispose every material owned at ${failureCheckpoint}`,
+  );
+};
+
+const assertAllSetupFailuresDispose = (
+  label: string,
+  checkpoints: string[],
+  create: (onSetupCheckpoint: (checkpoint: string) => void) => unknown,
+): void => {
+  for (const checkpoint of checkpoints) {
+    assertSetupFailureDisposal(
+      label,
+      checkpoint,
+      checkpoint === 'geometry-ready' ? 0 : 1,
+      create,
+    );
+  }
+};
+
 const assertIdempotentDisposal = (
   label: string,
   geometry: THREE.BufferGeometry,
@@ -42,6 +101,11 @@ assertIdempotentDisposal(
   cpuParticles.material,
   cpuParticles.dispose,
 );
+assertAllSetupFailuresDispose(
+  'CPU particle field setup failure',
+  ['geometry-ready', 'material-ready', 'object-ready', 'setup-complete'],
+  (onSetupCheckpoint) => createCpuParticleField(2, { onSetupCheckpoint }),
+);
 
 const trails = createTrailField();
 assert(trails.geometry instanceof THREE.BufferGeometry);
@@ -52,6 +116,11 @@ assert.equal(trails.positionAttribute.count, 15 * 20);
 assert.equal(trails.alphaAttribute.count, 15 * 20);
 assert.equal(trails.geometry.getAttribute('color').count, 15 * 20);
 assertIdempotentDisposal('trail field', trails.geometry, trails.material, trails.dispose);
+assertAllSetupFailuresDispose(
+  'trail field setup failure',
+  ['geometry-ready', 'material-ready', 'setup-complete'],
+  (onSetupCheckpoint) => createTrailField({ onSetupCheckpoint }),
+);
 
 const speedLines = createSpeedLineField();
 assert(speedLines.points instanceof THREE.Points);
@@ -68,6 +137,11 @@ assertIdempotentDisposal(
   speedLines.material,
   speedLines.dispose,
 );
+assertAllSetupFailuresDispose(
+  'speed-line field setup failure',
+  ['geometry-ready', 'material-ready', 'object-ready', 'setup-complete'],
+  (onSetupCheckpoint) => createSpeedLineField({ onSetupCheckpoint }),
+);
 
 const track = createShowroomTrack();
 assert(track.mesh instanceof THREE.InstancedMesh);
@@ -83,6 +157,11 @@ assertIdempotentDisposal(
   track.mesh.geometry,
   track.material,
   track.dispose,
+);
+assertAllSetupFailuresDispose(
+  'showroom track setup failure',
+  ['geometry-ready', 'material-ready', 'object-ready', 'setup-complete'],
+  (onSetupCheckpoint) => createShowroomTrack({ onSetupCheckpoint }),
 );
 
 const componentSource = readFileSync(

@@ -38,13 +38,67 @@ const rearWing = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 0.4));
 const hardRockPanelGroup = new THREE.Group();
 hardRockPanelGroup.name = 'RearHardRockAeroPanel';
 const hardRockPanel = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.4));
-hardRockPanelGroup.add(hardRockPanel);
+const wheelAdjacentCover = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.25));
+wheelAdjacentCover.name = 'FrontHardRockWheelCover_FL';
+wheelAdjacentCover.position.set(-0.7, -0.05, 0);
+const wheelAdjacentShroud = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.25, 0.2));
+wheelAdjacentShroud.name = 'FrontHardRockInnerShroud_FL';
+wheelAdjacentShroud.position.set(0.7, -0.05, 0);
+hardRockPanelGroup.add(hardRockPanel, wheelAdjacentCover, wheelAdjacentShroud);
 rearBodyAssembly.add(rearWing, hardRockPanelGroup);
 semanticRoot.add(mainBody, rearBodyAssembly);
 const semanticParts = createF1ExplodedParts(semanticRoot);
 assert(semanticParts.some((part) => part.object === rearBodyAssembly));
 assert(!semanticParts.some((part) => part.object === rearWing));
 assert(!semanticParts.some((part) => part.object === hardRockPanel));
+assert(!semanticParts.some((part) => part.object === wheelAdjacentCover));
+assert(!semanticParts.some((part) => part.object === wheelAdjacentShroud));
+
+semanticRoot.updateMatrixWorld(true);
+const assembledRearPosition = rearBodyAssembly.getWorldPosition(new THREE.Vector3());
+const assembledWheelAdjacentPositions = [wheelAdjacentCover, wheelAdjacentShroud].map((object) => (
+  object.getWorldPosition(new THREE.Vector3())
+));
+const semanticClearance = 0.01;
+const semanticFloorY = new THREE.Box3().setFromObject(semanticRoot).min.y - semanticClearance;
+const assertSemanticAssembly = (phase: string, frame: number): void => {
+  semanticRoot.updateMatrixWorld(true);
+  const rearDelta = rearBodyAssembly
+    .getWorldPosition(new THREE.Vector3())
+    .sub(assembledRearPosition);
+
+  [wheelAdjacentCover, wheelAdjacentShroud].forEach((object, index) => {
+    const childDelta = object
+      .getWorldPosition(new THREE.Vector3())
+      .sub(assembledWheelAdjacentPositions[index]);
+    assert(
+      childDelta.distanceTo(rearDelta) <= 1e-6,
+      `${phase} frame ${frame}: wheel-adjacent bodywork must follow RearBodyAssembly`,
+    );
+  });
+  for (const part of semanticParts) {
+    assert(
+      new THREE.Box3().setFromObject(part.object).min.y
+        >= semanticFloorY + semanticClearance - 1e-4,
+      `${phase} frame ${frame}: semantic body groups must retain floor clearance`,
+    );
+  }
+};
+
+for (let frame = 0; frame <= 120; frame += 1) {
+  updateF1ExplodedParts(semanticParts, frame / 120, 1 / 60, {
+    floorY: semanticFloorY,
+    clearance: semanticClearance,
+  });
+  assertSemanticAssembly('semantic explosion', frame);
+}
+for (let frame = 0; frame <= 120; frame += 1) {
+  updateF1ExplodedParts(semanticParts, 1 - frame / 120, 1 / 60, {
+    floorY: semanticFloorY,
+    clearance: semanticClearance,
+  });
+  assertSemanticAssembly('semantic reassembly', frame);
+}
 const cachedPartResources = parts.map((part) => {
   const cachedPart = part as typeof part & {
     localCorners?: readonly THREE.Vector3[];

@@ -6,6 +6,12 @@ import {
   TRAIL_COUNT,
   TRAIL_SEGMENTS,
 } from './showroom-constants';
+import {
+  createIdempotentDisposer,
+  createShowroomResource,
+  notifySetupCheckpoint,
+  type ShowroomFactoryOptions,
+} from './showroom-resource-lifecycle';
 
 export interface CpuParticleField {
   points: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
@@ -15,8 +21,13 @@ export interface CpuParticleField {
   dispose: () => void;
 }
 
-export const createCpuParticleField = (pixelRatio: number): CpuParticleField => {
-  const geometry = new THREE.BufferGeometry();
+export const createCpuParticleField = (
+  pixelRatio: number,
+  options?: ShowroomFactoryOptions,
+): CpuParticleField => {
+  return createShowroomResource((own) => {
+  const geometry = own(new THREE.BufferGeometry());
+  notifySetupCheckpoint(options, 'geometry-ready');
   const positions = new Float32Array(CPU_PARTICLE_COUNT * 3);
   const colors = new Float32Array(CPU_PARTICLE_COUNT * 3);
   const sizes = new Float32Array(CPU_PARTICLE_COUNT);
@@ -41,7 +52,7 @@ export const createCpuParticleField = (pixelRatio: number): CpuParticleField => 
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
-  const material = new THREE.ShaderMaterial({
+  const material = own(new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
       uPixelRatio: { value: pixelRatio },
@@ -74,18 +85,16 @@ export const createCpuParticleField = (pixelRatio: number): CpuParticleField => 
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-  });
+  }));
+  notifySetupCheckpoint(options, 'material-ready');
 
   const points = new THREE.Points(geometry, material);
-  let disposed = false;
-  const dispose = () => {
-    if (disposed) return;
-    disposed = true;
-    geometry.dispose();
-    material.dispose();
-  };
+  notifySetupCheckpoint(options, 'object-ready');
+  const dispose = createIdempotentDisposer([geometry, material]);
+  notifySetupCheckpoint(options, 'setup-complete');
 
   return { points, phases, positions, material, dispose };
+  });
 };
 
 export interface TrailField {
@@ -96,8 +105,10 @@ export interface TrailField {
   dispose: () => void;
 }
 
-export const createTrailField = (): TrailField => {
-  const geometry = new THREE.BufferGeometry();
+export const createTrailField = (options?: ShowroomFactoryOptions): TrailField => {
+  return createShowroomResource((own) => {
+  const geometry = own(new THREE.BufferGeometry());
+  notifySetupCheckpoint(options, 'geometry-ready');
   const positions = new Float32Array(TRAIL_COUNT * TRAIL_SEGMENTS * 3);
   const colors = new Float32Array(TRAIL_COUNT * TRAIL_SEGMENTS * 3);
   const alphas = new Float32Array(TRAIL_COUNT * TRAIL_SEGMENTS);
@@ -119,7 +130,7 @@ export const createTrailField = (): TrailField => {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.setAttribute('alpha', alphaAttribute);
 
-  const material = new THREE.ShaderMaterial({
+  const material = own(new THREE.ShaderMaterial({
     transparent: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
@@ -141,17 +152,14 @@ export const createTrailField = (): TrailField => {
           gl_FragColor = vec4(vColor, vAlpha * 0.6);
         }
       `
-  });
+  }));
+  notifySetupCheckpoint(options, 'material-ready');
 
-  let disposed = false;
-  const dispose = () => {
-    if (disposed) return;
-    disposed = true;
-    geometry.dispose();
-    material.dispose();
-  };
+  const dispose = createIdempotentDisposer([geometry, material]);
+  notifySetupCheckpoint(options, 'setup-complete');
 
   return { geometry, positionAttribute, alphaAttribute, material, dispose };
+  });
 };
 
 export interface SpeedLineField {
@@ -163,8 +171,10 @@ export interface SpeedLineField {
   dispose: () => void;
 }
 
-export const createSpeedLineField = (): SpeedLineField => {
-  const geometry = new THREE.BufferGeometry();
+export const createSpeedLineField = (options?: ShowroomFactoryOptions): SpeedLineField => {
+  return createShowroomResource((own) => {
+  const geometry = own(new THREE.BufferGeometry());
+  notifySetupCheckpoint(options, 'geometry-ready');
   const positions = new Float32Array(SPEED_LINE_COUNT * 3);
   const speeds = new Float32Array(SPEED_LINE_COUNT);
   const colors = new Float32Array(SPEED_LINE_COUNT * 3);
@@ -187,7 +197,7 @@ export const createSpeedLineField = (): SpeedLineField => {
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
-  const material = new THREE.ShaderMaterial({
+  const material = own(new THREE.ShaderMaterial({
     uniforms: { uPixelRatio: { value: 1 }, uOpacity: { value: 1.0 } },
     vertexShader: `
         attribute float size;
@@ -218,17 +228,15 @@ export const createSpeedLineField = (): SpeedLineField => {
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-  });
+  }));
+  notifySetupCheckpoint(options, 'material-ready');
 
   const points = new THREE.Points(geometry, material);
   points.visible = false;
-  let disposed = false;
-  const dispose = () => {
-    if (disposed) return;
-    disposed = true;
-    geometry.dispose();
-    material.dispose();
-  };
+  notifySetupCheckpoint(options, 'object-ready');
+  const dispose = createIdempotentDisposer([geometry, material]);
+  notifySetupCheckpoint(options, 'setup-complete');
 
   return { points, geometry, positions, speeds, material, dispose };
+  });
 };

@@ -61,6 +61,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoExplodeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasManualInteractionRef = React.useRef(false);
+  const hasStartedEntryRef = React.useRef(false);
 
   const handleCarManualInteraction = useCallback(() => {
     markF1ManualInteraction(
@@ -86,6 +87,23 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
       onEnter();
     }, REASSEMBLY_BEFORE_ENTER_MS);
   }, [isTransitioning, onEnter]);
+
+  const handleEnter = useCallback(() => {
+    if (progress < 100 || hasStartedEntryRef.current) return;
+    hasStartedEntryRef.current = true;
+
+    try {
+      const preparation = onPrepareEnter?.();
+      if (preparation) {
+        void preparation.catch((error) => {
+          console.error('[WelcomePage] Entry preparation failed:', error);
+        });
+      }
+    } catch (error) {
+      console.error('[WelcomePage] Entry preparation failed:', error);
+    }
+    enterAfterReassembly();
+  }, [enterAfterReassembly, onPrepareEnter, progress]);
 
   const handleTagClick = () => {
     setSimplyLovely(true);
@@ -380,12 +398,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
               onPointerCancel={() => {
                 setIsPressing(false);
               }}
-              onClick={() => {
-                if (progress >= 100) {
-                  onPrepareEnter?.();
-                  enterAfterReassembly();
-                }
-              }}
+              onClick={handleEnter}
               className="group relative z-[90] inline-flex items-center justify-center gap-2 px-10 py-4 w-[280px] sm:w-[360px] bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl uppercase tracking-wider transform -skew-x-12 pointer-events-auto cursor-pointer select-none"
             >
 

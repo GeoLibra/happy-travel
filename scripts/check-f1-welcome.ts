@@ -70,6 +70,11 @@ assert.match(
 );
 assert.match(
   source,
+  /const hasStartedEntryRef = React\.useRef\(false\);/,
+  'WelcomePage must synchronously reject repeated ENTER activation',
+);
+assert.match(
+  source,
   /const handleCarManualInteraction = useCallback\(\(\) => \{[\s\S]*?markF1ManualInteraction\([\s\S]*?hasManualInteractionRef,[\s\S]*?autoExplodeTimerRef,[\s\S]*?clearTimeout,[\s\S]*?\);[\s\S]*?\}, \[\]\);/,
   'WelcomePage must expose one focused manual-interaction cancellation callback',
 );

@@ -1,5 +1,11 @@
 import * as THREE from 'three';
 import { COLORS, HAIRLINE_COUNT, TOTAL_LINES } from './showroom-constants';
+import {
+  createIdempotentDisposer,
+  createShowroomResource,
+  notifySetupCheckpoint,
+  type ShowroomFactoryOptions,
+} from './showroom-resource-lifecycle';
 
 export interface TrackDatum {
   x: number;
@@ -19,22 +25,26 @@ export interface ShowroomTrack {
   dispose: () => void;
 }
 
-export const createShowroomTrack = (): ShowroomTrack => {
+export const createShowroomTrack = (options?: ShowroomFactoryOptions): ShowroomTrack => {
+  return createShowroomResource((own) => {
   // Base geometry: simple thin plane. We will scale it in instanceMatrix.
-  const hairGeo = new THREE.PlaneGeometry(1, 1);
+  const hairGeo = own(new THREE.PlaneGeometry(1, 1));
+  notifySetupCheckpoint(options, 'geometry-ready');
   // Move pivot to front edge so they scale from camera outwards nicely
   hairGeo.translate(0, 0, -0.5);
 
-  const hairMat = new THREE.MeshBasicMaterial({
+  const hairMat = own(new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
       opacity: 0.9,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide
-  });
+  }));
+  notifySetupCheckpoint(options, 'material-ready');
 
   const hairMesh = new THREE.InstancedMesh(hairGeo, hairMat, TOTAL_LINES);
+  notifySetupCheckpoint(options, 'object-ready');
 
   // The road needs to stay locked to the car's bottom, no matter the progress
   hairMesh.position.y = -10.05;
@@ -126,13 +136,8 @@ export const createShowroomTrack = (): ShowroomTrack => {
   hairMesh.instanceMatrix.needsUpdate = true;
   if (hairMesh.instanceColor) hairMesh.instanceColor.needsUpdate = true;
 
-  let disposed = false;
-  const dispose = () => {
-    if (disposed) return;
-    disposed = true;
-    hairGeo.dispose();
-    hairMat.dispose();
-  };
+  const dispose = createIdempotentDisposer([hairGeo, hairMat]);
+  notifySetupCheckpoint(options, 'setup-complete');
 
   return {
     mesh: hairMesh,
@@ -141,4 +146,5 @@ export const createShowroomTrack = (): ShowroomTrack => {
     material: hairMat,
     dispose,
   };
+  });
 };
