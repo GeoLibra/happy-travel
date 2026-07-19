@@ -40,12 +40,13 @@ const StartLights = ({ progress, isPressing }: { progress: number, isPressing: b
 
 interface WelcomeProps {
   onEnter: () => void;
+  onPrepareEnter?: () => void | Promise<void>;
 }
 
 const HOLOGRAM_REVEAL_MS = 4600;
 const REASSEMBLY_BEFORE_ENTER_MS = 1600;
 
-const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
+const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
@@ -381,6 +382,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               }}
               onClick={() => {
                 if (progress >= 100) {
+                  onPrepareEnter?.();
                   enterAfterReassembly();
                 }
               }}

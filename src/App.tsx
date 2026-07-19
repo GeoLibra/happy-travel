@@ -1,11 +1,4 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-// Shake detection state
-interface ShakeState {
-  lastX: number;
-  lastY: number;
-  lastZ: number;
-  lastTime: number;
-}
 interface RoseEasterEggProps {
   show: boolean;
   onClose: () => void;
@@ -43,6 +36,7 @@ import RoseModal from './components/RoseModal';
 import f1EngineShiftSound from './audio/f1-engine-2.mp3';
 import successSound from './audio/success.mp3';
 import { localizeItinerary, useI18n } from './i18n';
+import { EMPTY_SHAKE_STATE, stepShakeDetection } from './lib/shake-detection';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -71,7 +65,7 @@ export default function App() {
   // Rose easter egg state - Three.js Rose Modal
   const [showRoseModal, setShowRoseModal] = useState(false);
   const [motionPermissionGranted, setMotionPermissionGranted] = useState(false);
-  const shakeState = useRef<{ lastX: number; lastY: number; lastZ: number; lastTime: number }>({ lastX: 0, lastY: 0, lastZ: 0, lastTime: Date.now() });
+  const shakeState = useRef(EMPTY_SHAKE_STATE);
   const isModalOpenRef = useRef(showRoseModal);
   const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const secretClickRef = useRef(0);
@@ -155,36 +149,24 @@ export default function App() {
     successAudio.preload = 'auto';
 
     const handleMotion = (event: DeviceMotionEvent) => {
-      // 优先使用不含重力的加速度，如果没有再降级使用含重力的
-      const acceleration = event.acceleration || event.accelerationIncludingGravity;
-      if (!acceleration) return;
+      const acceleration = event.acceleration ?? event.accelerationIncludingGravity;
+      const result = stepShakeDetection(
+        shakeState.current,
+        {
+          x: acceleration?.x ?? null,
+          y: acceleration?.y ?? null,
+          z: acceleration?.z ?? null,
+        },
+        Date.now(),
+        isModalOpenRef.current,
+      );
+      shakeState.current = result.state;
 
-      const { x, y, z } = acceleration;
-      if (x === null || y === null || z === null) return;
-
-      const currentTime = Date.now();
-      const timeDiff = currentTime - shakeState.current.lastTime;
-
-      // 保持 100ms 的采样间隔
-      if (timeDiff > 100) {
-        const deltaX = Math.abs(x - shakeState.current.lastX);
-        const deltaY = Math.abs(y - shakeState.current.lastY);
-        const deltaZ = Math.abs(z - shakeState.current.lastZ);
-
-        // 标准摇一摇速率计算公式：位移差 / 时间差 * 10000
-        const speed = ((deltaX + deltaY + deltaZ) / timeDiff) * 10000;
-
-        // SHAKE_THRESHOLD 摇晃阈值，通常设定在 800 到 1500 之间。
-        if (speed > 1000 && !isModalOpenRef.current) {
-          console.log('[App] Shake detected!', { speed });
-          // Play success sound
-          successAudio.currentTime = 0;
-          successAudio.play().catch(() => {});
-          // Show Three.js Rose Modal
-          setShowRoseModal(true);
-        }
-
-        shakeState.current = { lastX: x, lastY: y, lastZ: z, lastTime: currentTime };
+      if (result.detected) {
+        console.log('[App] Shake detected!');
+        successAudio.currentTime = 0;
+        successAudio.play().catch(() => {});
+        setShowRoseModal(true);
       }
     };
 
@@ -233,12 +215,14 @@ export default function App() {
     <>
       <AnimatePresence>
         {showWelcome && (
-          <WelcomePage key="welcome" onEnter={async () => {
-            console.log('[App] Entering application...');
-            // 必须在同步事件链路的首位请求权限
-            await requestMotionPermission();
-            setShowWelcome(false);
-          }} />
+          <WelcomePage
+            key="welcome"
+            onPrepareEnter={() => { void requestMotionPermission(); }}
+            onEnter={() => {
+              console.log('[App] Entering application...');
+              setShowWelcome(false);
+            }}
+          />
         )}
       </AnimatePresence>
 

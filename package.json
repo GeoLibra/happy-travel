@@ -11,6 +11,7 @@
     "check:f1-airflow": "node --import tsx scripts/check-f1-airflow.ts",
     "check:f1-model": "node --import tsx scripts/check-f1-model.ts",
     "check:f1-welcome": "node --import tsx scripts/check-f1-welcome.ts",
+    "check:shake": "node --import tsx scripts/check-shake-detection.ts",
     "check:f1-studio": "node --import tsx scripts/check-f1-studio.ts",
     "check:f1-showroom-interaction": "node --import tsx scripts/check-f1-showroom-interaction.ts",
     "check:f1-arrival-motion": "node --import tsx scripts/check-f1-arrival-motion.ts",
