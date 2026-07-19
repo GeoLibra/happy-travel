@@ -269,7 +269,7 @@ export default function App() {
                 #1
               </div>
             </div>
-            <div onClick={handleSecretClick} className="cursor-pointer active:scale-95 transition-transform">
+            <div onClick={handleSecretClick} className="cursor-pointer active:scale-95 transition-transform select-none">
               <h1 className="text-xl font-bold tracking-tight">{t('app.title')}</h1>
               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider flex items-center gap-2">
                 2026.03.13 - 03.15

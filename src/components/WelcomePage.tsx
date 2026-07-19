@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Flag, ArrowRight, Zap, Trophy, Cpu } from 'lucide-react';
 import * as THREE from 'three';
@@ -8,7 +8,10 @@ import f1EngineSound from '../audio/f1-engine.mp3';
 import ParticleBackground from './ParticleBackground';
 import { loadModelWithCache } from '../lib/model-loader';
 import { ROSE_MODEL_URL } from '../lib/rose-animation';
+import { markF1ManualInteraction } from '../lib/f1-showroom-interaction';
 import { useI18n } from '../i18n';
+
+const F1_SHOWROOM_MODEL_URL = '/models/red_bull_f1_showroom_v4.glb?v=hard-rock-inner-shrouds-1';
 
 const StartLights = ({ progress, isPressing }: { progress: number, isPressing: boolean }) => {
   if (!isPressing && progress === 0) return null;
@@ -17,7 +20,7 @@ const StartLights = ({ progress, isPressing }: { progress: number, isPressing: b
   const lightsOn = isGreen ? 5 : Math.ceil(progress / 20);
 
   return (
-    <div className="absolute top-8 sm:top-12 md:top-16 landscape:top-4 left-1/2 -translate-x-1/2 z-[95] flex gap-2 sm:gap-4 md:gap-6 landscape:gap-2 p-2 sm:p-5 landscape:p-2 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in duration-300">
+    <div className="absolute top-8 sm:top-12 md:top-16 landscape:top-4 left-1/2 -translate-x-1/2 z-[70] flex gap-2 sm:gap-4 md:gap-6 landscape:gap-2 p-2 sm:p-5 landscape:p-2 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in duration-300">
       {[...Array(5)].map((_, i) => {
         const isOn = i < lightsOn;
         const colorClass = isGreen
@@ -39,6 +42,9 @@ interface WelcomeProps {
   onEnter: () => void;
 }
 
+const HOLOGRAM_REVEAL_MS = 4600;
+const REASSEMBLY_BEFORE_ENTER_MS = 1600;
+
 const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
@@ -48,7 +54,37 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   const [modelLoading, setModelLoading] = useState(true);
   const [modelProgress, setModelProgress] = useState(0);
   const [loadedModel, setLoadedModel] = useState<THREE.Group | null>(null);
+  const [isCarExploded, setIsCarExploded] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoExplodeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasManualInteractionRef = React.useRef(false);
+
+  const handleCarManualInteraction = useCallback(() => {
+    markF1ManualInteraction(
+      hasManualInteractionRef,
+      autoExplodeTimerRef,
+      clearTimeout,
+    );
+  }, []);
+
+  const toggleExplodedView = useCallback(() => {
+    if (isTransitioning) return;
+
+    handleCarManualInteraction();
+    setIsCarExploded((value) => !value);
+  }, [handleCarManualInteraction, isTransitioning]);
+
+  const enterAfterReassembly = useCallback(() => {
+    if (isTransitioning) return;
+
+    setIsTransitioning(true);
+    setIsCarExploded(false);
+    enterTimerRef.current = setTimeout(() => {
+      onEnter();
+    }, REASSEMBLY_BEFORE_ENTER_MS);
+  }, [isTransitioning, onEnter]);
 
   const handleTagClick = () => {
     setSimplyLovely(true);
@@ -68,7 +104,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
     };
 
     Promise.all([
-      loadModelWithCache('/models/red_bull_f1_showroom.glb', (p) => {
+      loadModelWithCache(F1_SHOWROOM_MODEL_URL, (p) => {
         carProg = p;
         updateCombinedProgress();
       }),
@@ -85,6 +121,27 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
     });
 
   }, []);
+
+  useEffect(() => () => {
+    if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
+    if (autoExplodeTimerRef.current) clearTimeout(autoExplodeTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (progress < 100 || isTransitioning || hasManualInteractionRef.current) return;
+
+    autoExplodeTimerRef.current = setTimeout(() => {
+      autoExplodeTimerRef.current = null;
+      setIsCarExploded(true);
+    }, HOLOGRAM_REVEAL_MS);
+
+    return () => {
+      if (autoExplodeTimerRef.current) {
+        clearTimeout(autoExplodeTimerRef.current);
+        autoExplodeTimerRef.current = null;
+      }
+    };
+  }, [progress, isTransitioning]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -161,6 +218,9 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
         progress={progress}
         audioRef={audioRef}
         loadedModel={loadedModel}
+        exploded={isCarExploded}
+        onCarClick={toggleExplodedView}
+        onCarManualInteraction={handleCarManualInteraction}
       />
 
       <StartLights progress={progress} isPressing={isPressing} />
@@ -247,7 +307,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
               onClick={handleTagClick}
-              className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-sm bg-[#E10600] text-white text-xs sm:text-sm font-bold tracking-[0.2em] mb-3 sm:mb-6 landscape:mb-2 shadow-[0_0_15px_rgba(225,6,0,0.5)] transform -skew-x-12 cursor-pointer active:scale-95 transition-transform pointer-events-auto"
+              className="inline-flex items-center gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-sm bg-[#E10600] text-white text-xs sm:text-sm font-bold tracking-[0.2em] mb-3 sm:mb-6 landscape:mb-2 shadow-[0_0_15px_rgba(225,6,0,0.5)] transform -skew-x-12 cursor-pointer active:scale-95 transition-transform pointer-events-auto select-none"
             >
               <Flag size={14} className="skew-x-12" />
               <span className="skew-x-12">RACE WEEKEND</span>
@@ -300,6 +360,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               className="mb-6 sm:mb-0 landscape:mb-4"
             >
             <button
+              data-f1-welcome-action="enter"
               onPointerDown={() => {
                 setIsPressing(true);
                 if (audioRef.current) {
@@ -318,7 +379,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               }}
               onClick={() => {
                 if (progress >= 100) {
-                  onEnter();
+                  enterAfterReassembly();
                 }
               }}
               className="group relative z-[90] inline-flex items-center justify-center gap-2 px-10 py-4 w-[280px] sm:w-[360px] bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl uppercase tracking-wider transform -skew-x-12 pointer-events-auto cursor-pointer select-none"
@@ -333,7 +394,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
   <Zap size={18} className="flex-shrink-0"/>
   <span className="flex-shrink-0">
     {progress >= 100
-      ? "ENTER"
+      ? (isTransitioning ? "REASSEMBLING..." : "ENTER")
       : (isPressing || progress > 0)
       ? `ENGINE STARTING ${progress}%`
       : (modelLoading ? "CALIBRATING..." : "HOLD TO START")}
@@ -347,14 +408,12 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter }) => {
               ref={audioRef}
               src={f1EngineSound}
               preload="auto"
-              onEnded={() => {
-                if (progress >= 100) {
-                  onEnter();
-                }
-              }}
             />
 
             </motion.div>
+
+            {/* Keep this slot mounted so reaching 100% cannot move the centered content. */}
+            <div className="h-8 sm:h-9 mt-3" aria-hidden="true" />
 
 
             {/* Glitch Overlay & Stats */}

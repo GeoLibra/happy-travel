@@ -17,3 +17,4 @@ docs/
 scripts/prepare_f1_wheels.py
 scripts/verify-f1-glb.mjs
 scripts/check_f1_ui.mjs
+.superpowers

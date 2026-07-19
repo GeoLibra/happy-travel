@@ -51,7 +51,7 @@ assert.ok(
 );
 
 const completeCar = new THREE.Group();
-for (const name of ['Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR']) {
+for (const name of ['WheelSpin_FL', 'WheelSpin_FR', 'WheelSpin_RL', 'WheelSpin_RR']) {
   const wheel = new THREE.Object3D();
   wheel.name = name;
   completeCar.add(wheel);
@@ -68,7 +68,7 @@ assert.deepEqual(completeWarnings, [], 'a complete model must not warn');
 const incompleteWarnings: string[] = [];
 const incompleteCar = new THREE.Group();
 const partialWheel = new THREE.Object3D();
-partialWheel.name = 'Wheel_FL';
+partialWheel.name = 'WheelSpin_FL';
 incompleteCar.add(partialWheel);
 assert.equal(
   resolveF1WheelNodes(incompleteCar, (message) => incompleteWarnings.push(message))
@@ -77,6 +77,6 @@ assert.equal(
   'available wheels must remain usable when other nodes are missing',
 );
 assert.equal(incompleteWarnings.length, 1, 'missing nodes must produce one warning');
-assert.match(incompleteWarnings[0], /Wheel_FR.*Wheel_RL.*Wheel_RR/);
+assert.match(incompleteWarnings[0], /WheelSpin_FR.*WheelSpin_RL.*WheelSpin_RR/);
 
 console.log('PASS: F1 motion is smooth and frame-rate independent');

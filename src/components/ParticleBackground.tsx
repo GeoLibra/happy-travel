@@ -7,7 +7,27 @@ import { DEFAULT_FORCE_FIELD_PARAMS } from './effects/forceField';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { HologramShaderUniforms, applyHologramMaterial, revertHologramMaterial } from './hologram/HologramEffect';
 import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '../lib/f1-motion';
-import { resolveF1WheelNodes } from '../lib/f1-model';
+import {
+  createF1ArrivalState,
+  dampF1ArrivalValue,
+  getF1ScreenStableOrbitTarget,
+  stepF1ArrivalState,
+} from '../lib/f1-arrival-motion';
+import { createF1ExplodedParts, getF1LocalBounds, resolveF1WheelNodes, updateF1ExplodedParts, type F1ExplodedPart } from '../lib/f1-model';
+import { applyF1WheelAngle, createF1WheelMotionState, getF1WheelRenderAngle, stepF1WheelMotion } from '../lib/f1-wheel-motion';
+import {
+  CAR_DRAG_TOLERANCE_PX,
+  CAR_HOLD_DELAY_MS,
+  canStartCarHold,
+  classifyCarRelease,
+  classifyShowroomPointerLayer,
+  isAdditionalCarGesturePointer,
+  isPointInsideCarGestureBounds,
+  stepStudioReveal,
+} from '../lib/f1-showroom-interaction';
+import { advanceF1AirflowTime, createF1Airflow } from './effects/f1Airflow';
+import { createF1StudioLighting } from './effects/f1StudioLighting';
+import { createStudioReflection } from './effects/studioReflection';
 
 interface ParticleBackgroundProps {
   isPressing: boolean;
@@ -15,6 +35,8 @@ interface ParticleBackgroundProps {
   audioRef?: React.RefObject<HTMLAudioElement | null>;
   loadedModel?: THREE.Group | null;
   onCarClick?: () => void;
+  onCarManualInteraction?: () => void;
+  exploded?: boolean;
 }
 
 const COLORS = {
@@ -27,13 +49,24 @@ const COLORS = {
 const SPEED_LINE_COUNT = 100;
 const CPU_PARTICLE_COUNT = 1000;
 
-const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, progress, audioRef, loadedModel, onCarClick }) => {
+const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
+  isPressing,
+  progress,
+  audioRef,
+  loadedModel,
+  onCarClick,
+  onCarManualInteraction,
+  exploded = false,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const spaceKeyArmedRef = useRef(false);
 
   // Track state in ref to avoid re-triggering the animation loop closure
   const stateRef = useRef({
     isPressing,
+    carHeld: false,
     progress,
+    exploded,
     explosionTime: 0,
     mouse: { x: 0, y: 0, targetX: 0, targetY: 0 },
     baseUniforms: {
@@ -54,6 +87,21 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     stateRef.current.isPressing = isPressing;
   }, [isPressing]);
 
+  useEffect(() => {
+    stateRef.current.exploded = exploded;
+    if (exploded) stateRef.current.carHeld = false;
+  }, [exploded]);
+
+  const onCarClickRef = useRef(onCarClick);
+  useEffect(() => {
+    onCarClickRef.current = onCarClick;
+  }, [onCarClick]);
+
+  const onCarManualInteractionRef = useRef(onCarManualInteraction);
+  useEffect(() => {
+    onCarManualInteractionRef.current = onCarManualInteraction;
+  }, [onCarManualInteraction]);
+
   const modelRef = useRef<THREE.Group | null>(null);
   useEffect(() => {
     modelRef.current = loadedModel || null;
@@ -64,6 +112,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       stateRef.current.explosionTime = -1; // -1 indicates it needs to be set to clock time
     }
     stateRef.current.progress = progress;
+    if (progress < 100) stateRef.current.carHeld = false;
   }, [progress]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -91,6 +140,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     renderer.setSize(window.innerWidth, window.innerHeight);
     const pixelRatio = Math.min(window.devicePixelRatio, 2);
     renderer.setPixelRatio(pixelRatio);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.35;
     stateRef.current.baseUniforms.uPixelRatio.value = pixelRatio;
 
     // We will render bgScene first, then scene on top without clearing
@@ -98,6 +149,20 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const usesLowPowerEffects = prefersReducedMotion || window.innerWidth < 768;
+    const studioLighting = createF1StudioLighting(scene);
+    const reflection = createStudioReflection({
+      renderer,
+      scene,
+      camera,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      tier: usesLowPowerEffects ? 'fallback' : 'reflective',
+    });
+    reflection.floor.position.y = -10.1;
+    let airflow: ReturnType<typeof createF1Airflow> | null = null;
+    const wheelMotion = createF1WheelMotionState();
 
     // ── Advanced Effects Initializers ──
     // const gpuParticles = new GPUParticleSystem(renderer);
@@ -181,37 +246,76 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     }
 
     // ── 3D Lighting for F1 Model ──
-    const ambientLight = new THREE.HemisphereLight(0xffffff, 0x001A30, 0.8);
+    const ambientLight = new THREE.HemisphereLight(0xeaf6ff, 0x17324a, 1.65);
     scene.add(ambientLight);
 
-    const mainLight = new THREE.DirectionalLight(0xFFB800, 1.5);
-    mainLight.position.set(10, 20, 10);
+    // Bright camera-side key light keeps the dark carbon-fibre pieces readable
+    // when they separate and no longer receive light bounced from nearby parts.
+    const mainLight = new THREE.DirectionalLight(0xfff4dc, 3.4);
+    mainLight.position.set(8, 16, 24);
     scene.add(mainLight);
 
-    const rimLight = new THREE.DirectionalLight(0xE10600, 1.0);
+    const fillLight = new THREE.DirectionalLight(0x8bd8ff, 2.25);
+    fillLight.position.set(-18, 8, 16);
+    scene.add(fillLight);
+
+    const lowerFillLight = new THREE.PointLight(0xffc85a, 2.4, 90, 1.4);
+    lowerFillLight.position.set(4, -4, 18);
+    scene.add(lowerFillLight);
+
+    // Core inspection light. It sits at the assembled model's local center and
+    // shines outward as parts separate, revealing the chassis and suspension.
+    const explodedCoreLight = new THREE.PointLight(0x77e7ff, 0.35, 78, 1.15);
+    const explodedCoreAnchor = new THREE.Vector3();
+    const explodedCoreWorldPosition = new THREE.Vector3();
+    scene.add(explodedCoreLight);
+
+    const rimLight = new THREE.DirectionalLight(0xE10600, 1.8);
     rimLight.position.set(-10, 5, -5);
     scene.add(rimLight);
 
     // ── F1 Car 3D Model Integration ──
     let f1CarGroup: THREE.Group | null = null;
+    let f1AssembledLocalBounds: THREE.Box3 | null = null;
     let f1Wheels: THREE.Object3D[] = [];
+    let f1ExplodedParts: F1ExplodedPart[] = [];
+    let explodeAmount = 0;
+    let hasPlacedStudioFloor = false;
+    const arrivalState = createF1ArrivalState();
+    const assembledWorldBounds = new THREE.Box3();
+    const assembledCenter = new THREE.Vector3();
+    const neutralCameraTarget = new THREE.Vector3();
+    const screenStableOrbitTarget = new THREE.Vector3();
     let isCarMaterialReplaced = false;
-    const f1Motion: F1MotionState = { speed: 0, wheelAngle: 0 };
+    const racingMotion: F1MotionState = { speed: 0, wheelAngle: 0 };
 
     // We'll check for modelRef.current dynamically in the animate loop to support late arrivals
     const checkModelInjection = () => {
       if (!f1CarGroup && modelRef.current) {
         f1CarGroup = modelRef.current;
         f1Wheels = resolveF1WheelNodes(f1CarGroup);
+        f1ExplodedParts = createF1ExplodedParts(f1CarGroup);
         f1CarGroup.scale.set(8, 8, 8);
         f1CarGroup.rotation.y = 0; // Face the camera directly
         f1CarGroup.position.set(0, -10, getF1Depth(0));
         f1CarGroup.visible = false;
+        f1CarGroup.updateMatrixWorld(true);
+
+        f1AssembledLocalBounds = getF1LocalBounds(f1CarGroup);
+
+        const assembledCenterWorld = new THREE.Box3()
+          .setFromObject(f1CarGroup)
+          .getCenter(new THREE.Vector3());
+        explodedCoreAnchor.copy(f1CarGroup.worldToLocal(assembledCenterWorld));
 
         if (!isCarMaterialReplaced) {
             isCarMaterialReplaced = applyHologramMaterial(f1CarGroup);
         }
 
+        airflow = createF1Airflow(usesLowPowerEffects ? 'low' : 'high', {
+          bounds: f1AssembledLocalBounds,
+        });
+        f1CarGroup.add(airflow.group);
         scene.add(f1CarGroup);
 
         // Performance Optimization: Pre-compile the model to avoid lag spikes
@@ -226,9 +330,232 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enablePan = false;
-    controls.minDistance = 10;
-    controls.maxDistance = 100;
+    controls.minPolarAngle = Math.PI / 3;
+    controls.maxPolarAngle = Math.PI / 2 - 0.04;
+    controls.minDistance = 28;
+    controls.maxDistance = 68;
     controls.enabled = false;
+    let hasSetOrbitTarget = false;
+    let isOrbitInteractionReady = false;
+
+    // ── Stopped-car gestures ──
+    const raycaster = new THREE.Raycaster();
+    const normalizedPointer = new THREE.Vector2();
+    let holdTimer: ReturnType<typeof setTimeout> | null = null;
+    let isForwardingPointerCancel = false;
+    let carGesture: {
+      pointerId: number;
+      startedAt: number;
+      startX: number;
+      startY: number;
+      travelPx: number;
+      startedOnCar: boolean;
+      holdStarted: boolean;
+    } | null = null;
+
+    const cancelHoldTimer = () => {
+      if (holdTimer === null) return;
+      clearTimeout(holdTimer);
+      holdTimer = null;
+    };
+
+    const clearCarGesture = (releaseCapture: boolean) => {
+      cancelHoldTimer();
+      stateRef.current.carHeld = false;
+      const pointerId = carGesture?.pointerId;
+      carGesture = null;
+      if (
+        releaseCapture
+        && pointerId !== undefined
+        && renderer.domElement.hasPointerCapture(pointerId)
+      ) {
+        renderer.domElement.releasePointerCapture(pointerId);
+      }
+    };
+
+    const updateGestureTravel = (event: PointerEvent) => {
+      if (!carGesture || carGesture.pointerId !== event.pointerId) return;
+      carGesture.travelPx = Math.max(
+        carGesture.travelPx,
+        Math.hypot(event.clientX - carGesture.startX, event.clientY - carGesture.startY),
+      );
+      if (carGesture.travelPx > CAR_DRAG_TOLERANCE_PX) {
+        cancelHoldTimer();
+        if (carGesture.holdStarted) {
+          stateRef.current.carHeld = false;
+          carGesture.startedOnCar = false;
+          carGesture.holdStarted = false;
+          controls.enabled = stateRef.current.progress >= 100 && isOrbitInteractionReady;
+        }
+      }
+    };
+
+    const raycastHitsCar = (event: PointerEvent): boolean => {
+      if (!f1CarGroup || !f1CarGroup.visible) return false;
+      const rect = renderer.domElement.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      normalizedPointer.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(normalizedPointer, camera);
+      return raycaster.intersectObject(f1CarGroup, true).some(({ object }) => {
+        let ancestor: THREE.Object3D | null = object;
+        while (ancestor && ancestor !== f1CarGroup) {
+          if (ancestor === airflow?.group) return false;
+          ancestor = ancestor.parent;
+        }
+        return ancestor === f1CarGroup;
+      });
+    };
+
+    const pointerIsInsideCanvas = (event: PointerEvent): boolean => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      return isPointInsideCarGestureBounds(event.clientX, event.clientY, rect);
+    };
+
+    const forwardPointerToUnderlyingWelcomeUi = (event: PointerEvent): boolean => {
+      const interactiveUi = document
+        .elementsFromPoint(event.clientX, event.clientY)
+        .map((element) => element.closest<HTMLElement>('[data-f1-welcome-action]'))
+        .find((element): element is HTMLElement => element !== null);
+      const owner = classifyShowroomPointerLayer({
+        carHit: raycastHitsCar(event),
+        interactiveUiHit: interactiveUi !== undefined,
+      });
+      if (owner !== 'ui' || !interactiveUi) return false;
+      interactiveUi.click();
+      return true;
+    };
+
+    const handleCarPointerDown = (event: PointerEvent) => {
+      if (isAdditionalCarGesturePointer(carGesture?.pointerId ?? null, event.pointerId)) {
+        clearCarGesture(false);
+        controls.enabled = stateRef.current.progress >= 100 && isOrbitInteractionReady;
+        return;
+      }
+      if (
+        carGesture
+        || !event.isPrimary
+        || (event.pointerType === 'mouse' && event.button !== 0)
+        || stateRef.current.progress < 100
+      ) return;
+
+      const startedOnCar = raycastHitsCar(event);
+      if (!startedOnCar) return;
+
+      carGesture = {
+        pointerId: event.pointerId,
+        startedAt: performance.now(),
+        startX: event.clientX,
+        startY: event.clientY,
+        travelPx: 0,
+        startedOnCar,
+        holdStarted: false,
+      };
+      renderer.domElement.setPointerCapture(event.pointerId);
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        if (!carGesture || carGesture.pointerId !== event.pointerId) return;
+        if (canStartCarHold({
+          elapsedMs: performance.now() - carGesture.startedAt,
+          travelPx: carGesture.travelPx,
+          startedOnCar: carGesture.startedOnCar,
+          stopped: stateRef.current.progress >= 100,
+          exploded: stateRef.current.exploded,
+        })) {
+          carGesture.holdStarted = true;
+          onCarManualInteractionRef.current?.();
+          stateRef.current.carHeld = true;
+          controls.enabled = false;
+        }
+      }, CAR_HOLD_DELAY_MS);
+    };
+
+    const handleCarPointerMove = (event: PointerEvent) => {
+      if (carGesture?.pointerId === event.pointerId && !pointerIsInsideCanvas(event)) {
+        forwardCarPointerCancel();
+        return;
+      }
+      updateGestureTravel(event);
+    };
+
+    const handleCarPointerUp = (event: PointerEvent) => {
+      if (!carGesture || carGesture.pointerId !== event.pointerId) {
+        if (
+          event.isPrimary
+          && (event.pointerType !== 'mouse' || event.button === 0)
+          && stateRef.current.progress >= 100
+        ) {
+          forwardPointerToUnderlyingWelcomeUi(event);
+        }
+        return;
+      }
+      if (!pointerIsInsideCanvas(event)) {
+        forwardCarPointerCancel();
+        return;
+      }
+      updateGestureTravel(event);
+      const holdStartedBeforeRelease = carGesture.holdStarted;
+      const release = classifyCarRelease({
+        elapsedMs: performance.now() - carGesture.startedAt,
+        travelPx: carGesture.travelPx,
+        startedOnCar: carGesture.startedOnCar,
+        stopped: stateRef.current.progress >= 100,
+        exploded: stateRef.current.exploded,
+        holdStarted: carGesture.holdStarted,
+      });
+
+      if (release === 'toggle') onCarClickRef.current?.();
+      if (release === 'end-hold') {
+        stateRef.current.carHeld = false;
+        if (!holdStartedBeforeRelease) onCarManualInteractionRef.current?.();
+      }
+      // Pointer capture is released automatically after pointerup (and by
+      // OrbitControls); keeping it through this dispatch avoids a second
+      // release racing the controls' own handler.
+      clearCarGesture(false);
+    };
+
+    const handleCarPointerCancel = (event: PointerEvent) => {
+      if (isForwardingPointerCancel) return;
+      if (carGesture?.pointerId === event.pointerId) clearCarGesture(false);
+    };
+
+    const forwardCarPointerCancel = () => {
+      if (!carGesture || isForwardingPointerCancel) return;
+      const cancelledGesture = carGesture;
+      isForwardingPointerCancel = true;
+      try {
+        renderer.domElement.dispatchEvent(new PointerEvent('pointercancel', {
+          bubbles: true,
+          cancelable: false,
+          pointerId: cancelledGesture.pointerId,
+          clientX: cancelledGesture.startX,
+          clientY: cancelledGesture.startY,
+          isPrimary: true,
+        }));
+      } finally {
+        isForwardingPointerCancel = false;
+        clearCarGesture(true);
+      }
+    };
+
+    const handleCarLostPointerCapture = (event: PointerEvent) => {
+      if (isForwardingPointerCancel) return;
+      if (carGesture?.pointerId === event.pointerId) forwardCarPointerCancel();
+    };
+
+    const handleWindowBlur = () => forwardCarPointerCancel();
+
+    // Capture phase lets the tap classifier run before OrbitControls releases
+    // its own pointer capture on the same canvas.
+    renderer.domElement.addEventListener('pointerdown', handleCarPointerDown, true);
+    renderer.domElement.addEventListener('pointermove', handleCarPointerMove, true);
+    renderer.domElement.addEventListener('pointerup', handleCarPointerUp, true);
+    renderer.domElement.addEventListener('pointercancel', handleCarPointerCancel, true);
+    renderer.domElement.addEventListener('lostpointercapture', handleCarLostPointerCapture, true);
+    window.addEventListener('blur', handleWindowBlur);
 
     // ── High-Fidelity Speed Trails (Shader Lines) ──
     const TRAIL_COUNT = 15;
@@ -454,6 +781,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
     // ── Animation Loop ──
     const timer = new THREE.Timer();
+    let airflowTime = 0;
+    let studioReveal = 0;
     let frameId = 0;
 
     const animate = (timestamp: number) => {
@@ -462,16 +791,39 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
       timer.update(timestamp);
       const time = timer.getElapsed();
-      const delta = Math.min(timer.getDelta(), 0.1);
+      const delta = Math.min(Math.max(timer.getDelta(), 0), 0.1);
+      airflowTime = advanceF1AirflowTime(airflowTime, delta);
 
       const s = stateRef.current;
       const targetRacingSpeed = getTargetSpeed(s.progress, s.isPressing);
-      stepF1Motion(f1Motion, targetRacingSpeed, delta);
-      const racingSpeed = f1Motion.speed;
-
-      for (const wheel of f1Wheels) {
-        wheel.rotation.x = f1Motion.wheelAngle;
+      stepF1Motion(racingMotion, targetRacingSpeed, delta);
+      const racingSpeed = racingMotion.speed;
+      stepF1WheelMotion(wheelMotion, s.carHeld, delta, prefersReducedMotion);
+      if (airflow) {
+        if (prefersReducedMotion) {
+          airflow.update({
+            time: airflowTime,
+            holdIntensity: wheelMotion.holdIntensity * 0.35,
+            reducedMotion: true,
+          });
+        } else {
+          airflow.update({
+            time: airflowTime,
+            holdIntensity: wheelMotion.holdIntensity,
+            reducedMotion: false,
+          });
+        }
       }
+      studioLighting.update(wheelMotion.holdIntensity);
+
+      applyF1WheelAngle(
+        f1Wheels,
+        getF1WheelRenderAngle(
+          racingMotion.wheelAngle,
+          wheelMotion.angle,
+          prefersReducedMotion,
+        ),
+      );
 
       // Connect audio on first press
       /*
@@ -536,12 +888,12 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       bgCamera.lookAt(0, 0, 0);
 
       if (s.progress >= 100) {
-        if (!controls.enabled) {
+        if (s.carHeld || !isOrbitInteractionReady) {
+          controls.enabled = false;
+        } else {
           controls.enabled = true;
-          // Set target to the fixed ground zero instead of the car group, which drifts
-          controls.target.set(0, 0, 0);
+          controls.update();
         }
-        controls.update();
       } else {
         controls.enabled = false;
         camera.position.x = bgCamera.position.x;
@@ -609,15 +961,17 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         // Restore the original long-distance reveal while keeping the newer
         // wheel and environment motion.
         const targetZ = getF1Depth(s.progress);
-        f1CarGroup.position.z += (targetZ - f1CarGroup.position.z) * 0.1;
+        f1CarGroup.position.z = dampF1ArrivalValue(f1CarGroup.position.z, targetZ, delta, 8);
         f1CarGroup.position.x = 0; // Stay centered
         const engineVibration =
           (Math.sin(time * 42) * 0.035 + Math.sin(time * 19) * 0.02) * racingSpeed;
-        f1CarGroup.position.y = -10 + engineVibration;
+        const targetY = s.progress >= 100 ? -10 : -10 + engineVibration;
+        f1CarGroup.position.y = dampF1ArrivalValue(f1CarGroup.position.y, targetY, delta, 10);
 
         // Scale: Grow to a balanced size
         const targetScale = 8 + (progressFactor * 4); // Final scale 12
-        f1CarGroup.scale.set(targetScale, targetScale, targetScale);
+        const settledScale = dampF1ArrivalValue(f1CarGroup.scale.x, targetScale, delta, 8);
+        f1CarGroup.scale.setScalar(settledScale);
 
         // Rotation: Background Match turn without tilting the car into the floor
         if (s.progress < 100) {
@@ -639,11 +993,73 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         }
         // When progress >= 100, we just keep the final rotation values intact so it doesn't snap!
 
+        if (f1AssembledLocalBounds) {
+          f1CarGroup.updateMatrixWorld(true);
+          assembledWorldBounds
+            .copy(f1AssembledLocalBounds)
+            .applyMatrix4(f1CarGroup.matrixWorld);
+          assembledWorldBounds.getCenter(assembledCenter);
+        }
+
+        const stoppedPoseSettled =
+          s.progress >= 100
+          && Math.abs(f1CarGroup.position.z - getF1Depth(100)) < 0.05
+          && Math.abs(f1CarGroup.position.y + 10) < 0.015
+          && Math.abs(f1CarGroup.scale.x - 12) < 0.02
+          && racingSpeed < 0.01;
+        stepF1ArrivalState(arrivalState, s.progress >= 100, stoppedPoseSettled, delta);
+
+        if (!hasSetOrbitTarget && arrivalState.ready) {
+          getF1ScreenStableOrbitTarget(
+            camera.position,
+            neutralCameraTarget,
+            assembledCenter,
+            screenStableOrbitTarget,
+          );
+          controls.target.copy(screenStableOrbitTarget);
+          hasSetOrbitTarget = true;
+        }
+
+        if (!hasPlacedStudioFloor && hasSetOrbitTarget && f1AssembledLocalBounds) {
+          reflection.floor.position.y = assembledWorldBounds.min.y - 0.03;
+          hasPlacedStudioFloor = true;
+        }
+
+        if (
+          !isOrbitInteractionReady
+          && hasSetOrbitTarget
+          && arrivalState.ready
+        ) {
+          isOrbitInteractionReady = true;
+        }
+
         // Update Trails (Trailing logic) (Removed old shader trail logic)
         // ... handled elsewhere if needed
 
       } else if (f1CarGroup) {
         f1CarGroup.visible = false;
+        stepF1ArrivalState(arrivalState, false, false, delta);
+      }
+
+      studioReveal = stepStudioReveal(
+        studioReveal,
+        arrivalState.ready && hasPlacedStudioFloor && hasSetOrbitTarget,
+        delta,
+      );
+      reflection.setReveal(studioReveal);
+
+      const explodeTarget = s.progress >= 100 && s.exploded ? 1 : 0;
+      explodeAmount += (explodeTarget - explodeAmount) * (1 - Math.exp(-delta * 4.2));
+      updateF1ExplodedParts(f1ExplodedParts, explodeAmount, delta, {
+        floorY: reflection.floor.position.y,
+        clearance: 0.03,
+      });
+      explodedCoreLight.intensity = 0.35 + explodeAmount * 7.15;
+      if (f1CarGroup) {
+        explodedCoreWorldPosition
+          .copy(explodedCoreAnchor)
+          .applyMatrix4(f1CarGroup.matrixWorld);
+        explodedCoreLight.position.copy(explodedCoreWorldPosition);
       }
 
       // ── Update Hairline Road & Speed Lines Fading ──
@@ -718,6 +1134,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       // 1. Render background lines with stable camera
       renderer.render(bgScene, bgCamera);
       // 2. Render car with OrbitControls camera on top
+      const previousAutoClear = renderer.autoClear;
+      renderer.autoClear = true;
+      reflection.render();
+      renderer.autoClear = previousAutoClear;
       renderer.render(scene, camera);
     };
 
@@ -731,6 +1151,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       bgCamera.updateProjectionMatrix();
 
       renderer.setSize(window.innerWidth, window.innerHeight);
+      reflection.resize(window.innerWidth, window.innerHeight);
       // godRays.resize(window.innerWidth, window.innerHeight);
     };
 
@@ -742,6 +1163,13 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('blur', handleWindowBlur);
+      renderer.domElement.removeEventListener('pointerdown', handleCarPointerDown, true);
+      renderer.domElement.removeEventListener('pointermove', handleCarPointerMove, true);
+      renderer.domElement.removeEventListener('pointerup', handleCarPointerUp, true);
+      renderer.domElement.removeEventListener('pointercancel', handleCarPointerCancel, true);
+      renderer.domElement.removeEventListener('lostpointercapture', handleCarLostPointerCapture, true);
+      clearCarGesture(false);
 
       // gpuParticles.dispose(scene);
       // godRays.dispose();
@@ -758,6 +1186,13 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
         (cpuParticles.material as THREE.Material).dispose();
       }
 
+      if (airflow) {
+        airflow.group.removeFromParent();
+        airflow.dispose();
+      }
+      controls.dispose();
+      studioLighting.dispose();
+      reflection.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
@@ -767,57 +1202,40 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({ isPressing, pro
 
   return <div
     ref={containerRef}
-    style={{ position: 'fixed', inset: 0, zIndex: 75, pointerEvents: progress >= 100 ? 'auto' : 'none' }}
-    onMouseDown={(e) => {
-
+    role="button"
+    tabIndex={progress >= 100 ? 0 : -1}
+    aria-label="Interactive Formula One showroom car"
+    aria-pressed={exploded}
+    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#FFB800]"
+    onClick={(event) => {
+      if (progress >= 100 && event.detail === 0) onCarClick?.();
     }}
-    onClick={(e) => {
-      // Smart event forwarding when progress >= 100
-      if (progress >= 100) {
-        const target = containerRef.current;
-        const canvas = containerRef.current?.querySelector('canvas');
-        if (!target || !canvas) return;
-
-        // The Three.js layer sits above the welcome content so the car remains
-        // visible. Resolve a clickable element at the same screen coordinate
-        // before treating the click as a car/orbit interaction.
-        const previousPointerEvents = target.style.pointerEvents;
-        target.style.pointerEvents = 'none';
-        const underlyingElement = document.elementFromPoint(e.clientX, e.clientY);
-        target.style.pointerEvents = previousPointerEvents;
-
-        const clickableElement = underlyingElement?.closest<HTMLElement>(
-          'button, a, [role="button"], [onclick]'
-        );
-        if (clickableElement) {
-          clickableElement.dispatchEvent(new MouseEvent('click', {
-            bubbles: true,
-            cancelable: true,
-            clientX: e.clientX,
-            clientY: e.clientY,
-          }));
-          e.stopPropagation();
-          return;
-        }
-
-        // Check if click is near center (where 3D car is positioned)
-        const rect = canvas.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-        // Calculate distance from center
-        const distanceFromCenter = Math.sqrt(x * x + y * y);
-
-
-
-        // If click is near center (on the car), handle car click.
-        if (distanceFromCenter < 0.4 && onCarClick) {
-          onCarClick();
-          e.stopPropagation();
-          // Let OrbitControls handle the interaction
-        }
+    onKeyDown={(event) => {
+      if (progress < 100) return;
+      if (event.repeat) {
+        if (event.key === ' ') event.preventDefault();
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        onCarClick?.();
+      } else if (event.key === ' ') {
+        event.preventDefault();
+        spaceKeyArmedRef.current = true;
       }
     }}
+    onKeyUp={(event) => {
+      if (event.key === ' ') {
+        event.preventDefault();
+        const shouldActivate = progress >= 100 && spaceKeyArmedRef.current;
+        spaceKeyArmedRef.current = false;
+        if (shouldActivate) onCarClick?.();
+      }
+    }}
+    onBlur={() => {
+      spaceKeyArmedRef.current = false;
+    }}
+    style={{ position: 'fixed', inset: 0, zIndex: 95, pointerEvents: progress >= 100 ? 'auto' : 'none', cursor: progress >= 100 ? 'grab' : 'default' }}
   />;
 };
 
