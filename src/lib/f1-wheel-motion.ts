@@ -12,6 +12,12 @@ export const createF1WheelMotionState = (): F1WheelMotionState => ({
   holdIntensity: 0,
 });
 
+export const getF1WheelRenderAngle = (
+  arrivalAngle: number,
+  holdAngle: number,
+  reducedMotion: boolean,
+): number => reducedMotion ? 0 : arrivalAngle + holdAngle;
+
 export const stepF1WheelMotion = (
   state: F1WheelMotionState,
   held: boolean,

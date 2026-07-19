@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
-import { applyF1WheelAngle, createF1WheelMotionState, stepF1WheelMotion } from '../src/lib/f1-wheel-motion';
+import { applyF1WheelAngle, createF1WheelMotionState, getF1WheelRenderAngle, stepF1WheelMotion } from '../src/lib/f1-wheel-motion';
 
 const state = createF1WheelMotionState();
 for (let i = 0; i < 60; i++) stepF1WheelMotion(state, true, 1 / 60, false);
@@ -29,6 +29,17 @@ for (let i = 0; i < 120; i++) {
 }
 assert.equal(reducedMotionState.velocity, 0, 'reduced-motion hold must keep wheel velocity at zero');
 assert.equal(reducedMotionState.angle, 0, 'reduced-motion hold must keep wheel angle at zero');
+
+assert.equal(
+  getF1WheelRenderAngle(1.25, 0.5, false),
+  1.75,
+  'arrival travel and stopped-car hold must both contribute to visible wheel rotation',
+);
+assert.equal(
+  getF1WheelRenderAngle(1.25, 0.5, true),
+  0,
+  'reduced motion must suppress visible wheel rotation',
+);
 
 const particleBackgroundSource = readFileSync(
   new URL('../src/components/ParticleBackground.tsx', import.meta.url),
@@ -131,13 +142,13 @@ const floorPlacement = particleBackgroundSource.indexOf(
   'reflection.floor.position.y = assembledWorldBounds.min.y - 0.03;',
   finalScale,
 );
-const progressiveCameraTarget = particleBackgroundSource.indexOf(
-  'controls.target.lerpVectors(',
+const stableOrbitTargetProjection = particleBackgroundSource.indexOf(
+  'getF1ScreenStableOrbitTarget(',
   finalScale,
 );
 const orbitTargetCommit = particleBackgroundSource.indexOf(
-  'hasSetOrbitTarget = true;',
-  progressiveCameraTarget,
+  'controls.target.copy(screenStableOrbitTarget);',
+  stableOrbitTargetProjection,
 );
 const floorPlacementCommit = particleBackgroundSource.indexOf(
   'hasPlacedStudioFloor = true;',
@@ -161,8 +172,8 @@ assert(finalStoppedY >= 0, 'the final assembled Y must be damped instead of snap
 assert(finalStoppedZ < finalStoppedY, 'depth damping must run before final Y/scale damping');
 assert(finalScale > finalStoppedY, 'final scale damping must run after final assembled Y');
 assert(
-  progressiveCameraTarget > finalScale && progressiveCameraTarget < orbitTargetCommit,
-  'camera target must blend during arrival before the studio floor is committed',
+  stableOrbitTargetProjection > finalScale && orbitTargetCommit > stableOrbitTargetProjection,
+  'orbit target must be projected onto the unchanged arrival view ray before it is committed',
 );
 assert(
   floorPlacement > orbitTargetCommit
@@ -193,6 +204,11 @@ assert.equal(
   particleBackgroundSource.match(/hasSetOrbitTarget = true;/g)?.length,
   1,
   'orbit target must only be committed once before the reveal starts',
+);
+assert.doesNotMatch(
+  particleBackgroundSource,
+  /controls\.target\.lerpVectors\(/,
+  'arrival must not retarget the camera toward the car and lift it in screen space',
 );
 const floorCommitBlock = particleBackgroundSource.slice(floorPlacement, revealAdvance);
 assert.doesNotMatch(
@@ -234,8 +250,8 @@ assert.match(
 );
 assert.match(
   particleBackgroundSource,
-  /applyF1WheelAngle\(f1Wheels, wheelMotion\.angle\);/,
-  'ParticleBackground must apply the wheel helper to resolved F1 wheels',
+  /applyF1WheelAngle\([\s\S]*?getF1WheelRenderAngle\([\s\S]*?racingMotion\.wheelAngle,[\s\S]*?wheelMotion\.angle,[\s\S]*?prefersReducedMotion/,
+  'ParticleBackground must render both arrival travel and stopped-car hold wheel angles',
 );
 assert.match(
   particleBackgroundSource,

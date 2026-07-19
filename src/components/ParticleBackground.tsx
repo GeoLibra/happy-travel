@@ -10,11 +10,11 @@ import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '..
 import {
   createF1ArrivalState,
   dampF1ArrivalValue,
-  getF1ArrivalCameraBlend,
+  getF1ScreenStableOrbitTarget,
   stepF1ArrivalState,
 } from '../lib/f1-arrival-motion';
 import { createF1ExplodedParts, getF1LocalBounds, resolveF1WheelNodes, updateF1ExplodedParts, type F1ExplodedPart } from '../lib/f1-model';
-import { applyF1WheelAngle, createF1WheelMotionState, stepF1WheelMotion } from '../lib/f1-wheel-motion';
+import { applyF1WheelAngle, createF1WheelMotionState, getF1WheelRenderAngle, stepF1WheelMotion } from '../lib/f1-wheel-motion';
 import {
   CAR_DRAG_TOLERANCE_PX,
   CAR_HOLD_DELAY_MS,
@@ -284,8 +284,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     const arrivalState = createF1ArrivalState();
     const assembledWorldBounds = new THREE.Box3();
     const assembledCenter = new THREE.Vector3();
-    const assembledSize = new THREE.Vector3();
     const neutralCameraTarget = new THREE.Vector3();
+    const screenStableOrbitTarget = new THREE.Vector3();
     let isCarMaterialReplaced = false;
     const racingMotion: F1MotionState = { speed: 0, wheelAngle: 0 };
 
@@ -816,7 +816,14 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       }
       studioLighting.update(wheelMotion.holdIntensity);
 
-      applyF1WheelAngle(f1Wheels, wheelMotion.angle);
+      applyF1WheelAngle(
+        f1Wheels,
+        getF1WheelRenderAngle(
+          racingMotion.wheelAngle,
+          wheelMotion.angle,
+          prefersReducedMotion,
+        ),
+      );
 
       // Connect audio on first press
       /*
@@ -992,14 +999,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
             .copy(f1AssembledLocalBounds)
             .applyMatrix4(f1CarGroup.matrixWorld);
           assembledWorldBounds.getCenter(assembledCenter);
-          assembledWorldBounds.getSize(assembledSize);
-          assembledCenter.y -= assembledSize.y * 0.08;
-          controls.target.lerpVectors(
-            neutralCameraTarget,
-            assembledCenter,
-            getF1ArrivalCameraBlend(s.progress),
-          );
-          if (!isOrbitInteractionReady) camera.lookAt(controls.target);
         }
 
         const stoppedPoseSettled =
@@ -1011,6 +1010,13 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         stepF1ArrivalState(arrivalState, s.progress >= 100, stoppedPoseSettled, delta);
 
         if (!hasSetOrbitTarget && arrivalState.ready) {
+          getF1ScreenStableOrbitTarget(
+            camera.position,
+            neutralCameraTarget,
+            assembledCenter,
+            screenStableOrbitTarget,
+          );
+          controls.target.copy(screenStableOrbitTarget);
           hasSetOrbitTarget = true;
         }
 

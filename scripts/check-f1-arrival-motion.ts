@@ -5,9 +5,10 @@ import {
   ARRIVAL_SETTLED_FRAMES,
   createF1ArrivalState,
   dampF1ArrivalValue,
-  getF1ArrivalCameraBlend,
+  getF1ScreenStableOrbitTarget,
   stepF1ArrivalState,
 } from '../src/lib/f1-arrival-motion';
+import * as THREE from 'three';
 
 assert.equal(ARRIVAL_SETTLED_FRAMES, 4);
 assert.equal(ARRIVAL_HOLD_MS, 120);
@@ -16,10 +17,20 @@ const first = dampF1ArrivalValue(-2, 0, 1 / 60, 8);
 assert(first > -2 && first < 0, 'arrival damping must approach without snapping');
 assert.equal(dampF1ArrivalValue(1, 3, 0, 8), 1, 'zero delta must preserve the current value');
 
-assert.equal(getF1ArrivalCameraBlend(82), 0, 'camera retargeting must begin before the stop');
-assert.equal(getF1ArrivalCameraBlend(91), 0.5, 'camera retargeting must be halfway before completion');
-assert.equal(getF1ArrivalCameraBlend(100), 1, 'camera target must already be final at the stop');
-assert.equal(getF1ArrivalCameraBlend(120), 1, 'camera retargeting must clamp above completion');
+const cameraPosition = new THREE.Vector3(0, 0, 50);
+const originalViewTarget = new THREE.Vector3(0, 0, 0);
+const carCenter = new THREE.Vector3(8, -10, -4);
+const stableOrbitTarget = getF1ScreenStableOrbitTarget(
+  cameraPosition,
+  originalViewTarget,
+  carCenter,
+  new THREE.Vector3(),
+);
+const originalViewDirection = originalViewTarget.clone().sub(cameraPosition).normalize();
+const committedViewDirection = stableOrbitTarget.clone().sub(cameraPosition).normalize();
+assert(originalViewDirection.distanceTo(committedViewDirection) < 1e-9, 'orbit target commit must preserve the arrival view direction');
+assert.equal(stableOrbitTarget.x, 0, 'screen-stable orbit target must stay on the existing view ray');
+assert.equal(stableOrbitTarget.y, 0, 'screen-stable orbit target must not lift the stopped car in screen space');
 
 const state = createF1ArrivalState();
 for (let frame = 0; frame < ARRIVAL_SETTLED_FRAMES - 1; frame += 1) {

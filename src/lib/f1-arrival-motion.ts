@@ -1,11 +1,23 @@
+import * as THREE from 'three';
+
 export const ARRIVAL_SETTLED_FRAMES = 4;
 export const ARRIVAL_HOLD_MS = 120;
 
-const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+export const getF1ScreenStableOrbitTarget = (
+  cameraPosition: THREE.Vector3,
+  currentViewTarget: THREE.Vector3,
+  subjectCenter: THREE.Vector3,
+  target: THREE.Vector3,
+): THREE.Vector3 => {
+  const viewDirection = currentViewTarget.clone().sub(cameraPosition);
+  if (viewDirection.lengthSq() < 1e-9) return target.copy(currentViewTarget);
 
-export const getF1ArrivalCameraBlend = (progress: number): number => {
-  const t = clamp01((progress - 82) / 18);
-  return t * t * (3 - 2 * t);
+  viewDirection.normalize();
+  const subjectDistance = Math.max(
+    0.1,
+    subjectCenter.clone().sub(cameraPosition).dot(viewDirection),
+  );
+  return target.copy(cameraPosition).addScaledVector(viewDirection, subjectDistance);
 };
 
 export interface F1ArrivalState {
