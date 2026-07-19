@@ -1,153 +1,124 @@
-# F1 Showroom Whole-Feature Final-Fix Report
+# Mobile controls/showroom final-review fix report
 
-Date: 2026-07-18 (Asia/Shanghai)
+Date: 2026-07-19 (Asia/Shanghai)
 
-Branch: `codex/f1-airflow-lighting`
+Worktree: `/Users/hgis/myproject/happy-travel/.worktrees/mobile-controls-shake-refactor`
 
-Base: `542f06d`
+Branch: `codex/mobile-controls-shake-refactor`
 
-Production/test commit: `25ffc93` (`fix: refine F1 showroom interaction flow`)
-
-Follow-up production/test commit: `11fa977` (`fix: stabilize F1 showroom follow-up interactions`)
+Commit: `f8bd772` (`fix: harden showroom entry and resource cleanup`)
 
 ## Outcome
 
-DONE. All six sections of the final-fix brief are implemented and verified as one cross-module interaction update:
+All final-review findings are fixed and verified.
 
-1. Airflow now starts at the shipped model's positive-Z nose, travels toward the negative-Z rear, and exits behind the car. The pulse follows increasing curve UV, the shader performs output color conversion, and tone mapping is explicit.
-2. The studio floor is measured and placed on the first progress-100 frame after the final car transform. Reveal begins only after that placement, and no later orbit-target settling path rewrites floor Y.
-3. An accepted hold, including an exact-deadline release, notifies `WelcomePage`, marks manual interaction, and cancels the pending 4.6-second automatic explosion. The untouched no-interaction path still auto-explodes.
-4. Gesture arbitration is atomic for additional pointers, exact-threshold release, captured-pointer exit, cancellation, blur, lost capture, drag, and release decay.
-5. The canvas keeps the bottom exploded-view button absent while supporting repeat-safe Enter, Space-on-keyup, zero-detail assistive-technology clicks, a stable accessible label, state-specific `aria-pressed`, and a visible inset yellow focus treatment.
-6. Exploded-floor guards reuse cached local corners and scratch math objects; model coverage checks every sampled explosion and reassembly frame. Task 4 wording and follow-up evidence were corrected in the local Task 4 report.
+1. Every particle/track factory now registers geometry and material ownership as soon as construction succeeds. Any subsequent setup exception attempts disposal of every registered resource and rethrows the original exception. Normal cleanup remains one-shot and attempts all owned disposals.
+2. `check:showroom-resources` injects deterministic failures at `geometry-ready`, `material-ready`, `object-ready` where applicable, and `setup-complete` for all four factories. It proves partial cleanup, original-error identity, and double-dispose idempotence.
+3. `WelcomePage` now sets `hasStartedEntryRef` before permission preparation. Three synchronous ENTER activations therefore produce one preparation call, one reassembly timer, and one final entry. Synchronous throws and rejected preparation promises are logged without blocking reassembly.
+4. Shake checks now cover exactly 100 ms, exactly threshold 1000, and modal-open state advancement.
+5. `check:f1-model` samples 121 explosion frames and 121 reassembly frames for both ordinary parts and the semantic rear-body fixture. Every sampled part remains above the floor, while wheel-adjacent Hard Rock cover/shroud fixtures retain exactly the `RearBodyAssembly` world translation.
+6. New desktop/mobile stopped screenshots were captured in the assembled state before the 4.6-second automatic explosion. Permission browser audits cover denied, rejected, unsupported, granted, and repeated-click behavior.
 
-## Changed files
-
-Production:
-
-- `src/components/effects/f1Airflow.ts`
-- `src/components/ParticleBackground.tsx`
-- `src/components/WelcomePage.tsx`
-- `src/lib/f1-model.ts`
-- `src/lib/f1-showroom-interaction.ts`
-
-Executable regression coverage:
-
-- `scripts/check-f1-airflow.ts`
-- `scripts/check-f1-model.ts`
-- `scripts/check-f1-showroom-interaction.ts`
-- `scripts/check-f1-welcome.ts`
-- `scripts/check-f1-wheel-hold.ts`
-
-Documentation:
-
-- `.superpowers/sdd/final-fix-report.md`
-- `.superpowers/sdd/task-4-report.md` (local ignored verification artifact)
+No GLB/model URL, wheel-node ownership, `RearHardRockAeroPanel` parentage, canvas stacking, or pointer-forwarding behavior changed.
 
 ## TDD evidence
 
-Regression contracts were added before their owning production changes. The expected RED runs were:
+RED runs before production edits:
 
-| Command | RED result |
-| --- | --- |
-| `npm run check:f1-airflow` | Exit 1: `paths must begin near the shipped model positive-Z front nose`. |
-| `npm run check:f1-model` | Exit 1: `each exploded part must cache its eight local bounds corners once`; received `undefined` instead of `8`. |
-| `npm run check:f1-showroom-interaction` | Exit 1: exact 260 ms expected `end-hold`, received `ignore`; the next RED run also proved the new pointer/bounds helpers were not yet exported. |
-| `npm run check:f1-welcome` | Exit 1: missing `markF1ManualInteraction` export and accepted-hold cancellation contract. |
-| `npm run check:f1-wheel-hold` | Exit 1: `ParticleBackground must expose a focused accepted-hold callback`. |
+- `npm run check:showroom-resources` — exit 1: `Missing expected exception: CPU particle field setup failure must rethrow the original setup error`.
+- `npm run check:shake` — exit 1: missing `hasStartedEntryRef` synchronous guard.
+- `npm run check:f1-welcome` — exit 1: `WelcomePage must synchronously reject repeated ENTER activation`.
 
-After implementation, every focused command above exited 0. The unchanged neighboring checks `check:f1-motion`, `check:f1-studio`, and `check:f1-reflection` also remained green.
+Focused GREEN runs:
 
-Deterministic coverage now proves:
+- `npm run check:showroom-resources` — exit 0, `Showroom resource checks passed.`
+- `npm run check:shake` — exit 0, `Shake detection and permission wiring checks passed.`
+- `npm run check:f1-welcome` — exit 0.
+- `npm run check:f1-model` — exit 0.
+- `npm run lint` — exit 0.
 
-- named positive-Z front/negative-Z rear airflow semantics, descending path Z, wake endpoint, pulse sign, shader output conversion, explicit tone mapping, and tier-specific path/radius behavior;
-- eight cached part corners and stable scratch-object identity, with clearance on every sampled frame from 0 through 120 in both explosion and reassembly;
-- exact-deadline hold resolution plus pure additional-pointer and canvas-boundary decisions;
-- no-interaction auto explosion at 4,600 ms and an accepted first hold at 4,560 ms that remains assembled across the original deadline;
-- floor placement before the first positive reveal update, exactly one floor-Y write, separate orbit-target gating, accepted-hold notification, multi-pointer/outside cancellation, and accessible keyboard/AT semantics.
+## Complete fresh verification
 
-## Final automated verification
+Every command below was run after the final source/test edits and exited 0:
 
-The complete Task 4 suite was rerun after the last production/test edit. The first parallel collection returned while lint/build were still active; those two were immediately rerun sequentially so every entry below has an explicit final exit code.
+- `npm run check:i18n` — `i18n checks passed for 37 locations`
+- `npm run check:shake` — `Shake detection and permission wiring checks passed.`
+- `npm run check:showroom-resources` — `Showroom resource checks passed.`
+- `npm run check:f1-welcome` — silent assertion pass
+- `npm run check:f1-motion` — `PASS: F1 motion is smooth and frame-rate independent`
+- `npm run check:f1-wheel-hold` — silent assertion pass
+- `npm run check:f1-airflow` — silent assertion pass
+- `npm run check:f1-studio` — silent assertion pass
+- `npm run check:f1-reflection` — silent assertion pass
+- `npm run check:f1-showroom-interaction` — silent assertion pass
+- `npm run check:f1-arrival-motion` — `PASS: F1 arrival settles for four frames and holds before studio reveal`
+- `npm run check:f1-model` — silent assertion pass; full bidirectional floor/semantic sampling
+- `npm run check:f1-showroom-v4` — `PASS: semantic F1 wheel and Hard Rock aero hierarchy`
+- `npm run check:showroom-assets` — `PASS: showroom assets (4.10 MB model)`
+- `npm run lint` — TypeScript `tsc --noEmit` pass
+- `npm run build` — Vite production build pass; 2,128 modules transformed in 3.34 s
+- `git diff --check` — exit 0, no output
 
-| Command | Final result |
-| --- | --- |
-| `npm run lint` | Exit 0; `tsc --noEmit`, no diagnostics. |
-| `npm run build` | Exit 0; 2,122 modules transformed, built in 13.11 s. Only the existing >500 kB chunk advisory remains. |
-| `npm run check:f1-motion` | Exit 0; `PASS: F1 motion is smooth and frame-rate independent`. |
-| `npm run check:f1-wheel-hold` | Exit 0. |
-| `npm run check:f1-airflow` | Exit 0. |
-| `npm run check:f1-welcome` | Exit 0. |
-| `npm run check:f1-studio` | Exit 0. |
-| `npm run check:f1-reflection` | Exit 0. |
-| `npm run check:f1-model` | Exit 0. |
-| `npm run check:f1-showroom-interaction` | Exit 0. |
-| `npm run check:showroom-assets` | Exit 0; `PASS: showroom assets (1.88 MB model)`. |
-| `git diff --check` | Exit 0 before staging; `git diff --cached --check` also exited 0. |
+The build emitted only Vite's existing advisory for the 1,189.89 kB minified application chunk.
 
 ## Browser verification
 
-Harness:
+Artifact root:
 
-- Wrapper: `/Users/hgis/.codex/skills/playwright/scripts/playwright_cli.sh`
-- Named headed session: `f1-showroom-final-fix`
-- App: `http://127.0.0.1:3000/`
-- Desktop viewport: 1440 x 900
-- Mobile viewport: 390 x 844
-- Reduced motion: `page.emulateMedia({ reducedMotion: "reduce" })`
-- Artifact root: `output/playwright/f1-showroom-refinement-final-fix/`
-- Trace: `output/playwright/f1-showroom-refinement-final-fix/.playwright-cli/traces/trace-1784381284713.trace`
-- Network log: `output/playwright/f1-showroom-refinement-final-fix/.playwright-cli/traces/trace-1784381284713.network`
+`/Users/hgis/myproject/happy-travel/.worktrees/mobile-controls-shake-refactor/output/playwright/final-review-fixes`
 
-Acceptance results:
+### Assembled stopped evidence
 
-- Desktop and mobile airflow remained white/cyan, close-fitting, and not overbright; sequential active frames show front-to-rear motion, while decay frames show complete removal after release.
-- Desktop and mobile floor captures at approximately 0/300/600/900 ms show the final horizon established before opacity rises, with no intersection or vertical jump during reveal.
-- A first valid hold crossed the original 4.6-second automatic deadline without explosion and decayed normally on release.
-- An exact-260 ms release completed the hold/manual-interaction path without toggling explosion.
-- A second pointer synchronously canceled a pending car gesture before OrbitControls saw it; leaving the canvas with a captured pointer canceled an active hold and removed airflow.
-- Repeat Enter toggled once, Space activated on keyup, a zero-detail synthetic click toggled exactly once, and an ordinary pointer tap also toggled once without double activation.
-- Keyboard focus produced the visible inset yellow ring (`rgb(255, 184, 0)` in computed box shadow).
-- In reduced motion, two active-hold frames captured 800 ms apart preserve wheel orientation and airflow phase; the decay frame removes airflow.
-- After the interaction matrix, the visible `ENTER` button still opened the itinerary; the final accessibility snapshot exposed `Shanghai Weekend Itinerary` with no welcome overlay.
+- `mobile-arrival-stopped-pre-hologram.png` — 390×844; captured 96 ms after ENTER appeared; car `aria-pressed="false"`.
+- `desktop-arrival-stopped-pre-hologram.png` — 1440×1000; captured 365 ms after ENTER appeared; car `aria-pressed="false"`.
+- `mobile-arrival-accelerating-fix.png` — additional mobile arrival sample.
+- Arrival trace: `.playwright-cli/traces/trace-1784463401404.trace`
+- Arrival network log: `.playwright-cli/traces/trace-1784463401404.network`
 
-Representative evidence:
+Visual inspection confirms the assembled car, unchanged framing, visible floor, and reflection in both stopped captures. Both measured capture delays are far below `HOLOGRAM_REVEAL_MS = 4600`.
 
-- Airflow: `desktop-airflow-direction-a.png`, `desktop-airflow-direction-b.png`, `desktop-airflow-direction-c.png`, `desktop-airflow-decayed.png`, and the corresponding `mobile-airflow-*` captures.
-- Floor: `desktop-floor-reveal-000ms.png`, `desktop-floor-reveal-300ms.png`, `desktop-floor-reveal-600ms.png`, `desktop-floor-reveal-900ms.png`, plus matching mobile captures.
-- Hold/gesture arbitration: `desktop-hold-before-auto-deadline.png`, `desktop-hold-across-auto-deadline.png`, `desktop-hold-after-auto-deadline-decayed.png`, `desktop-exact-threshold-release.png`, `desktop-two-pointer-cancelled.png`, `desktop-outside-cancel-active.png`, and `desktop-outside-cancelled.png`.
-- Accessibility: `desktop-enter-repeat-safe.png`, `desktop-space-keyup-activation.png`, `desktop-at-zero-detail-click.png`, `desktop-pointer-tap-single-toggle.png`, and `desktop-accessible-focus-visible.png`.
-- Reduced motion/navigation: `mobile-reduced-airflow-static-a.png`, `mobile-reduced-airflow-static-b.png`, `mobile-reduced-airflow-decayed.png`, and `mobile-reduced-entered.png`.
+### Permission/listener matrix
 
-All cited final screenshots were opened and visually inspected. Invalid exploratory captures were overwritten and are not cited.
+Each mobile scenario used a fresh browser context with an init-script audit of permission requests, `devicemotion` listener registration, and the `[App] Entering application...` completion log. Each exercised three synchronous `element.click()` calls after progress reached 100.
 
-## Self-review
+| Scenario | permission requests | listener adds | entries | Result |
+| --- | ---: | ---: | ---: | --- |
+| denied | 1 | 0 | 1 | entry continued exactly once |
+| rejected promise | 1 | 0 | 1 | exception logged; entry continued exactly once |
+| unsupported API | 0 | 1 | 1 | listener installed without permission prompt |
+| granted + repeated clicks | 1 | 1 | 1 | one-shot guard prevented duplicate preparation/entry |
 
-Verdict: **APPROVE**.
+Screenshots:
 
-- Reviewed the complete 10-file production/test diff and confirmed each change maps directly to a brief item.
-- Airflow path orientation, pulse direction, material output behavior, low-tier legibility, and path counts remain independently asserted.
-- Floor placement and reveal use separate state from orbit-target enablement; floor Y has one assignment site and cannot jump later.
-- Manual interaction is marked before state mutation, clears the exact pending timer, and leaves the no-interaction auto path intact.
-- Pointer state is invalidated synchronously on a second pointer or boundary exit, while tap/drag/cancel/lost-capture/blur cleanup and decay remain covered.
-- Synthetic click activation is restricted to `detail === 0`, so ordinary pointer events cannot double-fire the canvas toggle.
-- Cached exploded-part math eliminates the eight-per-mesh/per-frame corner allocation while retaining clearance through both motion directions.
-- Output artifacts remain ignored and were not staged. The branch is intentionally preserved as requested.
+- `permission-denied-entry.png`
+- `permission-rejected-entry.png`
+- `permission-unsupported-entry.png`
+- `permission-granted-repeated-click-entry.png`
+
+Traces:
+
+- denied: `.playwright-cli/traces/trace-1784463823406.trace`
+- rejected: `.playwright-cli/traces/trace-1784463878618.trace`
+- unsupported: `.playwright-cli/traces/trace-1784463980934.trace`
+- granted/repeated: `.playwright-cli/traces/trace-1784464074226.trace`
+
+Corresponding `.network` logs share the same numeric stems.
+
+## Files in the scoped commit
+
+- `src/components/WelcomePage.tsx`
+- `src/components/showroom/showroom-resource-lifecycle.ts`
+- `src/components/showroom/showroom-particles.ts`
+- `src/components/showroom/showroom-track.ts`
+- `scripts/check-showroom-resources.ts`
+- `scripts/check-shake-detection.ts`
+- `scripts/check-f1-welcome.ts`
+- `scripts/check-f1-model.ts`
 
 ## Concerns
 
-- Vite still reports its pre-existing main-chunk-size advisory; the production build succeeds.
-- The headed development browser reports only the unrelated `/favicon.ico` 404 (one or two entries after reload), with zero warnings and no model/runtime errors.
-- The Playwright trace resource directory is large because it contains the complete multi-viewport interaction session; it is ignored and remains under the requested artifact root.
-- No remaining functional, accessibility, or visual acceptance blocker was observed.
+- Vite's pre-existing large-chunk advisory remains; the production build succeeds.
+- The development browser reports the unrelated missing `/favicon.ico`; entered-app screenshots may also log the expected missing local AMap API key. Neither affects welcome, permission, shake, or showroom behavior.
+- Browser artifacts and `.superpowers` reports are ignored by repository policy and were intentionally not included in commit `f8bd772`.
 
-## Final follow-up verification
-
-Commit `11fa977` resolves the final review findings without changing the stable accessible label or restoring a bottom control:
-
-- assembled short press still toggles into exploded view, while exploded short press now toggles back to reassembly; exploded long press cannot start wheel/airflow hold behavior;
-- final car depth, measured floor placement, final controls target, and `controls.update()` all commit before the first positive floor reveal; user OrbitControls remain separately disabled until motion settles;
-- `check:f1-airflow` now parses `public/models/red_bull_f1_showroom.glb` and verifies the actual named front pivots are +Z and rear pivots are -Z;
-- threshold-settled exploded/reassembled poses skip matrix/corner floor-guard work while the frame-by-frame clearance checks remain green.
-
-The complete 11-command suite, lint, build, and diff checks all exit 0 on `11fa977`. The follow-up headed-browser evidence is under `output/playwright/f1-showroom-final-followup/`; desktop/mobile 0/300/600/900 ms captures keep a fixed horizon and car framing, and the desktop canvas-listener short-press sequence records `false -> true -> false`. Full RED/GREEN, artifact, self-review, and concern details are in `.superpowers/sdd/final-followup-report.md`.
+No functional or visual acceptance blocker remains from the final review.
