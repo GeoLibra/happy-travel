@@ -26,7 +26,8 @@ import {
   Flag,
   Utensils,
   Music,
-  Sparkles
+  Sparkles,
+  Languages
 } from 'lucide-react';
 import { ITINERARY_DATA, Location, TYPE_COLORS } from './constants';
 import MapComponent from './components/MapComponent';
@@ -289,9 +290,10 @@ export default function App() {
               type="button"
               onClick={toggleLocale}
               aria-label={t('language.label')}
-              className="h-9 min-w-14 rounded-lg border border-slate-200 bg-white/80 px-3 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-[#E10600]/40 hover:text-[#E10600]"
+              title={t('language.label')}
+              className="h-9 w-9 shrink-0 rounded-lg border border-slate-200 bg-white/80 inline-flex items-center justify-center text-slate-700 shadow-sm transition-colors hover:border-[#E10600]/40 hover:text-[#E10600] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E10600]/40"
             >
-              {t('language.switchLabel')}
+              <Languages size={18} aria-hidden="true" />
             </button>
           <div className="md:hidden flex bg-slate-100 p-1 rounded-lg">
             <button

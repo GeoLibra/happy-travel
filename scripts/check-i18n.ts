@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import itinerary from '../src/data/itinerary.json';
 import {
   getInitialLocale,
@@ -7,6 +8,8 @@ import {
   type Locale,
 } from '../src/i18n';
 import type { DayPlan } from '../src/constants';
+
+const appSource = readFileSync('src/App.tsx', 'utf8');
 
 const containsHan = (value: string | undefined) => Boolean(value && /\p{Script=Han}/u.test(value));
 
@@ -40,5 +43,12 @@ assert.match(english[1].locations[1].description ?? '', /Imagine Dragons LOOM Wo
 
 const locales: Locale[] = ['zh', 'en'];
 assert.deepEqual(locales.map((locale) => translate(locale, 'language.switchLabel')), ['English', '中文']);
+
+assert.match(appSource, /import[\s\S]*Languages[\s\S]*from 'lucide-react'/);
+assert.match(appSource, /aria-label=\{t\('language\.label'\)\}/);
+assert.match(appSource, /title=\{t\('language\.label'\)\}/);
+assert.match(appSource, /className="h-9 w-9/);
+assert.match(appSource, /<Languages[^>]*size=\{18\}/);
+assert.doesNotMatch(appSource, /\{t\('language\.switchLabel'\)\}/);
 
 console.log(`i18n checks passed for ${english.flatMap((day) => day.locations).length} locations`);
