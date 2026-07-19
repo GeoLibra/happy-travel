@@ -17,7 +17,7 @@ All final-review findings are fixed and verified.
 3. `WelcomePage` now sets `hasStartedEntryRef` before permission preparation. Three synchronous ENTER activations therefore produce one preparation call, one reassembly timer, and one final entry. Synchronous throws and rejected preparation promises are logged without blocking reassembly.
 4. Shake checks now cover exactly 100 ms, exactly threshold 1000, and modal-open state advancement.
 5. `check:f1-model` samples 121 explosion frames and 121 reassembly frames for both ordinary parts and the semantic rear-body fixture. Every sampled part remains above the floor, while wheel-adjacent Hard Rock cover/shroud fixtures retain exactly the `RearBodyAssembly` world translation.
-6. New desktop/mobile stopped screenshots were captured in the assembled state before the 4.6-second automatic explosion. Permission browser audits cover denied, rejected, unsupported, granted, and repeated-click behavior.
+6. Authoritative desktop/mobile stopped screenshots were recaptured at 1.5 seconds in the assembled state before the 4.6-second automatic explosion. Permission browser audits cover denied, rejected, unsupported, granted, and repeated-click behavior.
 
 No GLB/model URL, wheel-node ownership, `RearHardRockAeroPanel` parentage, canvas stacking, or pointer-forwarding behavior changed.
 
@@ -67,15 +67,15 @@ Artifact root:
 
 `/Users/hgis/myproject/happy-travel/.worktrees/mobile-controls-shake-refactor/output/playwright/final-review-fixes`
 
-### Assembled stopped evidence
+### Superseded preliminary stopped evidence
 
-- `mobile-arrival-stopped-pre-hologram.png` — 390×844; captured 96 ms after ENTER appeared; car `aria-pressed="false"`.
-- `desktop-arrival-stopped-pre-hologram.png` — 1440×1000; captured 365 ms after ENTER appeared; car `aria-pressed="false"`.
+- `mobile-arrival-stopped-pre-hologram.png` — **superseded; not authoritative**.
+- `desktop-arrival-stopped-pre-hologram.png` — **superseded; not authoritative**.
 - `mobile-arrival-accelerating-fix.png` — additional mobile arrival sample.
 - Arrival trace: `.playwright-cli/traces/trace-1784463401404.trace`
 - Arrival network log: `.playwright-cli/traces/trace-1784463401404.network`
 
-Visual inspection confirms the assembled car, unchanged framing, visible floor, and reflection in both stopped captures. Both measured capture delays are far below `HOLOGRAM_REVEAL_MS = 4600`.
+These preliminary captures and their old visual/timing claims are superseded by the authoritative 1.5-second recapture section at the end of this report.
 
 ### Permission/listener matrix
 
@@ -122,3 +122,72 @@ Corresponding `.network` logs share the same numeric stems.
 - Browser artifacts and `.superpowers` reports are ignored by repository policy and were intentionally not included in commit `f8bd772`.
 
 No functional or visual acceptance blocker remains from the final review.
+
+---
+
+## Authoritative 1.5-second stopped recapture
+
+This section supersedes the earlier `*-arrival-stopped-pre-hologram.png` claims and trace `trace-1784463401404.trace`. Those captures were too early to prove the settled studio state and are not authoritative.
+
+### Fresh browser procedure
+
+Artifact root:
+
+`/Users/hgis/myproject/happy-travel/.worktrees/mobile-controls-shake-refactor/output/playwright/final-review-stopped-recapture`
+
+Two isolated headed Chromium sessions were used: `f1-stopped-mobile-recapture` at 390×844 and `f1-stopped-desktop-recapture` at 1440×1000. For each authoritative trace:
+
+1. Start tracing, reload the page at the final viewport, and wait 3,500 ms for model/loading completion.
+2. Save a same-run idle reference screenshot.
+3. Dispatch pointer-down on `[data-f1-welcome-action=enter]`, hold for 1,800 ms, and dispatch pointer-up through the stable selector.
+4. Wait until the visible button name is exactly `ENTER`; record `performance.now()` at that first observable stopped state.
+5. Wait 1,500 ms, then assert the car control has `aria-pressed="false"` and the welcome button still reads `ENTER`.
+6. Record the elapsed time and save the authoritative screenshot.
+7. Wait another 140 ms, repeat both state assertions, and save the follow-up screenshot.
+8. Fail the run unless the authoritative elapsed time is between 1,400 and 2,200 ms and the follow-up remains before 2,600 ms—comfortably before `HOLOGRAM_REVEAL_MS = 4600`.
+
+### Exact browser assertion results
+
+| Viewport | Authoritative elapsed | Follow-up elapsed | Assembled assertions | Auto-explosion margin |
+| --- | ---: | ---: | --- | ---: |
+| Mobile 390×844 | 1,509 ms | 1,847 ms | both frames: `aria-pressed="false"`, `ENTER` | 3,091 ms |
+| Desktop 1440×1000 | 1,505 ms | 2,074 ms | both frames: `aria-pressed="false"`, `ENTER` | 3,095 ms |
+
+Authoritative screenshots:
+
+- `mobile-arrival-stopped-verified-1500ms.png`
+- `desktop-arrival-stopped-verified-1500ms.png`
+
+Supporting files:
+
+- `mobile-arrival-idle-reference.png`
+- `desktop-arrival-idle-reference.png`
+- `mobile-arrival-stopped-stability-b.png`
+- `desktop-arrival-stopped-stability-b.png`
+- `verify-stopped-evidence.sh`
+
+Clean final traces and network logs:
+
+- mobile: `.playwright-cli/traces/trace-1784468526791.trace` and `.network`
+- desktop: `.playwright-cli/traces/trace-1784468589212.trace` and `.network`
+
+### Programmatic floor/reflection and stopped-speed equivalent
+
+From the worktree root, `zsh output/playwright/final-review-stopped-recapture/verify-stopped-evidence.sh` crops the lower showroom region from each authoritative screenshot and its same-run idle reference, checks exact image dimensions, and requires stopped luminance, highlight, and saturation energy to exceed idle thresholds. Exact exit-0 output:
+
+```text
+mobile lower-band floor/reflection: YAVG 76.4558 -> 86.6085, YHIGH 108.0 -> 170.0, SATAVG 20.9897 -> 26.6251
+desktop lower-band floor/reflection: YAVG 44.5917 -> 55.4458, YHIGH 70.0 -> 81.0, SATAVG 10.6652 -> 17.1588
+PASS: stopped screenshots have the required dimensions and visible floor/reflection energy above idle references
+```
+
+This is also the direct browser-observable equivalent for stopped/faded speed trails. In `ParticleBackground`, studio reveal can advance only when `arrivalState.ready`; that state can become ready only after `stoppedPoseSettled`, whose predicates include `racingSpeed < 0.01`. Therefore the programmatically observed revealed floor/reflection, combined with the still-assembled state and the arrival/studio/reflection checks below, proves the stopped-speed gate was reached rather than merely observing progress 100.
+
+Fresh supporting checks, all exit 0:
+
+- `npm run check:f1-motion` — `PASS: F1 motion is smooth and frame-rate independent`
+- `npm run check:f1-arrival-motion` — `PASS: F1 arrival settles for four frames and holds before studio reveal`
+- `npm run check:f1-studio` — silent assertion pass
+- `npm run check:f1-reflection` — silent assertion pass
+
+No source, GLB, or model URL changed for this evidence correction. Browser console noise remains limited to the unrelated missing `/favicon.ico` and absent local AMap key.
