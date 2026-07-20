@@ -10,9 +10,9 @@ import { loadModelWithCache } from '../lib/model-loader';
 import { ROSE_MODEL_URL } from '../lib/rose-animation';
 import { markF1ManualInteraction } from '../lib/f1-showroom-interaction';
 import {
-  AUTO_EXPLODE_DELAY_MS,
-  getF1GlitchProgress,
-} from '../lib/f1-glitch-sequence';
+  createF1WelcomeSequence,
+  type F1WelcomeSequence,
+} from '../lib/f1-welcome-sequence';
 import { useI18n } from '../i18n';
 
 const F1_SHOWROOM_MODEL_URL = '/models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2';
@@ -66,6 +66,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const autoExplodeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const glitchFrameRef = React.useRef<number | null>(null);
   const sequenceStartedAtRef = React.useRef<number | null>(null);
+  const automaticSequenceRef = React.useRef<F1WelcomeSequence | null>(null);
   const hasManualInteractionRef = React.useRef(false);
   const hasStartedEntryRef = React.useRef(false);
 
@@ -78,6 +79,8 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
       cancelAnimationFrame(glitchFrameRef.current);
       glitchFrameRef.current = null;
     }
+    automaticSequenceRef.current?.cancel();
+    automaticSequenceRef.current = null;
     sequenceStartedAtRef.current = null;
     setGlitchProgress(null);
   }, []);
@@ -168,28 +171,47 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   }, [cancelAutomaticShowroomSequence]);
 
   useEffect(() => {
-    if (progress < 100 || isTransitioning || hasManualInteractionRef.current) return;
+    if (
+      progress < 100
+      || isTransitioning
+      || hasManualInteractionRef.current
+      || automaticSequenceRef.current
+    ) return;
 
+    let sequence: F1WelcomeSequence;
+    sequence = createF1WelcomeSequence({
+      requestAnimationFrame: (callback) => {
+        const frame = requestAnimationFrame((now) => {
+          glitchFrameRef.current = null;
+          callback(now);
+        });
+        glitchFrameRef.current = frame;
+        return frame;
+      },
+      cancelAnimationFrame: (frame) => {
+        cancelAnimationFrame(frame);
+        if (glitchFrameRef.current === frame) glitchFrameRef.current = null;
+      },
+      onGlitchProgress: setGlitchProgress,
+      onExplode: () => {
+        automaticSequenceRef.current = null;
+        sequenceStartedAtRef.current = null;
+        setIsCarExploded(true);
+      },
+    });
+    automaticSequenceRef.current = sequence;
     sequenceStartedAtRef.current = performance.now();
-    const updateGlitch = (now: number) => {
-      const startedAt = sequenceStartedAtRef.current;
-      if (startedAt === null) return;
-      setGlitchProgress(getF1GlitchProgress(now - startedAt));
-      if (now - startedAt < AUTO_EXPLODE_DELAY_MS) {
-        glitchFrameRef.current = requestAnimationFrame(updateGlitch);
-      }
-    };
-    glitchFrameRef.current = requestAnimationFrame(updateGlitch);
-    autoExplodeTimerRef.current = setTimeout(() => {
-      autoExplodeTimerRef.current = null;
-      setIsCarExploded(true);
-      glitchFrameRef.current = null;
-      sequenceStartedAtRef.current = null;
-      setGlitchProgress(null);
-    }, AUTO_EXPLODE_DELAY_MS);
+    sequence.start(sequenceStartedAtRef.current);
 
-    return cancelAutomaticShowroomSequence;
-  }, [cancelAutomaticShowroomSequence, isTransitioning, progress]);
+    return () => {
+      sequence.cancel();
+      if (automaticSequenceRef.current === sequence) {
+        automaticSequenceRef.current = null;
+      }
+      sequenceStartedAtRef.current = null;
+      glitchFrameRef.current = null;
+    };
+  }, [isTransitioning, progress]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;

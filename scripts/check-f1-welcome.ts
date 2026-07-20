@@ -1,16 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  CAR_HOLD_DELAY_MS,
-  markF1ManualInteraction,
-} from '../src/lib/f1-showroom-interaction';
-import {
   AUTO_EXPLODE_DELAY_MS,
   GLITCH_CLEAN_FRAME_MS,
   GLITCH_CLEAN_HOLD_MS,
   GLITCH_DURATION_MS,
   HOLOGRAM_REVEAL_MS,
 } from '../src/lib/f1-glitch-sequence';
+import { createF1WelcomeSequence } from '../src/lib/f1-welcome-sequence';
 
 const source = readFileSync(
   new URL('../src/components/WelcomePage.tsx', import.meta.url),
@@ -81,7 +78,13 @@ assert.match(source, /cancelAutomaticShowroomSequence/);
 assert.match(source, /cancelAnimationFrame\(glitchFrameRef\.current\)/);
 assert.match(source, /glitchProgress=\{glitchProgress\}/);
 assert.match(source, /setIsCarExploded\(true\)/);
-assert.match(source, /AUTO_EXPLODE_DELAY_MS/);
+assert.match(source, /createF1WelcomeSequence/);
+assert.match(source, /automaticSequenceRef/);
+assert.doesNotMatch(
+  source,
+  /autoExplodeTimerRef\.current\s*=\s*setTimeout/,
+  'automatic explosion must be animation-frame owned, never timeout owned',
+);
 assert.match(
   source,
   /const hasStartedEntryRef = React\.useRef\(false\);/,
@@ -99,7 +102,7 @@ assert.match(
 );
 assert.match(
   source,
-  /if \(progress < 100 \|\| isTransitioning \|\| hasManualInteractionRef\.current\) return;/,
+  /progress < 100[\s\S]*?\|\| isTransitioning[\s\S]*?\|\| hasManualInteractionRef\.current[\s\S]*?\|\| automaticSequenceRef\.current/,
   'auto-explode must remain cancelled after any accepted manual interaction',
 );
 assert.match(
@@ -120,98 +123,103 @@ assert.match(
   'mobile viewports must retain the reflective tier unless reduced motion is requested',
 );
 
-type FakeTimer = number;
+type FakeFrame = number;
 
-class FakeScheduler {
+class FakeAnimationFrames {
   now = 0;
   private nextId = 1;
-  private readonly tasks = new Map<FakeTimer, { at: number; callback: () => void }>();
+  private readonly callbacks = new Map<FakeFrame, (now: number) => void>();
+  private readonly allCallbacks = new Map<FakeFrame, (now: number) => void>();
 
-  setTimeout(callback: () => void, delayMs: number): FakeTimer {
+  requestAnimationFrame(callback: (now: number) => void): FakeFrame {
     const id = this.nextId;
     this.nextId += 1;
-    this.tasks.set(id, { at: this.now + delayMs, callback });
+    this.callbacks.set(id, callback);
+    this.allCallbacks.set(id, callback);
     return id;
   }
 
-  clearTimeout(id: FakeTimer): void {
-    this.tasks.delete(id);
+  cancelAnimationFrame(id: FakeFrame): void {
+    this.callbacks.delete(id);
   }
 
-  advanceBy(deltaMs: number): void {
-    const target = this.now + deltaMs;
-    while (true) {
-      const next = [...this.tasks.entries()]
-        .filter(([, task]) => task.at <= target)
-        .sort((left, right) => left[1].at - right[1].at || left[0] - right[0])[0];
-      if (!next) break;
-      const [id, task] = next;
-      this.tasks.delete(id);
-      this.now = task.at;
-      task.callback();
-    }
-    this.now = target;
+  runNext(now: number): FakeFrame {
+    const next = this.callbacks.entries().next().value as [FakeFrame, (time: number) => void] | undefined;
+    assert(next, 'expected an animation frame to be scheduled');
+    const [id, callback] = next;
+    this.callbacks.delete(id);
+    this.now = now;
+    callback(now);
+    return id;
+  }
+
+  runStale(id: FakeFrame, now: number): void {
+    const callback = this.allCallbacks.get(id);
+    assert(callback, `expected frame ${id} to exist`);
+    this.now = now;
+    callback(now);
+  }
+
+  get pendingCount(): number {
+    return this.callbacks.size;
   }
 }
 
-const untouchedScheduler = new FakeScheduler();
-let untouchedExploded = false;
-untouchedScheduler.setTimeout(() => {
-  untouchedExploded = true;
-}, AUTO_EXPLODE_DELAY_MS);
-untouchedScheduler.advanceBy(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS + GLITCH_DURATION_MS);
-assert.equal(
-  untouchedExploded,
-  false,
-  'the car must remain assembled through the hologram and glitch windows',
-);
-untouchedScheduler.advanceBy(GLITCH_CLEAN_FRAME_MS);
-assert.equal(untouchedExploded, true, 'automatic explosion must still run without interaction');
-
-const heldScheduler = new FakeScheduler();
-let heldExploded = false;
-const hasManualInteraction = { current: false };
-const pendingAutoExplosion: { current: FakeTimer | null } = {
-  current: heldScheduler.setTimeout(() => {
-    heldExploded = true;
-  }, AUTO_EXPLODE_DELAY_MS),
+const createSequenceHarness = () => {
+  const frames = new FakeAnimationFrames();
+  const events: Array<string | number | null> = [];
+  const sequence = createF1WelcomeSequence({
+    requestAnimationFrame: (callback) => frames.requestAnimationFrame(callback),
+    cancelAnimationFrame: (frame) => frames.cancelAnimationFrame(frame),
+    onGlitchProgress: (value) => events.push(value),
+    onExplode: () => events.push('explode'),
+  });
+  return { events, frames, sequence };
 };
 
-heldScheduler.advanceBy(AUTO_EXPLODE_DELAY_MS - CAR_HOLD_DELAY_MS - 40);
-heldScheduler.setTimeout(() => {
-  markF1ManualInteraction(
-    hasManualInteraction,
-    pendingAutoExplosion,
-    (timer) => heldScheduler.clearTimeout(timer),
-  );
-}, CAR_HOLD_DELAY_MS);
-heldScheduler.advanceBy(CAR_HOLD_DELAY_MS + 80);
+const hasExplosion = (events: ReadonlyArray<number | string | null>): boolean =>
+  events.some((event) => event === 'explode');
 
-assert.equal(hasManualInteraction.current, true, 'accepted first hold must mark manual interaction');
-assert.equal(pendingAutoExplosion.current, null, 'accepted first hold must clear the auto timer');
+const cleanFrameSequence = createSequenceHarness();
+assert.equal(cleanFrameSequence.sequence.start(0), true, 'the automatic sequence must start once');
+cleanFrameSequence.frames.runNext(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS - 1);
+assert.deepEqual(cleanFrameSequence.events, [], 'glitch state must remain clean before the active window');
+cleanFrameSequence.frames.runNext(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS);
+assert.deepEqual(cleanFrameSequence.events, [0], 'glitch progress must start at zero on the exact boundary');
+cleanFrameSequence.frames.runNext(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS + GLITCH_DURATION_MS / 2);
+assert.equal(cleanFrameSequence.events.at(-1), 0.5, 'glitch progress must reach the deterministic midpoint');
+cleanFrameSequence.frames.runNext(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS + GLITCH_DURATION_MS);
+assert.deepEqual(
+  cleanFrameSequence.events.slice(-2),
+  [0.5, null],
+  'glitch completion must commit a clean assembled frame before explosion',
+);
+assert.equal(hasExplosion(cleanFrameSequence.events), false, 'completion frame must not explode the car');
+cleanFrameSequence.frames.runNext(AUTO_EXPLODE_DELAY_MS);
+assert.equal(cleanFrameSequence.events.at(-1), 'explode', 'only the later animation frame may explode the car');
+assert.equal(cleanFrameSequence.frames.pendingCount, 0, 'explosion must stop the frame loop');
+
+const preGlitchCancellation = createSequenceHarness();
+assert.equal(preGlitchCancellation.sequence.start(0), true);
+const preGlitchFrame = preGlitchCancellation.frames.runNext(100);
+preGlitchCancellation.sequence.cancel();
+assert.equal(preGlitchCancellation.frames.pendingCount, 0, 'pre-glitch cancellation must remove the pending frame');
+preGlitchCancellation.frames.runStale(preGlitchFrame, AUTO_EXPLODE_DELAY_MS + 100);
+assert.deepEqual(preGlitchCancellation.events, [null], 'a stale pre-glitch callback must not restart or explode');
+assert.equal(preGlitchCancellation.sequence.start(200), false, 'a cancelled sequence instance must never restart');
+
+const activeGlitchCancellation = createSequenceHarness();
+assert.equal(activeGlitchCancellation.sequence.start(0), true);
+activeGlitchCancellation.frames.runNext(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS + 200);
+const activeGlitchFrame = activeGlitchCancellation.frames.runNext(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS + 400);
+activeGlitchCancellation.sequence.cancel();
+assert.equal(activeGlitchCancellation.frames.pendingCount, 0, 'active-glitch cancellation must remove the pending frame');
+activeGlitchCancellation.frames.runStale(activeGlitchFrame, AUTO_EXPLODE_DELAY_MS + 100);
+assert.equal(activeGlitchCancellation.events.at(-1), null, 'active-glitch cancellation must clear the visual state');
+assert.equal(hasExplosion(activeGlitchCancellation.events), false, 'stale active-glitch callbacks must not explode the car');
+
 assert.equal(
-  heldExploded,
-  false,
-  'a first hold spanning the original 4.6-second deadline must not explode the car',
+  AUTO_EXPLODE_DELAY_MS,
+  HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS + GLITCH_DURATION_MS + GLITCH_CLEAN_FRAME_MS,
+  'the controller must use the complete timing contract',
 );
-
-const glitchScheduler = new FakeScheduler();
-let glitchExploded = false;
-const duringGlitchInteraction = { current: false };
-const duringGlitchTimer: { current: FakeTimer | null } = {
-  current: glitchScheduler.setTimeout(() => {
-    glitchExploded = true;
-  }, AUTO_EXPLODE_DELAY_MS),
-};
-
-glitchScheduler.advanceBy(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS + GLITCH_DURATION_MS / 2);
-markF1ManualInteraction(
-  duringGlitchInteraction,
-  duringGlitchTimer,
-  (timer) => glitchScheduler.clearTimeout(timer),
-);
-glitchScheduler.advanceBy(GLITCH_DURATION_MS);
-
-assert.equal(duringGlitchInteraction.current, true, 'a manual interaction during the glitch must be retained');
-assert.equal(duringGlitchTimer.current, null, 'a manual interaction during the glitch must clear the timer');
-assert.equal(glitchExploded, false, 'a manual interaction during the glitch must prevent automatic explosion');
