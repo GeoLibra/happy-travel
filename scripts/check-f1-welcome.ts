@@ -195,9 +195,16 @@ assert.deepEqual(
   'glitch completion must commit a clean assembled frame before explosion',
 );
 assert.equal(hasExplosion(cleanFrameSequence.events), false, 'completion frame must not explode the car');
+cleanFrameSequence.frames.runNext(AUTO_EXPLODE_DELAY_MS - 1);
+assert.equal(
+  hasExplosion(cleanFrameSequence.events),
+  false,
+  'the second post-glitch frame must not explode before the complete clean-frame delay',
+);
 cleanFrameSequence.frames.runNext(AUTO_EXPLODE_DELAY_MS);
 assert.equal(cleanFrameSequence.events.at(-1), 'explode', 'only the later animation frame may explode the car');
 assert.equal(cleanFrameSequence.frames.pendingCount, 0, 'explosion must stop the frame loop');
+assert.equal(cleanFrameSequence.sequence.start(AUTO_EXPLODE_DELAY_MS + 1), false, 'a completed sequence instance must never restart');
 
 const preGlitchCancellation = createSequenceHarness();
 assert.equal(preGlitchCancellation.sequence.start(0), true);
