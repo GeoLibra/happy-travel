@@ -4,6 +4,13 @@ import {
   CAR_HOLD_DELAY_MS,
   markF1ManualInteraction,
 } from '../src/lib/f1-showroom-interaction';
+import {
+  AUTO_EXPLODE_DELAY_MS,
+  GLITCH_CLEAN_FRAME_MS,
+  GLITCH_CLEAN_HOLD_MS,
+  GLITCH_DURATION_MS,
+  HOLOGRAM_REVEAL_MS,
+} from '../src/lib/f1-glitch-sequence';
 
 const source = readFileSync(
   new URL('../src/components/WelcomePage.tsx', import.meta.url),
@@ -68,6 +75,13 @@ assert.match(
   /const autoExplodeTimerRef = React\.useRef<ReturnType<typeof setTimeout> \| null>\(null\);/,
   'WelcomePage must retain the pending auto-explode timer',
 );
+assert.match(source, /const \[glitchProgress, setGlitchProgress\] = useState<number \| null>\(null\)/);
+assert.match(source, /const glitchFrameRef = React\.useRef<number \| null>\(null\)/);
+assert.match(source, /cancelAutomaticShowroomSequence/);
+assert.match(source, /cancelAnimationFrame\(glitchFrameRef\.current\)/);
+assert.match(source, /glitchProgress=\{glitchProgress\}/);
+assert.match(source, /setIsCarExploded\(true\)/);
+assert.match(source, /AUTO_EXPLODE_DELAY_MS/);
 assert.match(
   source,
   /const hasStartedEntryRef = React\.useRef\(false\);/,
@@ -75,7 +89,7 @@ assert.match(
 );
 assert.match(
   source,
-  /const handleCarManualInteraction = useCallback\(\(\) => \{[\s\S]*?markF1ManualInteraction\([\s\S]*?hasManualInteractionRef,[\s\S]*?autoExplodeTimerRef,[\s\S]*?clearTimeout,[\s\S]*?\);[\s\S]*?\}, \[\]\);/,
+  /const handleCarManualInteraction = useCallback\(\(\) => \{[\s\S]*?markF1ManualInteraction\([\s\S]*?hasManualInteractionRef,[\s\S]*?autoExplodeTimerRef,[\s\S]*?clearTimeout,[\s\S]*?\);[\s\S]*?cancelAutomaticShowroomSequence\(\);[\s\S]*?\}\, \[cancelAutomaticShowroomSequence\]\);/,
   'WelcomePage must expose one focused manual-interaction cancellation callback',
 );
 assert.match(
@@ -140,14 +154,18 @@ class FakeScheduler {
   }
 }
 
-const AUTO_EXPLODE_DELAY_MS = 4600;
-
 const untouchedScheduler = new FakeScheduler();
 let untouchedExploded = false;
 untouchedScheduler.setTimeout(() => {
   untouchedExploded = true;
 }, AUTO_EXPLODE_DELAY_MS);
-untouchedScheduler.advanceBy(AUTO_EXPLODE_DELAY_MS);
+untouchedScheduler.advanceBy(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS + GLITCH_DURATION_MS);
+assert.equal(
+  untouchedExploded,
+  false,
+  'the car must remain assembled through the hologram and glitch windows',
+);
+untouchedScheduler.advanceBy(GLITCH_CLEAN_FRAME_MS);
 assert.equal(untouchedExploded, true, 'automatic explosion must still run without interaction');
 
 const heldScheduler = new FakeScheduler();
@@ -176,3 +194,24 @@ assert.equal(
   false,
   'a first hold spanning the original 4.6-second deadline must not explode the car',
 );
+
+const glitchScheduler = new FakeScheduler();
+let glitchExploded = false;
+const duringGlitchInteraction = { current: false };
+const duringGlitchTimer: { current: FakeTimer | null } = {
+  current: glitchScheduler.setTimeout(() => {
+    glitchExploded = true;
+  }, AUTO_EXPLODE_DELAY_MS),
+};
+
+glitchScheduler.advanceBy(HOLOGRAM_REVEAL_MS + GLITCH_CLEAN_HOLD_MS + GLITCH_DURATION_MS / 2);
+markF1ManualInteraction(
+  duringGlitchInteraction,
+  duringGlitchTimer,
+  (timer) => glitchScheduler.clearTimeout(timer),
+);
+glitchScheduler.advanceBy(GLITCH_DURATION_MS);
+
+assert.equal(duringGlitchInteraction.current, true, 'a manual interaction during the glitch must be retained');
+assert.equal(duringGlitchTimer.current, null, 'a manual interaction during the glitch must clear the timer');
+assert.equal(glitchExploded, false, 'a manual interaction during the glitch must prevent automatic explosion');

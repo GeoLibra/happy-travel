@@ -40,6 +40,7 @@ interface ParticleBackgroundProps {
   onCarClick?: () => void;
   onCarManualInteraction?: () => void;
   exploded?: boolean;
+  glitchProgress?: number | null;
 }
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
@@ -50,6 +51,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
   onCarClick,
   onCarManualInteraction,
   exploded = false,
+  glitchProgress: _glitchProgress = null,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const spaceKeyArmedRef = useRef(false);
