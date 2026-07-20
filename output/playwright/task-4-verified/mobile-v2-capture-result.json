@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "artifact": "mobile-arrival-touch-v2.webm",
+  "viewport": { "width": 390, "height": 844 },
+  "completedUtc": "2026-07-20T13:03:24.632Z",
+  "captureMethod": "Three bounded Playwright CLI run-code steps in one named session; exact commands are recorded in mobile-v2-executed-actions.md",
+  "startInput": {
+    "mechanism": "trusted CDP touch, released after progress reached at least 35%; application auto-completed"
+  },
+  "rayTouch": {
+    "mechanism": "trusted CDP touch",
+    "point": { "x": 120, "y": 450 },
+    "before": "true",
+    "after": "false",
+    "reassemblyStartedOffsetMs": 109965.60000000149
+  },
+  "browserPointerEvents": [
+    { "type": "pointerdown", "trusted": true, "pointerType": "touch", "x": 120, "y": 450, "offsetMs": 109769.70000000298 },
+    { "type": "pointerup", "trusted": true, "pointerType": "touch", "x": 120, "y": 450, "offsetMs": 109902.30000000447 }
+  ],
+  "environment": { "maxTouchPoints": 1, "coarsePointer": true }
+}

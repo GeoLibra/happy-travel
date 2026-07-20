@@ -1,0 +1,12 @@
+$ ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_read_frames -show_entries format=duration -of default=nw=1 ../../../output/playwright/task-4-verified/mobile-arrival-touch-v2.webm
+width=390
+height=844
+r_frame_rate=25/1
+nb_read_frames=2834
+duration=113.360000
+
+$ ffmpeg -hide_banner -i ../../../output/playwright/task-4-verified/mobile-arrival-touch-v2.webm -vf blackdetect=d=0.10:pix_th=0.10 -an -f null -
+Input: VP8 390x844, 25 fps, duration 00:01:53.36
+Processed frames: 2834
+black_start/black_end/black_duration events: NONE
+RESULT: PASS
