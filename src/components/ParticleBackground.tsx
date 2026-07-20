@@ -28,7 +28,11 @@ import {
 import { advanceF1AirflowTime, createF1Airflow } from './effects/f1Airflow';
 import { createF1StudioLighting } from './effects/f1StudioLighting';
 import { createStudioReflection } from './effects/studioReflection';
-import { createF1GlitchPostProcess, type F1GlitchPostProcess } from '../lib/f1-glitch-postprocess';
+import {
+  createF1GlitchPostProcess,
+  renderF1GlitchFrame,
+  type F1GlitchPostProcess,
+} from '../lib/f1-glitch-postprocess';
 import { CPU_PARTICLE_COUNT, SPEED_LINE_COUNT, TOTAL_LINES } from './showroom/showroom-constants';
 import { createCpuParticleField, createSpeedLineField, createTrailField } from './showroom/showroom-particles';
 import { createShowroomTrack } from './showroom/showroom-track';
@@ -893,26 +897,12 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
 
       // ── Render Dual Pass ──
       const activeGlitchProgress = stateRef.current.glitchProgress;
-      if (
-        activeGlitchProgress === null
-        || activeGlitchProgress === undefined
-        || glitchPostProcess === null
-      ) {
-        renderShowroom(null);
-      } else {
-        try {
-          glitchPostProcess.render({ progress: activeGlitchProgress, renderSource: renderShowroom });
-        } catch {
-          try {
-            glitchPostProcess.dispose();
-          } catch {
-            // Rendering fallback must survive cleanup failures too.
-          }
-          glitchPostProcess = null;
-          warnF1GlitchPostProcessUnavailable();
-          renderShowroom(null);
-        }
-      }
+      glitchPostProcess = renderF1GlitchFrame({
+        glitchPostProcess,
+        progress: activeGlitchProgress,
+        renderShowroom,
+        onUnavailable: warnF1GlitchPostProcessUnavailable,
+      });
     };
 
     animate(performance.now());

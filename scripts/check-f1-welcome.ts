@@ -9,7 +9,9 @@ import {
   HOLOGRAM_REVEAL_MS,
 } from '../src/lib/f1-glitch-sequence';
 import { createF1WelcomeSequence } from '../src/lib/f1-welcome-sequence';
-import { createF1GlitchPostProcess } from '../src/lib/f1-glitch-postprocess';
+import * as glitchPostProcessModule from '../src/lib/f1-glitch-postprocess';
+
+const { createF1GlitchPostProcess, renderF1GlitchFrame } = glitchPostProcessModule;
 
 const source = readFileSync(
   new URL('../src/components/WelcomePage.tsx', import.meta.url),
@@ -130,7 +132,8 @@ assert.match(
 );
 assert.match(particleSource, /glitchProgress\?: number \| null/);
 assert.match(particleSource, /createF1GlitchPostProcess/);
-assert.match(particleSource, /glitchPostProcess\.render/);
+assert.match(particleSource, /renderF1GlitchFrame/);
+assert.match(glitchPostSource, /glitchPostProcess\.render/);
 assert.match(particleSource, /glitchPostProcess\.resize/);
 assert.match(particleSource, /glitchPostProcess\.dispose\(\)/);
 assert.match(glitchPostSource, /new THREE\.WebGLRenderTarget/);
@@ -139,14 +142,37 @@ assert.match(glitchPostSource, /prefersReducedMotion/);
 assert.match(glitchPostSource, /mobile/);
 assert.match(glitchPostSource, /renderer\.setRenderTarget\(null\)/);
 assert.match(glitchPostSource, /scan\*spatial/, 'reduced motion must suppress spatial scan bands');
+assert.match(glitchPostSource, /vec2 blockCell=floor\(vUv\*vec2\(/, 'block noise must use both UV axes');
+assert.match(glitchPostSource, /vec2 blockOffset=/);
+assert.match(glitchPostSource, /float scanDistortion=/);
+assert.match(glitchPostSource, /float pixelNoise=/);
 assert.match(particleSource, /\[F1 glitch\] Post-process unavailable/);
 
 class FakeGlitchRenderer {
   readonly events: string[] = [];
   renderedScene: THREE.Scene | null = null;
+  compileCalls = 0;
+  failShaderLink = false;
+  autoClear = false;
+  readonly debug: THREE.WebGLDebug = {
+    checkShaderErrors: true,
+    onShaderError: null,
+  };
+  private target: THREE.WebGLRenderTarget | null = null;
 
   setRenderTarget(target: THREE.WebGLRenderTarget | null): void {
+    this.target = target;
     this.events.push(target === null ? 'screen' : 'target');
+  }
+
+  getRenderTarget(): THREE.WebGLRenderTarget | null {
+    return this.target;
+  }
+
+  compile(): Set<THREE.Material> {
+    this.compileCalls += 1;
+    this.events.push('compile');
+    return new Set();
   }
 
   clear(): void {
@@ -156,8 +182,90 @@ class FakeGlitchRenderer {
   render(scene: THREE.Scene): void {
     this.events.push('render');
     this.renderedScene = scene;
+    if (this.failShaderLink) {
+      this.failShaderLink = false;
+      this.debug.onShaderError?.(
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+      );
+    }
   }
 }
+
+const shaderFailureRenderer = new FakeGlitchRenderer();
+shaderFailureRenderer.autoClear = true;
+shaderFailureRenderer.failShaderLink = true;
+const shaderFailurePreviousTarget = new THREE.WebGLRenderTarget(2, 2);
+shaderFailureRenderer.setRenderTarget(shaderFailurePreviousTarget);
+shaderFailureRenderer.events.length = 0;
+let priorShaderErrorCalls = 0;
+const priorShaderError = () => { priorShaderErrorCalls += 1; };
+shaderFailureRenderer.debug.checkShaderErrors = false;
+shaderFailureRenderer.debug.onShaderError = priorShaderError;
+assert.throws(
+  () => createF1GlitchPostProcess(
+    shaderFailureRenderer as unknown as THREE.WebGLRenderer,
+    100,
+    50,
+    1,
+    { mobile: false, prefersReducedMotion: false },
+  ),
+  /failed to compile or link/,
+  'lazy shader link errors must disable the post-process before active output',
+);
+assert.equal(priorShaderErrorCalls, 1, 'an existing renderer shader diagnostic callback must still run');
+assert.equal(shaderFailureRenderer.autoClear, true, 'shader validation must restore autoClear');
+assert.equal(shaderFailureRenderer.debug.checkShaderErrors, false);
+assert.equal(shaderFailureRenderer.debug.onShaderError, priorShaderError);
+assert.equal(
+  shaderFailureRenderer.getRenderTarget(),
+  shaderFailurePreviousTarget,
+  'shader validation must restore the render target',
+);
+shaderFailurePreviousTarget.dispose();
+
+const simulatedOffscreenTarget = new THREE.WebGLRenderTarget(1, 1);
+const fallbackTargets: Array<THREE.WebGLRenderTarget | null> = [];
+let fallbackWarnings = 0;
+let failedPostDisposals = 0;
+let failingPostProcess: glitchPostProcessModule.F1GlitchPostProcess | null = {
+  render({ renderSource }) {
+    renderSource(simulatedOffscreenTarget);
+    throw new Error('simulated draw failure after the source composite');
+  },
+  resize() {
+    throw new Error('a failed resource must never be resized again');
+  },
+  dispose() {
+    failedPostDisposals += 1;
+  },
+};
+failingPostProcess = renderF1GlitchFrame({
+  glitchPostProcess: failingPostProcess,
+  progress: 0.5,
+  renderShowroom: (target) => fallbackTargets.push(target),
+  onUnavailable: () => { fallbackWarnings += 1; },
+});
+assert.equal(failingPostProcess, null, 'a failed active resource must stay disabled');
+assert.deepEqual(
+  fallbackTargets,
+  [simulatedOffscreenTarget, null],
+  'a failure after offscreen source rendering must redraw directly in the same frame',
+);
+assert.equal(failedPostDisposals, 1);
+assert.equal(fallbackWarnings, 1);
+failingPostProcess = renderF1GlitchFrame({
+  glitchPostProcess: failingPostProcess,
+  progress: 0.6,
+  renderShowroom: (target) => fallbackTargets.push(target),
+  onUnavailable: () => { fallbackWarnings += 1; },
+});
+assert.equal(failingPostProcess, null);
+assert.equal(fallbackTargets.at(-1), null, 'later active timing frames must remain on direct rendering');
+assert.equal(fallbackWarnings, 1, 'persistent direct fallback must not warn again');
+simulatedOffscreenTarget.dispose();
 
 const desktopRenderer = new FakeGlitchRenderer();
 const desktopPostProcess = createF1GlitchPostProcess(
@@ -167,6 +275,8 @@ const desktopPostProcess = createF1GlitchPostProcess(
   3,
   { mobile: false, prefersReducedMotion: false },
 );
+assert.equal(desktopRenderer.compileCalls, 1, 'the fullscreen shader must be compiled before active rendering');
+desktopRenderer.events.length = 0;
 let desktopTarget: THREE.WebGLRenderTarget | null = null;
 desktopPostProcess.render({
   progress: 0.5,
@@ -178,7 +288,11 @@ desktopPostProcess.render({
 assert(desktopTarget, 'post-process must provide its offscreen target to the showroom renderer');
 assert.equal(desktopTarget.width, 200, 'desktop target DPR must be capped at 2');
 assert.equal(desktopTarget.height, 100, 'desktop target height must follow the capped DPR');
-assert.equal(desktopTarget.texture.colorSpace, THREE.SRGBColorSpace);
+assert.equal(
+  desktopTarget.texture.colorSpace,
+  THREE.LinearSRGBColorSpace,
+  'the offscreen composite must remain linear until the fullscreen output pass',
+);
 assert.deepEqual(
   desktopRenderer.events,
   ['source', 'screen', 'clear', 'render'],
@@ -186,14 +300,57 @@ assert.deepEqual(
 );
 assert(desktopRenderer.renderedScene);
 const desktopQuad = desktopRenderer.renderedScene.children[0] as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+assert.equal(desktopQuad.material.transparent, false, 'the already-composited alpha must not be blended twice');
+assert.equal(desktopQuad.material.blending, THREE.NoBlending);
+assert.equal(desktopQuad.material.toneMapped, true);
+assert.equal(desktopQuad.material.fragmentShader.match(/#include <tonemapping_fragment>/g)?.length, 1);
+assert.equal(desktopQuad.material.fragmentShader.match(/#include <colorspace_fragment>/g)?.length, 1);
+assert.doesNotMatch(desktopQuad.material.fragmentShader, /#include <opaque_fragment>/);
 assert.equal(desktopQuad.material.uniforms.uPulse.value, 1, 'the post-process must consume the glitch pulse envelope');
 assert.equal(desktopQuad.material.uniforms.uAmplitude.value, 1);
 assert.equal(desktopQuad.material.uniforms.uReducedMotion.value, 0);
+assert(desktopQuad.material.uniforms.uBlockSeed, 'block noise requires an independent frame seed');
+assert(desktopQuad.material.uniforms.uScanSeed, 'scan distortion requires an independent frame seed');
+assert(desktopQuad.material.uniforms.uNoiseSeed, 'grain noise requires an independent frame seed');
+assert(desktopQuad.material.uniforms.uSpatialAmount, 'spatial artifacts require a pulse-gated amplitude');
+assert(desktopQuad.material.uniforms.uReducedBrightness, 'reduced motion requires a separate brightness flicker');
+assert(desktopQuad.material.uniforms.uReducedNoise, 'reduced motion requires a separate noise flicker');
+
+const readDesktopGlitchState = (progress: number) => {
+  desktopPostProcess.render({ progress, renderSource: () => undefined });
+  return {
+    pulse: desktopQuad.material.uniforms.uPulse.value as number,
+    spatialAmount: desktopQuad.material.uniforms.uSpatialAmount.value as number,
+    blockSeed: desktopQuad.material.uniforms.uBlockSeed.value as number,
+    scanSeed: desktopQuad.material.uniforms.uScanSeed.value as number,
+    noiseSeed: desktopQuad.material.uniforms.uNoiseSeed.value as number,
+  };
+};
+
+const firstPulseState = readDesktopGlitchState(0.16);
+const secondPulseState = readDesktopGlitchState(0.5);
+const thirdPulseState = readDesktopGlitchState(0.82);
+for (const state of [firstPulseState, secondPulseState, thirdPulseState]) {
+  assert.equal(state.pulse, 1, 'each of the three pulse centers must fully activate');
+  assert(state.spatialAmount > 0, 'each pulse must activate spatial artifacts');
+  assert.equal(new Set([state.blockSeed, state.scanSeed, state.noiseSeed]).size, 3);
+}
+assert.notDeepEqual(
+  [firstPulseState.blockSeed, firstPulseState.scanSeed, firstPulseState.noiseSeed],
+  [secondPulseState.blockSeed, secondPulseState.scanSeed, secondPulseState.noiseSeed],
+  'independent glitch seeds must evolve between pulses',
+);
+const betweenPulseState = readDesktopGlitchState(0.32);
+assert.equal(betweenPulseState.pulse, 0);
+assert.equal(betweenPulseState.spatialAmount, 0, 'block, scan, and grain artifacts must stop between pulses');
 
 let targetDisposals = 0;
 let geometryDisposals = 0;
 let materialDisposals = 0;
-desktopTarget.dispose = () => { targetDisposals += 1; };
+desktopTarget.dispose = () => {
+  targetDisposals += 1;
+  throw new Error('simulated target disposal failure');
+};
 desktopQuad.geometry.dispose = () => { geometryDisposals += 1; };
 desktopQuad.material.dispose = () => { materialDisposals += 1; };
 desktopPostProcess.dispose();
@@ -221,6 +378,32 @@ assert(mobileRenderer.renderedScene);
 const mobileQuad = mobileRenderer.renderedScene.children[0] as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
 assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 0.65);
 assert.equal(mobileQuad.material.uniforms.uReducedMotion.value, 1);
+assert.equal(mobileQuad.material.uniforms.uSpatialAmount.value, 0);
+assert(
+  mobileQuad.material.uniforms.uReducedBrightness.value > 0
+    && mobileQuad.material.uniforms.uReducedBrightness.value <= 0.03,
+  'reduced motion must use a low-amplitude brightness flicker instead of full dropout',
+);
+assert(
+  Math.abs(mobileQuad.material.uniforms.uReducedNoise.value) > 0
+    && Math.abs(mobileQuad.material.uniforms.uReducedNoise.value) <= 0.01,
+  'reduced motion must retain only low-amplitude non-spatial noise flicker',
+);
+mobilePostProcess.render({ progress: 0.32, renderSource: () => undefined });
+assert.equal(mobileQuad.material.uniforms.uReducedBrightness.value, 0);
+assert.equal(mobileQuad.material.uniforms.uReducedNoise.value, 0);
+mobilePostProcess.resize(1000, 500, 3);
+assert.equal(mobileTarget.width, 2000, 'crossing to desktop must raise the live target DPR cap to 2');
+assert.equal(mobileTarget.height, 1000);
+assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 1, 'desktop resize must restore full amplitude');
+mobilePostProcess.render({ progress: 0.5, renderSource: () => undefined });
+assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 1);
+mobilePostProcess.resize(390, 844, 3);
+assert.equal(mobileTarget.width, 390, 'crossing back to mobile must restore the 1x DPR cap');
+assert.equal(mobileTarget.height, 844);
+assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 0.65);
+mobilePostProcess.render({ progress: 0.5, renderSource: () => undefined });
+assert.equal(mobileQuad.material.uniforms.uSpatialAmount.value, 0);
 mobilePostProcess.dispose();
 
 type FakeFrame = number;
