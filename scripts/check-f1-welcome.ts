@@ -141,6 +141,15 @@ assert.match(particleSource, /renderF1GlitchFrame/);
 assert.match(glitchPostSource, /glitchPostProcess\.render/);
 assert.match(particleSource, /glitchPostProcess\.resize/);
 assert.match(particleSource, /glitchPostProcess\.dispose\(\)/);
+assert.match(glitchPostSource, /webglcontextlost/);
+assert.match(glitchPostSource, /webglcontextrestored/);
+assert.match(particleSource, /bindF1GlitchContextRecovery/);
+assert.match(particleSource, /prewarm\(renderShowroom\)/);
+assert.match(
+  particleSource,
+  /revalidateGlitchAfterModelInjection/,
+  'late GLB injection must prewarm the car source shaders before glitch activation',
+);
 assert.match(glitchPostSource, /new THREE\.WebGLRenderTarget/);
 assert.match(glitchPostSource, /getF1GlitchPulse/);
 assert.match(glitchPostSource, /prefersReducedMotion/);
@@ -153,12 +162,56 @@ assert.match(glitchPostSource, /float scanDistortion=/);
 assert.match(glitchPostSource, /float pixelNoise=/);
 assert.match(particleSource, /\[F1 glitch\] Post-process unavailable/);
 
+class FakeGlitchContext {
+  readonly NO_ERROR = 0;
+  readonly INVALID_OPERATION = 0x0502;
+  readonly FRAMEBUFFER = 0x8D40;
+  readonly FRAMEBUFFER_COMPLETE = 0x8CD5;
+  readonly FRAMEBUFFER_INCOMPLETE_ATTACHMENT = 0x8CD6;
+  framebufferStatus = this.FRAMEBUFFER_COMPLETE;
+  contextLost = false;
+  private readonly errors: number[] = [];
+
+  getError(): number {
+    return this.errors.shift() ?? this.NO_ERROR;
+  }
+
+  pushError(error: number): void {
+    this.errors.push(error);
+  }
+
+  checkFramebufferStatus(): number {
+    return this.framebufferStatus;
+  }
+
+  isContextLost(): boolean {
+    return this.contextLost;
+  }
+}
+
 class FakeGlitchRenderer {
   readonly events: string[] = [];
+  readonly context = new FakeGlitchContext();
+  readonly domElement = new EventTarget();
   renderedScene: THREE.Scene | null = null;
   compileCalls = 0;
   failShaderLink = false;
+  failNextRenderedDrawWithGlError = false;
+  supportsHalfFloat = true;
+  supportsFloat = true;
+  halfFloatFramebufferComplete = true;
+  floatFramebufferComplete = true;
   autoClear = false;
+  outputColorSpace = THREE.SRGBColorSpace;
+  readonly extensions = {
+    has: (name: string) => (
+      name === 'EXT_color_buffer_half_float'
+        ? this.supportsHalfFloat
+        : name === 'EXT_color_buffer_float'
+          ? this.supportsFloat
+          : false
+    ),
+  };
   readonly debug: THREE.WebGLDebug = {
     checkShaderErrors: true,
     onShaderError: null,
@@ -168,6 +221,17 @@ class FakeGlitchRenderer {
   setRenderTarget(target: THREE.WebGLRenderTarget | null): void {
     this.target = target;
     this.events.push(target === null ? 'screen' : 'target');
+    if (target?.texture.type === THREE.HalfFloatType) {
+      this.context.framebufferStatus = this.halfFloatFramebufferComplete
+        ? this.context.FRAMEBUFFER_COMPLETE
+        : this.context.FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
+    } else if (target?.texture.type === THREE.FloatType) {
+      this.context.framebufferStatus = this.floatFramebufferComplete
+        ? this.context.FRAMEBUFFER_COMPLETE
+        : this.context.FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
+    } else {
+      this.context.framebufferStatus = this.context.FRAMEBUFFER_COMPLETE;
+    }
   }
 
   getRenderTarget(): THREE.WebGLRenderTarget | null {
@@ -180,6 +244,14 @@ class FakeGlitchRenderer {
     return new Set();
   }
 
+  initRenderTarget(target: THREE.WebGLRenderTarget): void {
+    this.events.push(`init:${target.texture.type}`);
+  }
+
+  getContext(): FakeGlitchContext {
+    return this.context;
+  }
+
   clear(): void {
     this.events.push('clear');
   }
@@ -187,6 +259,10 @@ class FakeGlitchRenderer {
   render(scene: THREE.Scene): void {
     this.events.push('render');
     this.renderedScene = scene;
+    if (this.failNextRenderedDrawWithGlError) {
+      this.failNextRenderedDrawWithGlError = false;
+      this.context.pushError(this.context.INVALID_OPERATION);
+    }
     if (this.failShaderLink) {
       this.failShaderLink = false;
       this.debug.onShaderError?.(
@@ -236,6 +312,9 @@ const fallbackTargets: Array<THREE.WebGLRenderTarget | null> = [];
 let fallbackWarnings = 0;
 let failedPostDisposals = 0;
 let failingPostProcess: glitchPostProcessModule.F1GlitchPostProcess | null = {
+  prewarm() {
+    // This stub represents a resource that already passed initialization.
+  },
   render({ renderSource }) {
     renderSource(simulatedOffscreenTarget);
     throw new Error('simulated draw failure after the source composite');
@@ -272,6 +351,24 @@ assert.equal(fallbackTargets.at(-1), null, 'later active timing frames must rema
 assert.equal(fallbackWarnings, 1, 'persistent direct fallback must not warn again');
 simulatedOffscreenTarget.dispose();
 
+let zeroPulsePostRenders = 0;
+const zeroPulseTargets: Array<THREE.WebGLRenderTarget | null> = [];
+const zeroPulsePostProcess: glitchPostProcessModule.F1GlitchPostProcess = {
+  prewarm() {},
+  render() { zeroPulsePostRenders += 1; },
+  resize() {},
+  dispose() {},
+};
+const retainedZeroPulsePostProcess = renderF1GlitchFrame({
+  glitchPostProcess: zeroPulsePostProcess,
+  progress: 0,
+  renderShowroom: (target) => zeroPulseTargets.push(target),
+  onUnavailable: () => undefined,
+});
+assert.equal(retainedZeroPulsePostProcess, zeroPulsePostProcess);
+assert.equal(zeroPulsePostRenders, 0, 'pulse-zero must bypass the composite output transform');
+assert.deepEqual(zeroPulseTargets, [null], 'pulse-zero must be framebuffer-equivalent to direct rendering');
+
 const desktopRenderer = new FakeGlitchRenderer();
 const desktopPostProcess = createF1GlitchPostProcess(
   desktopRenderer as unknown as THREE.WebGLRenderer,
@@ -281,6 +378,23 @@ const desktopPostProcess = createF1GlitchPostProcess(
   { mobile: false, prefersReducedMotion: false },
 );
 assert.equal(desktopRenderer.compileCalls, 1, 'the fullscreen shader must be compiled before active rendering');
+desktopRenderer.events.length = 0;
+let prewarmedDesktopTarget: THREE.WebGLRenderTarget | null = null;
+(desktopPostProcess as unknown as {
+  prewarm(renderSource: (target: THREE.WebGLRenderTarget) => void): void;
+}).prewarm((target) => {
+  prewarmedDesktopTarget = target;
+  desktopRenderer.events.push('source-prewarm');
+  desktopRenderer.setRenderTarget(target);
+});
+assert(prewarmedDesktopTarget, 'prewarm must allocate and exercise the full-size showroom target');
+assert.equal(prewarmedDesktopTarget.width, 200);
+assert.equal(prewarmedDesktopTarget.height, 100);
+assert.deepEqual(
+  desktopRenderer.events,
+  ['source-prewarm', 'target', 'target', 'screen', 'render', 'screen'],
+  'prewarm must exercise the offscreen source and identity composite before restoring the screen target',
+);
 desktopRenderer.events.length = 0;
 let desktopTarget: THREE.WebGLRenderTarget | null = null;
 desktopPostProcess.render({
@@ -294,13 +408,18 @@ assert(desktopTarget, 'post-process must provide its offscreen target to the sho
 assert.equal(desktopTarget.width, 200, 'desktop target DPR must be capped at 2');
 assert.equal(desktopTarget.height, 100, 'desktop target height must follow the capped DPR');
 assert.equal(
+  desktopTarget.texture.type,
+  THREE.HalfFloatType,
+  'the offscreen composite must retain HDR precision until each source material applies its output transform',
+);
+assert.equal(
   desktopTarget.texture.colorSpace,
   THREE.LinearSRGBColorSpace,
-  'the offscreen composite must remain linear until the fullscreen output pass',
+  'the HDR source composite must remain linear until the single fullscreen output transform',
 );
 assert.deepEqual(
   desktopRenderer.events,
-  ['source', 'screen', 'clear', 'render'],
+  ['source', 'target', 'screen', 'clear', 'render'],
   'source composition must finish before the post-process renders to the transparent canvas',
 );
 assert(desktopRenderer.renderedScene);
@@ -366,6 +485,204 @@ assert.deepEqual(
   'all owned GPU resources must be disposed exactly once',
 );
 
+const floatFallbackRenderer = new FakeGlitchRenderer();
+floatFallbackRenderer.halfFloatFramebufferComplete = false;
+const floatFallbackPostProcess = createF1GlitchPostProcess(
+  floatFallbackRenderer as unknown as THREE.WebGLRenderer,
+  64,
+  32,
+  1,
+  { mobile: false, prefersReducedMotion: false },
+);
+let floatFallbackTarget: THREE.WebGLRenderTarget | null = null;
+(floatFallbackPostProcess as unknown as {
+  prewarm(renderSource: (target: THREE.WebGLRenderTarget) => void): void;
+}).prewarm((target) => {
+  floatFallbackTarget = target;
+  floatFallbackRenderer.setRenderTarget(target);
+});
+assert(floatFallbackTarget);
+assert.equal(
+  floatFallbackTarget.texture.type,
+  THREE.FloatType,
+  'a validated Float target is the only allowed HDR fallback when HalfFloat is incomplete',
+);
+floatFallbackPostProcess.dispose();
+
+const unavailableHdrRenderer = new FakeGlitchRenderer();
+unavailableHdrRenderer.supportsHalfFloat = false;
+unavailableHdrRenderer.supportsFloat = false;
+assert.throws(
+  () => createF1GlitchPostProcess(
+    unavailableHdrRenderer as unknown as THREE.WebGLRenderer,
+    64,
+    32,
+    1,
+    { mobile: false, prefersReducedMotion: false },
+  ),
+  /HDR render target unavailable/,
+  'the effect must fall back to direct rendering instead of silently using a clipping RGBA8 target',
+);
+
+const incompleteHdrRenderer = new FakeGlitchRenderer();
+incompleteHdrRenderer.halfFloatFramebufferComplete = false;
+incompleteHdrRenderer.floatFramebufferComplete = false;
+assert.throws(
+  () => createF1GlitchPostProcess(
+    incompleteHdrRenderer as unknown as THREE.WebGLRenderer,
+    64,
+    32,
+    1,
+    { mobile: false, prefersReducedMotion: false },
+  ),
+  /framebuffer incomplete/,
+  'non-throwing framebuffer allocation failures must disable the visual effect before activation',
+);
+
+const sourceGlErrorRenderer = new FakeGlitchRenderer();
+let sourceGlErrorPostProcess: glitchPostProcessModule.F1GlitchPostProcess | null = createF1GlitchPostProcess(
+  sourceGlErrorRenderer as unknown as THREE.WebGLRenderer,
+  64,
+  32,
+  1,
+  { mobile: false, prefersReducedMotion: false },
+);
+(sourceGlErrorPostProcess as unknown as {
+  prewarm(renderSource: (target: THREE.WebGLRenderTarget) => void): void;
+}).prewarm((target) => sourceGlErrorRenderer.setRenderTarget(target));
+const sourceGlErrorTargets: Array<THREE.WebGLRenderTarget | null> = [];
+let sourceGlErrorWarnings = 0;
+sourceGlErrorPostProcess = renderF1GlitchFrame({
+  glitchPostProcess: sourceGlErrorPostProcess,
+  progress: 0.5,
+  renderShowroom: (target) => {
+    sourceGlErrorTargets.push(target);
+    sourceGlErrorRenderer.setRenderTarget(target);
+    if (target) sourceGlErrorRenderer.context.pushError(sourceGlErrorRenderer.context.INVALID_OPERATION);
+  },
+  onUnavailable: () => { sourceGlErrorWarnings += 1; },
+});
+assert.equal(sourceGlErrorPostProcess, null);
+assert.equal(sourceGlErrorTargets.at(-1), null, 'a source GL error must trigger same-frame direct redraw');
+assert.equal(sourceGlErrorWarnings, 1);
+
+const compositeGlErrorRenderer = new FakeGlitchRenderer();
+let compositeGlErrorPostProcess: glitchPostProcessModule.F1GlitchPostProcess | null = createF1GlitchPostProcess(
+  compositeGlErrorRenderer as unknown as THREE.WebGLRenderer,
+  64,
+  32,
+  1,
+  { mobile: false, prefersReducedMotion: false },
+);
+(compositeGlErrorPostProcess as unknown as {
+  prewarm(renderSource: (target: THREE.WebGLRenderTarget) => void): void;
+}).prewarm((target) => compositeGlErrorRenderer.setRenderTarget(target));
+const compositeGlErrorTargets: Array<THREE.WebGLRenderTarget | null> = [];
+compositeGlErrorPostProcess = renderF1GlitchFrame({
+  glitchPostProcess: compositeGlErrorPostProcess,
+  progress: 0.5,
+  renderShowroom: (target) => {
+    compositeGlErrorTargets.push(target);
+    compositeGlErrorRenderer.setRenderTarget(target);
+    if (target) compositeGlErrorRenderer.failNextRenderedDrawWithGlError = true;
+  },
+  onUnavailable: () => undefined,
+});
+assert.equal(compositeGlErrorPostProcess, null);
+assert.equal(compositeGlErrorTargets.at(-1), null, 'a composite GL error must trigger same-frame direct redraw');
+
+const lostContextRenderer = new FakeGlitchRenderer();
+let lostContextPostProcess: glitchPostProcessModule.F1GlitchPostProcess | null = createF1GlitchPostProcess(
+  lostContextRenderer as unknown as THREE.WebGLRenderer,
+  64,
+  32,
+  1,
+  { mobile: false, prefersReducedMotion: false },
+);
+(lostContextPostProcess as unknown as {
+  prewarm(renderSource: (target: THREE.WebGLRenderTarget) => void): void;
+}).prewarm((target) => lostContextRenderer.setRenderTarget(target));
+lostContextRenderer.context.contextLost = true;
+const lostContextTargets: Array<THREE.WebGLRenderTarget | null> = [];
+lostContextPostProcess = renderF1GlitchFrame({
+  glitchPostProcess: lostContextPostProcess,
+  progress: 0.5,
+  renderShowroom: (target) => lostContextTargets.push(target),
+  onUnavailable: () => undefined,
+});
+assert.equal(lostContextPostProcess, null, 'context loss must persistently disable the stale resource');
+assert.equal(lostContextTargets.at(-1), null, 'context loss must retain the direct render route');
+
+assert.equal(
+  typeof (glitchPostProcessModule as Record<string, unknown>).bindF1GlitchContextRecovery,
+  'function',
+  'the component needs a tested context restoration binding',
+);
+let contextLostCallbacks = 0;
+let contextRestoredCallbacks = 0;
+const removeContextRecovery = (
+  glitchPostProcessModule as unknown as {
+    bindF1GlitchContextRecovery(
+      canvas: EventTarget,
+      callbacks: { onContextLost(): void; onContextRestored(): void },
+    ): () => void;
+  }
+).bindF1GlitchContextRecovery(lostContextRenderer.domElement, {
+  onContextLost: () => { contextLostCallbacks += 1; },
+  onContextRestored: () => { contextRestoredCallbacks += 1; },
+});
+lostContextRenderer.domElement.dispatchEvent(new Event('webglcontextlost'));
+lostContextRenderer.domElement.dispatchEvent(new Event('webglcontextrestored'));
+assert.deepEqual([contextLostCallbacks, contextRestoredCallbacks], [1, 1]);
+removeContextRecovery();
+lostContextRenderer.domElement.dispatchEvent(new Event('webglcontextrestored'));
+assert.equal(contextRestoredCallbacks, 1, 'cleanup must remove the restoration callback');
+
+assert.equal(
+  typeof (glitchPostProcessModule as Record<string, unknown>).restoreF1GlitchPostProcess,
+  'function',
+  'context restoration needs a behaviorally tested recreate-and-prewarm operation',
+);
+let staleRestorationDisposals = 0;
+let restoredPrewarms = 0;
+const restoredTarget = new THREE.WebGLRenderTarget(2, 2);
+const staleRestorationPostProcess: glitchPostProcessModule.F1GlitchPostProcess = {
+  prewarm() {},
+  render() {},
+  resize() {},
+  dispose() { staleRestorationDisposals += 1; },
+};
+const recreatedRestorationPostProcess: glitchPostProcessModule.F1GlitchPostProcess = {
+  prewarm(renderSource) {
+    restoredPrewarms += 1;
+    renderSource(restoredTarget);
+  },
+  render() {},
+  resize() {},
+  dispose() {},
+};
+let restoredSourceTarget: THREE.WebGLRenderTarget | null = null;
+const restoredPostProcess = (
+  glitchPostProcessModule as unknown as {
+    restoreF1GlitchPostProcess(input: {
+      glitchPostProcess: glitchPostProcessModule.F1GlitchPostProcess | null;
+      create(): glitchPostProcessModule.F1GlitchPostProcess;
+      renderSource(target: THREE.WebGLRenderTarget): void;
+      onUnavailable(): void;
+    }): glitchPostProcessModule.F1GlitchPostProcess | null;
+  }
+).restoreF1GlitchPostProcess({
+  glitchPostProcess: staleRestorationPostProcess,
+  create: () => recreatedRestorationPostProcess,
+  renderSource: (target) => { restoredSourceTarget = target; },
+  onUnavailable: () => assert.fail('successful restoration must not warn'),
+});
+assert.equal(restoredPostProcess, recreatedRestorationPostProcess);
+assert.equal(staleRestorationDisposals, 1, 'restoration must dispose stale driver resources once');
+assert.equal(restoredPrewarms, 1, 'restoration must prewarm the complete replacement pipeline');
+assert.equal(restoredSourceTarget, restoredTarget);
+restoredTarget.dispose();
+
 const mobileRenderer = new FakeGlitchRenderer();
 const mobilePostProcess = createF1GlitchPostProcess(
   mobileRenderer as unknown as THREE.WebGLRenderer,
@@ -375,6 +692,12 @@ const mobilePostProcess = createF1GlitchPostProcess(
   { mobile: true, prefersReducedMotion: true },
 );
 let mobileTarget: THREE.WebGLRenderTarget | null = null;
+(mobilePostProcess as unknown as {
+  prewarm(renderSource: (target: THREE.WebGLRenderTarget) => void): void;
+}).prewarm((target) => {
+  mobileTarget = target;
+  mobileRenderer.setRenderTarget(target);
+});
 mobilePostProcess.render({ progress: 0.5, renderSource: (target) => { mobileTarget = target; } });
 assert(mobileTarget);
 assert.equal(mobileTarget.width, 100, 'mobile target DPR must be capped at 1');
@@ -398,12 +721,18 @@ mobilePostProcess.render({ progress: 0.32, renderSource: () => undefined });
 assert.equal(mobileQuad.material.uniforms.uReducedBrightness.value, 0);
 assert.equal(mobileQuad.material.uniforms.uReducedNoise.value, 0);
 mobilePostProcess.resize(1000, 500, 3);
+(mobilePostProcess as unknown as {
+  prewarm(renderSource: (target: THREE.WebGLRenderTarget) => void): void;
+}).prewarm((target) => mobileRenderer.setRenderTarget(target));
 assert.equal(mobileTarget.width, 2000, 'crossing to desktop must raise the live target DPR cap to 2');
 assert.equal(mobileTarget.height, 1000);
 assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 1, 'desktop resize must restore full amplitude');
 mobilePostProcess.render({ progress: 0.5, renderSource: () => undefined });
 assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 1);
 mobilePostProcess.resize(390, 844, 3);
+(mobilePostProcess as unknown as {
+  prewarm(renderSource: (target: THREE.WebGLRenderTarget) => void): void;
+}).prewarm((target) => mobileRenderer.setRenderTarget(target));
 assert.equal(mobileTarget.width, 390, 'crossing back to mobile must restore the 1x DPR cap');
 assert.equal(mobileTarget.height, 844);
 assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 0.65);
