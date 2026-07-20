@@ -1,0 +1,119 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - button "Interactive Formula One showroom car"
+    - generic [ref=e6]:
+      - heading "RACE PREP IN PROGRESS" [level=3] [ref=e11]
+      - paragraph [ref=e12]: Downloading Telemetry Data... 0%
+      - generic [ref=e14]:
+        - generic [ref=e15]: RB20 SYSTEM INIT
+        - generic [ref=e16]: CONNECTED
+    - generic:
+      - generic:
+        - generic:
+          - generic [ref=e17] [cursor=pointer]: RACE WEEKEND
+          - generic:
+            - heading "Ready To Race" [level=1]
+          - generic:
+            - heading "Welcome to an Epic Shanghai Weekend" [level=2]
+            - generic:
+              - paragraph: Where roaring engines meet a rock storm
+              - paragraph: A Shanghai adventure of racing and Imagine Dragons
+          - button "CALIBRATING..." [ref=e21] [cursor=pointer]
+          - generic:
+            - generic:
+              - generic: "// MAX VERSTAPPEN #1 // ORACLE RED BULL RACING"
+              - generic: "// MAX VERSTAPPEN #1 // ORACLE RED BULL RACING"
+              - generic: "// MAX VERSTAPPEN #1 // ORACLE RED BULL RACING"
+            - generic:
+              - generic: 4x World Champion
+              - generic: 71 Wins
+              - generic: 48 Pole Positions
+  - generic:
+    - banner:
+      - generic:
+        - generic:
+          - generic: "#1"
+          - generic:
+            - heading "Shanghai Weekend Itinerary" [level=1]
+            - paragraph:
+              - text: 2026.03.13 - 03.15
+              - generic: RACE WEEKEND
+              - generic: MV1
+        - generic:
+          - button "Language"
+          - generic:
+            - button
+            - button
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - img "Trip Highlight"
+        - generic:
+          - button "DAY 1 03.12":
+            - generic: DAY 1
+            - generic: "03.12"
+          - button "DAY 2 03.13":
+            - generic: DAY 2
+            - generic: "03.13"
+          - button "DAY 3 03.14":
+            - generic: DAY 3
+            - generic: "03.14"
+          - button "DAY 4 03.15":
+            - generic: DAY 4
+            - generic: "03.15"
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading "JI Hotel Shanghai Anting Metro Station" [level=3]
+                  - paragraph:
+                    - generic: 1F, Fortune Plaza, 5598 Cao’an Road, Anting, Jiading District
+                  - paragraph: Hotel check-in and rest
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading "LANN I Traditional Thai Massage (Ating Life Hub)" [level=3]
+                  - paragraph:
+                    - generic: Room 1314, 3F, Life Hub Central, 989 Moyu South Road, Jiading District
+                  - paragraph: Traditional Thai massage
+                - button "Open link"
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading "Omori Late-Night Diner (Mandufanle City)" [level=3]
+                  - paragraph:
+                    - generic: 1F, Sande Plaza, 1080 Moyu South Road, Jiading District (opposite Life Hub)
+                  - paragraph: Japanese cuisine
+                - button "Open link"
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading "Liushanmen Jiangxi Stir-fry (Anting Fortune Plaza)" [level=3]
+                  - paragraph:
+                    - generic: 2F, Anting Fortune Plaza, Jiading District
+                  - paragraph: Jiangxi cuisine
+                - button "Open link"
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading "Yuanxinyuan Qiqihar BBQ (Anting)" [level=3]
+                  - paragraph:
+                    - generic: 20 m west of Zepu Road and Xinyuan Road, south side, Jiading District
+                  - paragraph: Fusion barbecue
+                - button "Open link"
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - heading "Fresh Seafood & Classic Farmhouse Cuisine" [level=3]
+                  - paragraph:
+                    - generic: Room 102, No. 21, Lane 258 Anli Road, Jiading District
+                  - paragraph: Seafood
+                - button "Open link"

@@ -1,0 +1,32 @@
+{
+  "viewport": { "width": 390, "height": 844 },
+  "captureStatus": "ACCEPTED_WITH_LONG_SETTLED_EXPLOSION_HOLD",
+  "videoPhaseOffsetsSeconds": {
+    "progressComplete": 6.70,
+    "hologramCompletion": 11.08,
+    "cleanHold": 11.14,
+    "pulse1": 11.45,
+    "pulse2": 12.06,
+    "pulse3": 12.64,
+    "cleanRecovery": 13.00,
+    "explosionStart": 13.16,
+    "explosionSettled": 15.00,
+    "reassemblyStart": 68.30,
+    "reassemblySettled": 70.00
+  },
+  "startInput": {
+    "type": "trusted CDP touchStart released at 35%; application auto-completed to 100%",
+    "startPoint": { "x": 194.99999237060547, "y": 464.5 }
+  },
+  "touchEnvironment": {
+    "maxTouchPoints": 1,
+    "coarsePointer": true
+  },
+  "automaticExplosionGate": "PASS (aria-pressed became true before the reassembly attempt)",
+  "rayTouch": {
+    "point": { "x": 120, "y": 450 },
+    "stateAfterTrustedTouch": "false",
+    "stateAfterSettle": "false"
+  },
+  "reducedMotion": false
+}

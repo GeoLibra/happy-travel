@@ -1,0 +1,119 @@
+
+$ npm run check:f1-glitch
+
+> react-example@0.0.0 check:f1-glitch
+> node --import tsx scripts/check-f1-glitch-sequence.ts
+
+RESULT: PASS — npm run check:f1-glitch
+
+$ npm run check:f1-welcome
+
+> react-example@0.0.0 check:f1-welcome
+> node --import tsx scripts/check-f1-welcome.ts
+
+RESULT: PASS — npm run check:f1-welcome
+
+$ npm run check:showroom-resources
+
+> react-example@0.0.0 check:showroom-resources
+> node --import tsx scripts/check-showroom-resources.ts
+
+Showroom resource checks passed.
+RESULT: PASS — npm run check:showroom-resources
+
+$ npm run check:f1-motion
+
+> react-example@0.0.0 check:f1-motion
+> node --import tsx scripts/check-f1-motion.ts
+
+PASS: F1 motion is smooth and frame-rate independent
+RESULT: PASS — npm run check:f1-motion
+
+$ npm run check:f1-wheel-hold
+
+> react-example@0.0.0 check:f1-wheel-hold
+> node --import tsx scripts/check-f1-wheel-hold.ts
+
+RESULT: PASS — npm run check:f1-wheel-hold
+
+$ npm run check:f1-airflow
+
+> react-example@0.0.0 check:f1-airflow
+> node --import tsx scripts/check-f1-airflow.ts
+
+RESULT: PASS — npm run check:f1-airflow
+
+$ npm run check:f1-studio
+
+> react-example@0.0.0 check:f1-studio
+> node --import tsx scripts/check-f1-studio.ts
+
+RESULT: PASS — npm run check:f1-studio
+
+$ npm run check:f1-reflection
+
+> react-example@0.0.0 check:f1-reflection
+> node --import tsx scripts/check-f1-reflection.ts
+
+RESULT: PASS — npm run check:f1-reflection
+
+$ npm run check:f1-showroom-interaction
+
+> react-example@0.0.0 check:f1-showroom-interaction
+> node --import tsx scripts/check-f1-showroom-interaction.ts
+
+RESULT: PASS — npm run check:f1-showroom-interaction
+
+$ npm run check:f1-model
+
+> react-example@0.0.0 check:f1-model
+> node --import tsx scripts/check-f1-model.ts
+
+RESULT: PASS — npm run check:f1-model
+
+$ npm run check:showroom-assets
+
+> react-example@0.0.0 check:showroom-assets
+> node scripts/check-showroom-assets.mjs
+
+PASS: showroom assets (10.38 MB model)
+RESULT: PASS — npm run check:showroom-assets
+
+$ npm run check:f1-showroom-v5
+
+> react-example@0.0.0 check:f1-showroom-v5
+> node scripts/verify-rb20-showroom-v5.mjs public/models/2024_redbull_rb20_showroom_v5.glb
+
+PASS: native RB20 showroom hierarchy (172 meshes, 10.38 MB)
+RESULT: PASS — npm run check:f1-showroom-v5
+
+$ npm run lint
+
+> react-example@0.0.0 lint
+> tsc --noEmit
+
+RESULT: PASS — npm run lint
+
+$ npm run build
+
+> react-example@0.0.0 build
+> vite build
+
+vite v6.4.1 building for production...
+✓ 2131 modules transformed.
+dist/index.html                         0.38 kB │ gzip:   0.27 kB
+dist/assets/success-xJwVkoxT.mp3       45.37 kB
+dist/assets/f1-engine-DhYm5OHF.mp3    254.69 kB
+dist/assets/IMG_9596-DkGiQ2hm.jpg     440.87 kB
+dist/assets/IMG_9599-9QwS-4Wi.jpg   1,095.49 kB
+dist/assets/index-DVVOUUrl.css         52.08 kB │ gzip:   8.89 kB
+dist/assets/index-DGcaayj9.js       1,196.52 kB │ gzip: 340.33 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.98s
+RESULT: PASS — npm run build
+
+FINAL STATUS: 0

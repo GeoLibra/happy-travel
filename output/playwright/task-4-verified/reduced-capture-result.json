@@ -1,0 +1,16 @@
+{
+  "viewport": { "width": 1440, "height": 900 },
+  "cliResultUtc": "2026-07-20T11:58:36.147Z",
+  "videoStartPerformanceMs": 4732.5999999940395,
+  "progressCompletePerformanceMs": 13245.39999999851,
+  "progressCompleteVideoOffsetMs": 8512.80000000447,
+  "glitchIntervalVideoOffsetsMs": {
+    "start": 13112.80000000447,
+    "end": 14912.80000000447
+  },
+  "startInput": {
+    "type": "trusted mouse",
+    "startPoint": { "x": 720, "y": 466.5 }
+  },
+  "reducedMotion": true
+}

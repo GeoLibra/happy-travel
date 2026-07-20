@@ -1,0 +1,84 @@
+
+$ ffprobe ../../../output/playwright/task-4-verified/desktop-arrival.webm
+width=1440
+height=900
+avg_frame_rate=25/1
+nb_read_frames=460
+duration=18.400000
+$ ffmpeg blackdetect ../../../output/playwright/task-4-verified/desktop-arrival.webm
+Input #0, matroska,webm, from '../../../output/playwright/task-4-verified/desktop-arrival.webm':
+  Metadata:
+    ENCODER         : Lavf61.1.100
+  Duration: 00:00:18.40, start: 0.000000, bitrate: 1167 kb/s
+  Stream #0:0(eng): Video: vp8, yuv420p(progressive), 1440x900, SAR 1:1 DAR 8:5, 25 fps, 25 tbr, 1k tbn (default)
+    Metadata:
+      ENCODER         : Lavc61.3.100 libvpx
+      DURATION        : 00:00:18.400000000
+Stream mapping:
+  Stream #0:0 -> #0:0 (vp8 (native) -> wrapped_avframe (native))
+Press [q] to stop, [?] for help
+Output #0, null, to 'pipe:':
+  Metadata:
+    encoder         : Lavf62.12.102
+  Stream #0:0(eng): Video: wrapped_avframe, yuv420p(tv, bt470bg/unknown/unknown, progressive), 1440x900 [SAR 1:1 DAR 8:5], q=2-31, 200 kb/s, 25 fps, 25 tbn (default)
+    Metadata:
+      encoder         : Lavc62.28.102 wrapped_avframe
+      DURATION        : 00:00:18.400000000
+[out#0/null @ 0x14f706320] video:190KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame=  460 fps=0.0 q=-0.0 Lsize=N/A time=00:00:18.40 bitrate=N/A speed=72.2x elapsed=0:00:00.25
+
+$ ffprobe ../../../output/playwright/task-4-verified/mobile-arrival-touch.webm
+width=390
+height=844
+avg_frame_rate=25/1
+nb_read_frames=2132
+duration=85.280000
+$ ffmpeg blackdetect ../../../output/playwright/task-4-verified/mobile-arrival-touch.webm
+Input #0, matroska,webm, from '../../../output/playwright/task-4-verified/mobile-arrival-touch.webm':
+  Metadata:
+    ENCODER         : Lavf61.1.100
+  Duration: 00:01:25.28, start: 0.000000, bitrate: 367 kb/s
+  Stream #0:0(eng): Video: vp8, yuv420p(progressive), 390x844, SAR 1:1 DAR 195:422, 25 fps, 25 tbr, 1k tbn (default)
+    Metadata:
+      ENCODER         : Lavc61.3.100 libvpx
+      DURATION        : 00:01:25.280000000
+Stream mapping:
+  Stream #0:0 -> #0:0 (vp8 (native) -> wrapped_avframe (native))
+Press [q] to stop, [?] for help
+Output #0, null, to 'pipe:':
+  Metadata:
+    encoder         : Lavf62.12.102
+  Stream #0:0(eng): Video: wrapped_avframe, yuv420p(tv, bt470bg/unknown/unknown, progressive), 390x844 [SAR 1:1 DAR 195:422], q=2-31, 200 kb/s, 25 fps, 25 tbn (default)
+    Metadata:
+      encoder         : Lavc62.28.102 wrapped_avframe
+      DURATION        : 00:01:25.280000000
+[out#0/null @ 0x140e3d5e0] video:883KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame= 2132 fps=0.0 q=-0.0 Lsize=N/A time=00:01:25.28 bitrate=N/A speed= 192x elapsed=0:00:00.44
+
+$ ffprobe ../../../output/playwright/task-4-verified/desktop-reduced-motion-glitch.webm
+width=1440
+height=900
+avg_frame_rate=25/1
+nb_read_frames=411
+duration=16.440000
+$ ffmpeg blackdetect ../../../output/playwright/task-4-verified/desktop-reduced-motion-glitch.webm
+Input #0, matroska,webm, from '../../../output/playwright/task-4-verified/desktop-reduced-motion-glitch.webm':
+  Metadata:
+    ENCODER         : Lavf61.1.100
+  Duration: 00:00:16.44, start: 0.000000, bitrate: 1064 kb/s
+  Stream #0:0(eng): Video: vp8, yuv420p(progressive), 1440x900, SAR 1:1 DAR 8:5, 25 fps, 25 tbr, 1k tbn (default)
+    Metadata:
+      ENCODER         : Lavc61.3.100 libvpx
+      DURATION        : 00:00:16.440000000
+Stream mapping:
+  Stream #0:0 -> #0:0 (vp8 (native) -> wrapped_avframe (native))
+Press [q] to stop, [?] for help
+Output #0, null, to 'pipe:':
+  Metadata:
+    encoder         : Lavf62.12.102
+  Stream #0:0(eng): Video: wrapped_avframe, yuv420p(tv, bt470bg/unknown/unknown, progressive), 1440x900 [SAR 1:1 DAR 8:5], q=2-31, 200 kb/s, 25 fps, 25 tbn (default)
+    Metadata:
+      encoder         : Lavc62.28.102 wrapped_avframe
+      DURATION        : 00:00:16.440000000
+[out#0/null @ 0x149606420] video:170KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame=  411 fps=0.0 q=-0.0 Lsize=N/A time=00:00:16.44 bitrate=N/A speed=46.8x elapsed=0:00:00.35
