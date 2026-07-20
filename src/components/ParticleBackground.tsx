@@ -28,9 +28,18 @@ import {
 import { advanceF1AirflowTime, createF1Airflow } from './effects/f1Airflow';
 import { createF1StudioLighting } from './effects/f1StudioLighting';
 import { createStudioReflection } from './effects/studioReflection';
+import { createF1GlitchPostProcess, type F1GlitchPostProcess } from '../lib/f1-glitch-postprocess';
 import { CPU_PARTICLE_COUNT, SPEED_LINE_COUNT, TOTAL_LINES } from './showroom/showroom-constants';
 import { createCpuParticleField, createSpeedLineField, createTrailField } from './showroom/showroom-particles';
 import { createShowroomTrack } from './showroom/showroom-track';
+
+let hasWarnedF1GlitchPostProcessUnavailable = false;
+
+const warnF1GlitchPostProcessUnavailable = () => {
+  if (hasWarnedF1GlitchPostProcessUnavailable) return;
+  hasWarnedF1GlitchPostProcessUnavailable = true;
+  console.warn('[F1 glitch] Post-process unavailable');
+};
 
 interface ParticleBackgroundProps {
   isPressing: boolean;
@@ -51,7 +60,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
   onCarClick,
   onCarManualInteraction,
   exploded = false,
-  glitchProgress: _glitchProgress = null,
+  glitchProgress = null,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const spaceKeyArmedRef = useRef(false);
@@ -62,6 +71,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     carHeld: false,
     progress,
     exploded,
+    glitchProgress,
     explosionTime: 0,
     mouse: { x: 0, y: 0, targetX: 0, targetY: 0 },
     baseUniforms: {
@@ -86,6 +96,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     stateRef.current.exploded = exploded;
     if (exploded) stateRef.current.carHeld = false;
   }, [exploded]);
+
+  useEffect(() => {
+    stateRef.current.glitchProgress = glitchProgress;
+  }, [glitchProgress]);
 
   const onCarClickRef = useRef(onCarClick);
   useEffect(() => {
@@ -147,6 +161,22 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
 
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const usesLowPowerAirflow = prefersReducedMotion || window.innerWidth < 768;
+    const glitchProfile = {
+      mobile: window.innerWidth < 768,
+      prefersReducedMotion,
+    };
+    let glitchPostProcess: F1GlitchPostProcess | null = null;
+    try {
+      glitchPostProcess = createF1GlitchPostProcess(
+        renderer,
+        window.innerWidth,
+        window.innerHeight,
+        window.devicePixelRatio,
+        glitchProfile,
+      );
+    } catch {
+      warnF1GlitchPostProcessUnavailable();
+    }
     const studioLighting = createF1StudioLighting(scene);
     const reflection = createStudioReflection({
       renderer,
@@ -510,6 +540,23 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     let studioReveal = 0;
     let frameId = 0;
 
+    const renderShowroom = (target: THREE.WebGLRenderTarget | null) => {
+      renderer.setRenderTarget(target);
+      renderer.clear();
+      // 1. Render background lines with stable camera.
+      renderer.render(bgScene, bgCamera);
+      // 2. Update the reflection and restore the requested composition target.
+      const previousAutoClear = renderer.autoClear;
+      renderer.autoClear = true;
+      try {
+        reflection.render();
+      } finally {
+        renderer.autoClear = previousAutoClear;
+        renderer.setRenderTarget(target);
+      }
+      renderer.render(scene, camera);
+    };
+
     const animate = (timestamp: number) => {
       frameId = requestAnimationFrame(animate);
       checkModelInjection();
@@ -845,16 +892,27 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       }
 
       // ── Render Dual Pass ──
-      renderer.setRenderTarget(null);
-      renderer.clear();
-      // 1. Render background lines with stable camera
-      renderer.render(bgScene, bgCamera);
-      // 2. Render car with OrbitControls camera on top
-      const previousAutoClear = renderer.autoClear;
-      renderer.autoClear = true;
-      reflection.render();
-      renderer.autoClear = previousAutoClear;
-      renderer.render(scene, camera);
+      const activeGlitchProgress = stateRef.current.glitchProgress;
+      if (
+        activeGlitchProgress === null
+        || activeGlitchProgress === undefined
+        || glitchPostProcess === null
+      ) {
+        renderShowroom(null);
+      } else {
+        try {
+          glitchPostProcess.render({ progress: activeGlitchProgress, renderSource: renderShowroom });
+        } catch {
+          try {
+            glitchPostProcess.dispose();
+          } catch {
+            // Rendering fallback must survive cleanup failures too.
+          }
+          glitchPostProcess = null;
+          warnF1GlitchPostProcessUnavailable();
+          renderShowroom(null);
+        }
+      }
     };
 
     animate(performance.now());
@@ -866,8 +924,14 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       bgCamera.aspect = window.innerWidth / window.innerHeight;
       bgCamera.updateProjectionMatrix();
 
+      const nextPixelRatio = Math.min(window.devicePixelRatio, 2);
+      renderer.setPixelRatio(nextPixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
+      stateRef.current.baseUniforms.uPixelRatio.value = nextPixelRatio;
       reflection.resize(window.innerWidth, window.innerHeight);
+      if (glitchPostProcess) {
+        glitchPostProcess.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio);
+      }
       // godRays.resize(window.innerWidth, window.innerHeight);
     };
 
@@ -903,6 +967,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       controls.dispose();
       studioLighting.dispose();
       reflection.dispose();
+      if (glitchPostProcess) glitchPostProcess.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);

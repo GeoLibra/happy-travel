@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 import {
   AUTO_EXPLODE_DELAY_MS,
   GLITCH_CLEAN_FRAME_MS,
@@ -8,6 +9,7 @@ import {
   HOLOGRAM_REVEAL_MS,
 } from '../src/lib/f1-glitch-sequence';
 import { createF1WelcomeSequence } from '../src/lib/f1-welcome-sequence';
+import { createF1GlitchPostProcess } from '../src/lib/f1-glitch-postprocess';
 
 const source = readFileSync(
   new URL('../src/components/WelcomePage.tsx', import.meta.url),
@@ -15,6 +17,10 @@ const source = readFileSync(
 );
 const particleSource = readFileSync(
   new URL('../src/components/ParticleBackground.tsx', import.meta.url),
+  'utf8',
+);
+const glitchPostSource = readFileSync(
+  new URL('../src/lib/f1-glitch-postprocess.ts', import.meta.url),
   'utf8',
 );
 const agentGuidance = readFileSync(
@@ -122,6 +128,100 @@ assert.match(
   /tier:\s*prefersReducedMotion\s*\?\s*'fallback'\s*:\s*'reflective'/,
   'mobile viewports must retain the reflective tier unless reduced motion is requested',
 );
+assert.match(particleSource, /glitchProgress\?: number \| null/);
+assert.match(particleSource, /createF1GlitchPostProcess/);
+assert.match(particleSource, /glitchPostProcess\.render/);
+assert.match(particleSource, /glitchPostProcess\.resize/);
+assert.match(particleSource, /glitchPostProcess\.dispose\(\)/);
+assert.match(glitchPostSource, /new THREE\.WebGLRenderTarget/);
+assert.match(glitchPostSource, /getF1GlitchPulse/);
+assert.match(glitchPostSource, /prefersReducedMotion/);
+assert.match(glitchPostSource, /mobile/);
+assert.match(glitchPostSource, /renderer\.setRenderTarget\(null\)/);
+assert.match(glitchPostSource, /scan\*spatial/, 'reduced motion must suppress spatial scan bands');
+assert.match(particleSource, /\[F1 glitch\] Post-process unavailable/);
+
+class FakeGlitchRenderer {
+  readonly events: string[] = [];
+  renderedScene: THREE.Scene | null = null;
+
+  setRenderTarget(target: THREE.WebGLRenderTarget | null): void {
+    this.events.push(target === null ? 'screen' : 'target');
+  }
+
+  clear(): void {
+    this.events.push('clear');
+  }
+
+  render(scene: THREE.Scene): void {
+    this.events.push('render');
+    this.renderedScene = scene;
+  }
+}
+
+const desktopRenderer = new FakeGlitchRenderer();
+const desktopPostProcess = createF1GlitchPostProcess(
+  desktopRenderer as unknown as THREE.WebGLRenderer,
+  100,
+  50,
+  3,
+  { mobile: false, prefersReducedMotion: false },
+);
+let desktopTarget: THREE.WebGLRenderTarget | null = null;
+desktopPostProcess.render({
+  progress: 0.5,
+  renderSource: (target) => {
+    desktopRenderer.events.push('source');
+    desktopTarget = target;
+  },
+});
+assert(desktopTarget, 'post-process must provide its offscreen target to the showroom renderer');
+assert.equal(desktopTarget.width, 200, 'desktop target DPR must be capped at 2');
+assert.equal(desktopTarget.height, 100, 'desktop target height must follow the capped DPR');
+assert.equal(desktopTarget.texture.colorSpace, THREE.SRGBColorSpace);
+assert.deepEqual(
+  desktopRenderer.events,
+  ['source', 'screen', 'clear', 'render'],
+  'source composition must finish before the post-process renders to the transparent canvas',
+);
+assert(desktopRenderer.renderedScene);
+const desktopQuad = desktopRenderer.renderedScene.children[0] as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+assert.equal(desktopQuad.material.uniforms.uPulse.value, 1, 'the post-process must consume the glitch pulse envelope');
+assert.equal(desktopQuad.material.uniforms.uAmplitude.value, 1);
+assert.equal(desktopQuad.material.uniforms.uReducedMotion.value, 0);
+
+let targetDisposals = 0;
+let geometryDisposals = 0;
+let materialDisposals = 0;
+desktopTarget.dispose = () => { targetDisposals += 1; };
+desktopQuad.geometry.dispose = () => { geometryDisposals += 1; };
+desktopQuad.material.dispose = () => { materialDisposals += 1; };
+desktopPostProcess.dispose();
+desktopPostProcess.dispose();
+assert.deepEqual(
+  [targetDisposals, geometryDisposals, materialDisposals],
+  [1, 1, 1],
+  'all owned GPU resources must be disposed exactly once',
+);
+
+const mobileRenderer = new FakeGlitchRenderer();
+const mobilePostProcess = createF1GlitchPostProcess(
+  mobileRenderer as unknown as THREE.WebGLRenderer,
+  100,
+  50,
+  3,
+  { mobile: true, prefersReducedMotion: true },
+);
+let mobileTarget: THREE.WebGLRenderTarget | null = null;
+mobilePostProcess.render({ progress: 0.5, renderSource: (target) => { mobileTarget = target; } });
+assert(mobileTarget);
+assert.equal(mobileTarget.width, 100, 'mobile target DPR must be capped at 1');
+assert.equal(mobileTarget.height, 50);
+assert(mobileRenderer.renderedScene);
+const mobileQuad = mobileRenderer.renderedScene.children[0] as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 0.65);
+assert.equal(mobileQuad.material.uniforms.uReducedMotion.value, 1);
+mobilePostProcess.dispose();
 
 type FakeFrame = number;
 
