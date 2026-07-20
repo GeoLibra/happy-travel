@@ -25,6 +25,10 @@ const glitchPostSource = readFileSync(
   new URL('../src/lib/f1-glitch-postprocess.ts', import.meta.url),
   'utf8',
 );
+const glitchProbeSource = readFileSync(
+  new URL('./run-f1-glitch-webgl-probe.mjs', import.meta.url),
+  'utf8',
+);
 const agentGuidance = readFileSync(
   new URL('../AGENTS.md', import.meta.url),
   'utf8',
@@ -164,6 +168,27 @@ assert.match(
   particleSource,
   /__f1RendererAudit/,
   'the mounted showroom canvas must expose a focused context-loss integration probe',
+);
+assert.match(
+  particleSource,
+  /const contextLossExtension = rendererAuditEnabled\s*\?\s*renderer\.getContext\(\)\.getExtension\('WEBGL_lose_context'\)\s*:\s*null/,
+  'production visits must not request the synthetic context-loss extension',
+);
+const probeRelease = glitchProbeSource.indexOf('await page.mouse.up()');
+const probeEnterWait = glitchProbeSource.indexOf("text.includes('ENTER')", probeRelease);
+assert.match(
+  glitchProbeSource,
+  /ENGINE STARTING[\s\S]*?progress\s*>=\s*30/,
+  'the component probe must release once auto-complete owns progress, before ENTER can forward the CTA',
+);
+assert(
+  probeRelease >= 0 && probeEnterWait > probeRelease,
+  'the probe must release before waiting for 100%/ENTER',
+);
+assert.match(
+  glitchProbeSource,
+  /page\.url\(\)[\s\S]*?welcome/i,
+  'the probe must prove the release did not navigate away from the welcome scene',
 );
 assert.match(glitchPostSource, /new THREE\.WebGLRenderTarget/);
 assert.match(glitchPostSource, /getF1GlitchPulse/);
@@ -368,6 +393,11 @@ assert.throws(
 );
 assert.equal(prewarmSource.visible, false, 'failed prewarm must restore model visibility');
 assert.equal(prewarmMesh.frustumCulled, true, 'failed prewarm must restore mesh culling');
+assert.equal(
+  prewarmMesh.onBeforeRender,
+  originalBeforeRender,
+  'failed prewarm must restore mesh render callbacks',
+);
 assert.equal(prewarmRenderer.getRenderTarget(), prewarmPreviousTarget, 'failed prewarm must restore target');
 prewarmPreviousTarget.dispose();
 prewarmTarget.dispose();

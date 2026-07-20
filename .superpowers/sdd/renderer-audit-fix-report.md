@@ -70,3 +70,25 @@ The mounted-canvas probe was intentionally not executed after the instruction to
 ## Remaining concern
 
 Run the focused component probe in a real WebGL browser on the final commit, save its returned JSON with the final commit SHA, and then run the broader F1 asset/reflection/showroom matrix before claiming complete browser evidence.
+
+## Review follow-up
+
+RED was re-established with `npm run check:f1-welcome`: the new production contract failed because `WEBGL_lose_context` was requested on ordinary visits. The same test now also contracts the probe ordering and exceptional `onBeforeRender` restoration.
+
+The follow-up changes:
+
+- request `WEBGL_lose_context` only when `?f1RendererAudit=1` enables the audit hook;
+- release the probe's trusted hold after progress reaches the 30–99% auto-complete range, before the canvas can forward a 100% pointer release to the ENTER CTA;
+- wait for automatic completion/ENTER after release and assert that the URL and welcome showroom remain intact before waiting for `activePulseFrames`;
+- assert that an exceptional target-bound source render restores the mesh's original `onBeforeRender` callback.
+
+Fresh follow-up GREEN evidence:
+
+```text
+npm run check:f1-welcome  # exit 0
+npm run check:f1-glitch   # exit 0
+npm run lint              # exit 0, tsc --noEmit
+npm run build             # exit 0, 2131 modules transformed
+```
+
+No browser or WebGL probe process was run, as instructed. The build again emitted only the existing chunk-size advisory.

@@ -204,7 +204,9 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     };
     let prewarmProgramCount = 0;
     let expectsPrewarmedFirstPulse = false;
-    const contextLossExtension = renderer.getContext().getExtension('WEBGL_lose_context');
+    const contextLossExtension = rendererAuditEnabled
+      ? renderer.getContext().getExtension('WEBGL_lose_context')
+      : null;
     const auditCanvas = renderer.domElement as F1RendererAuditCanvas;
     if (rendererAuditEnabled) {
       auditCanvas.__f1RendererAudit = {

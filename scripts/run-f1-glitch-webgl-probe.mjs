@@ -19,13 +19,23 @@ async page => {
 
   const startBox = await startButton.boundingBox();
   if (!startBox) throw new Error('start control has no layout box');
+  const welcomeUrl = page.url();
   await page.mouse.move(startBox.x + startBox.width / 2, startBox.y + startBox.height / 2);
   await page.mouse.down();
   await page.waitForFunction(() => {
     const text = document.querySelector('[data-f1-welcome-action="enter"]')?.textContent ?? '';
-    return text.includes('ENTER') && !text.includes('STARTING');
+    const match = text.match(/ENGINE STARTING (\d+)%/);
+    const progress = Number(match?.[1] ?? 0);
+    return progress >= 30 && progress < 100;
   }, null, { timeout: 12_000 });
   await page.mouse.up();
+  await page.waitForFunction(() => {
+    const text = document.querySelector('[data-f1-welcome-action="enter"]')?.textContent ?? '';
+    return text.includes('ENTER') && !text.includes('STARTING');
+  }, null, { timeout: 12_000 });
+  if (page.url() !== welcomeUrl || !(await showroom.isVisible())) {
+    throw new Error('pre-100% release left the welcome scene');
+  }
 
   await page.waitForFunction(() => {
     const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
