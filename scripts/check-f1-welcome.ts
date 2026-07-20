@@ -78,7 +78,7 @@ assert.match(
 assert.match(
   source,
   /const autoExplodeTimerRef = React\.useRef<ReturnType<typeof setTimeout> \| null>\(null\);/,
-  'WelcomePage must retain the pending auto-explode timer',
+  'WelcomePage must retain the manual-interaction timer compatibility ref',
 );
 assert.match(source, /const \[glitchProgress, setGlitchProgress\] = useState<number \| null>\(null\)/);
 assert.match(source, /const glitchFrameRef = React\.useRef<number \| null>\(null\)/);
@@ -92,6 +92,11 @@ assert.doesNotMatch(
   source,
   /autoExplodeTimerRef\.current\s*=\s*setTimeout/,
   'automatic explosion must be animation-frame owned, never timeout owned',
+);
+assert.doesNotMatch(
+  source,
+  /sequenceStartedAtRef/,
+  'WelcomePage must pass the sequence start timestamp directly without redundant ref state',
 );
 assert.match(
   source,

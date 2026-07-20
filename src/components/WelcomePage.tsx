@@ -65,7 +65,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoExplodeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const glitchFrameRef = React.useRef<number | null>(null);
-  const sequenceStartedAtRef = React.useRef<number | null>(null);
   const automaticSequenceRef = React.useRef<F1WelcomeSequence | null>(null);
   const hasManualInteractionRef = React.useRef(false);
   const hasStartedEntryRef = React.useRef(false);
@@ -81,7 +80,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
     }
     automaticSequenceRef.current?.cancel();
     automaticSequenceRef.current = null;
-    sequenceStartedAtRef.current = null;
     setGlitchProgress(null);
   }, []);
 
@@ -195,20 +193,17 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
       onGlitchProgress: setGlitchProgress,
       onExplode: () => {
         automaticSequenceRef.current = null;
-        sequenceStartedAtRef.current = null;
         setIsCarExploded(true);
       },
     });
     automaticSequenceRef.current = sequence;
-    sequenceStartedAtRef.current = performance.now();
-    sequence.start(sequenceStartedAtRef.current);
+    sequence.start(performance.now());
 
     return () => {
       sequence.cancel();
       if (automaticSequenceRef.current === sequence) {
         automaticSequenceRef.current = null;
       }
-      sequenceStartedAtRef.current = null;
       glitchFrameRef.current = null;
     };
   }, [isTransitioning, progress]);
