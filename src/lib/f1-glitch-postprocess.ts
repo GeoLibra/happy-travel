@@ -84,6 +84,72 @@ const validateRenderTarget = (
   }
 };
 
+export interface F1GlitchPrewarmSourceInput {
+  renderer: THREE.WebGLRenderer;
+  target: THREE.WebGLRenderTarget;
+  source: THREE.Object3D | null;
+  renderSource(target: THREE.WebGLRenderTarget): void;
+}
+
+export interface F1GlitchPrewarmSourceResult {
+  sourcePassParticipated: boolean;
+}
+
+/**
+ * Exercises the exact source-target shader variants without ever drawing the
+ * temporarily revealed source to the visible framebuffer. Every object state
+ * touched for the probe is restored, including exceptional exits.
+ */
+export function renderF1GlitchPrewarmSource({
+  renderer,
+  target,
+  source,
+  renderSource,
+}: F1GlitchPrewarmSourceInput): F1GlitchPrewarmSourceResult {
+  const previousTarget = renderer.getRenderTarget();
+  const previousSourceVisibility = source?.visible;
+  const meshStates: Array<{
+    mesh: THREE.Mesh;
+    frustumCulled: boolean;
+    onBeforeRender: THREE.Object3D['onBeforeRender'];
+  }> = [];
+  let sourcePassParticipated = false;
+
+  source?.traverse((object) => {
+    if (!(object as THREE.Mesh).isMesh) return;
+    const mesh = object as THREE.Mesh;
+    const previousOnBeforeRender = mesh.onBeforeRender;
+    meshStates.push({
+      mesh,
+      frustumCulled: mesh.frustumCulled,
+      onBeforeRender: previousOnBeforeRender,
+    });
+    mesh.frustumCulled = false;
+    mesh.onBeforeRender = function onF1GlitchPrewarmSource(...args) {
+      sourcePassParticipated = true;
+      previousOnBeforeRender.apply(this, args);
+    };
+  });
+
+  try {
+    // Bind before revealing the model so no synchronous source render can
+    // accidentally reach the screen framebuffer.
+    renderer.setRenderTarget(target);
+    if (source) source.visible = true;
+    renderSource(target);
+    return { sourcePassParticipated };
+  } finally {
+    for (const { mesh, frustumCulled, onBeforeRender } of meshStates) {
+      mesh.frustumCulled = frustumCulled;
+      mesh.onBeforeRender = onBeforeRender;
+    }
+    if (source && previousSourceVisibility !== undefined) {
+      source.visible = previousSourceVisibility;
+    }
+    renderer.setRenderTarget(previousTarget);
+  }
+}
+
 export interface F1GlitchContextRecoveryCallbacks {
   onContextLost(): void;
   onContextRestored(): void;
@@ -218,13 +284,39 @@ const validateShaderProgram = (
   }
 };
 
+export interface F1GlitchResourceFactory {
+  createRenderTarget(
+    width: number,
+    height: number,
+    options: THREE.RenderTargetOptions,
+  ): THREE.WebGLRenderTarget;
+  createShaderMaterial(parameters: THREE.ShaderMaterialParameters): THREE.ShaderMaterial;
+  createGeometry(): THREE.PlaneGeometry;
+  createMesh(
+    geometry: THREE.PlaneGeometry,
+    material: THREE.ShaderMaterial,
+  ): THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+}
+
+const defaultF1GlitchResourceFactory: F1GlitchResourceFactory = {
+  createRenderTarget: (width, height, options) => new THREE.WebGLRenderTarget(width, height, options),
+  createShaderMaterial: (parameters) => new THREE.ShaderMaterial(parameters),
+  createGeometry: () => new THREE.PlaneGeometry(2, 2),
+  createMesh: (geometry, material) => new THREE.Mesh(geometry, material),
+};
+
 export function createF1GlitchPostProcess(
   renderer: THREE.WebGLRenderer,
   width: number,
   height: number,
   pixelRatio: number,
   profile: F1GlitchProfile,
+  resourceFactory: Partial<F1GlitchResourceFactory> = {},
 ): F1GlitchPostProcess {
+  const factory: F1GlitchResourceFactory = {
+    ...defaultF1GlitchResourceFactory,
+    ...resourceFactory,
+  };
   let mobile = profile.mobile;
   const getRenderSize = (
     nextWidth: number,
@@ -252,7 +344,7 @@ export function createF1GlitchPostProcess(
   const createValidatedTarget = (): THREE.WebGLRenderTarget => {
     let lastError: unknown = null;
     for (const type of candidateTypes) {
-      const candidate = new THREE.WebGLRenderTarget(initialSize.width, initialSize.height, {
+      const candidate = factory.createRenderTarget(initialSize.width, initialSize.height, {
         depthBuffer: true,
         stencilBuffer: false,
         type,
@@ -285,15 +377,22 @@ export function createF1GlitchPostProcess(
     uReducedBrightness: { value: 0 },
     uReducedNoise: { value: 0 },
   };
-  const material = new THREE.ShaderMaterial({
-    uniforms,
-    depthTest: false,
-    depthWrite: false,
-    transparent: false,
-    blending: THREE.NoBlending,
-    toneMapped: true,
-    vertexShader: `varying vec2 vUv; void main(){vUv=uv;gl_Position=vec4(position,1.0);}`,
-    fragmentShader: `
+  const scene = new THREE.Scene();
+  const camera = new THREE.Camera();
+  let ownedMaterial: THREE.ShaderMaterial | null = null;
+  let ownedGeometry: THREE.PlaneGeometry | null = null;
+  let ownedQuad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | null = null;
+
+  try {
+    ownedMaterial = factory.createShaderMaterial({
+      uniforms,
+      depthTest: false,
+      depthWrite: false,
+      transparent: false,
+      blending: THREE.NoBlending,
+      toneMapped: true,
+      vertexShader: `varying vec2 vUv; void main(){vUv=uv;gl_Position=vec4(position,1.0);}`,
+      fragmentShader: `
       varying vec2 vUv;
       uniform sampler2D uTexture;
       uniform vec2 uResolution;
@@ -343,22 +442,25 @@ export function createF1GlitchPostProcess(
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }
-    `,
-  });
-  const scene = new THREE.Scene();
-  const camera = new THREE.Camera();
-  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
-  scene.add(quad);
-  let disposed = false;
-  let prewarmed = false;
-
-  try {
-    validateShaderProgram(renderer, scene, camera, material);
+      `,
+    });
+    ownedGeometry = factory.createGeometry();
+    ownedQuad = factory.createMesh(ownedGeometry, ownedMaterial);
+    scene.add(ownedQuad);
+    validateShaderProgram(renderer, scene, camera, ownedMaterial);
   } catch (error) {
-    disposed = true;
-    disposeBestEffort([target, quad.geometry, material]);
+    disposeBestEffort([
+      target,
+      ...(ownedGeometry ? [ownedGeometry] : []),
+      ...(ownedMaterial ? [ownedMaterial] : []),
+    ]);
     throw error;
   }
+
+  const material = ownedMaterial;
+  const quad = ownedQuad;
+  let disposed = false;
+  let prewarmed = false;
 
   const prewarm = (renderSource: (target: THREE.WebGLRenderTarget) => void): void => {
     if (disposed) throw new Error('F1 glitch post-process is disposed');

@@ -31,10 +31,12 @@ import { createStudioReflection } from './effects/studioReflection';
 import {
   bindF1GlitchContextRecovery,
   createF1GlitchPostProcess,
+  renderF1GlitchPrewarmSource,
   renderF1GlitchFrame,
   restoreF1GlitchPostProcess,
   type F1GlitchPostProcess,
 } from '../lib/f1-glitch-postprocess';
+import { getF1GlitchPulse } from '../lib/f1-glitch-sequence';
 import { CPU_PARTICLE_COUNT, SPEED_LINE_COUNT, TOTAL_LINES } from './showroom/showroom-constants';
 import { createCpuParticleField, createSpeedLineField, createTrailField } from './showroom/showroom-particles';
 import { createShowroomTrack } from './showroom/showroom-track';
@@ -57,6 +59,27 @@ interface ParticleBackgroundProps {
   exploded?: boolean;
   glitchProgress?: number | null;
 }
+
+interface F1RendererAuditSnapshot {
+  status: string;
+  sourcePrewarms: number;
+  modelSourcePrewarms: number;
+  modelSourceMisses: number;
+  contextLosses: number;
+  contextRestores: number;
+  directFallbackFrames: number;
+  activePulseFrames: number;
+  unavailableCount: number;
+  firstPulseProgramDeltas: number[];
+}
+
+type F1RendererAuditCanvas = HTMLCanvasElement & {
+  __f1RendererAudit?: {
+    snapshot(): F1RendererAuditSnapshot;
+    loseContext(): boolean;
+    restoreContext(): boolean;
+  };
+};
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
   isPressing,
@@ -164,6 +187,43 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
 
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
+
+    const rendererAuditEnabled = new URLSearchParams(window.location.search)
+      .get('f1RendererAudit') === '1';
+    const rendererAudit: F1RendererAuditSnapshot = {
+      status: 'initializing',
+      sourcePrewarms: 0,
+      modelSourcePrewarms: 0,
+      modelSourceMisses: 0,
+      contextLosses: 0,
+      contextRestores: 0,
+      directFallbackFrames: 0,
+      activePulseFrames: 0,
+      unavailableCount: 0,
+      firstPulseProgramDeltas: [],
+    };
+    let prewarmProgramCount = 0;
+    let expectsPrewarmedFirstPulse = false;
+    const contextLossExtension = renderer.getContext().getExtension('WEBGL_lose_context');
+    const auditCanvas = renderer.domElement as F1RendererAuditCanvas;
+    if (rendererAuditEnabled) {
+      auditCanvas.__f1RendererAudit = {
+        snapshot: () => ({
+          ...rendererAudit,
+          firstPulseProgramDeltas: [...rendererAudit.firstPulseProgramDeltas],
+        }),
+        loseContext: () => {
+          if (!contextLossExtension) return false;
+          contextLossExtension.loseContext();
+          return true;
+        },
+        restoreContext: () => {
+          if (!contextLossExtension) return false;
+          contextLossExtension.restoreContext();
+          return true;
+        },
+      };
+    }
 
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const usesLowPowerAirflow = prefersReducedMotion || window.innerWidth < 768;
@@ -554,6 +614,31 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       renderer.render(scene, camera);
     };
 
+    const renderShowroomForGlitchPrewarm = (target: THREE.WebGLRenderTarget) => {
+      const result = renderF1GlitchPrewarmSource({
+        renderer,
+        target,
+        source: f1CarGroup,
+        renderSource: renderShowroom,
+      });
+      rendererAudit.sourcePrewarms += 1;
+      if (f1CarGroup) {
+        if (!result.sourcePassParticipated) {
+          rendererAudit.modelSourceMisses += 1;
+          throw new Error('F1 glitch model source did not participate in target prewarm');
+        }
+        rendererAudit.modelSourcePrewarms += 1;
+      }
+      prewarmProgramCount = renderer.info.programs.length;
+      expectsPrewarmedFirstPulse = true;
+    };
+
+    const markGlitchPostProcessUnavailable = () => {
+      rendererAudit.unavailableCount += 1;
+      rendererAudit.status = 'fallback';
+      warnF1GlitchPostProcessUnavailable();
+    };
+
     const disableGlitchPostProcess = () => {
       if (!glitchPostProcess) return;
       glitchPostProcess.dispose();
@@ -570,9 +655,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
           window.devicePixelRatio,
           glitchProfile,
         ),
-        renderSource: renderShowroom,
-        onUnavailable: warnF1GlitchPostProcessUnavailable,
+        renderSource: renderShowroomForGlitchPrewarm,
+        onUnavailable: markGlitchPostProcessUnavailable,
       });
+      if (glitchPostProcess) rendererAudit.status = 'prewarmed';
     };
     revalidateGlitchAfterModelInjection = initializeGlitchPostProcess;
 
@@ -585,9 +671,11 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         // handles. Drop the JS owner without issuing stale-context deletes;
         // restoration creates and validates a completely new resource set.
         glitchPostProcess = null;
-        warnF1GlitchPostProcessUnavailable();
+        rendererAudit.contextLosses += 1;
+        rendererAudit.status = 'context-lost';
       },
       onContextRestored: () => {
+        rendererAudit.contextRestores += 1;
         initializeGlitchPostProcess();
       },
     });
@@ -673,6 +761,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
           if (hologramProgress >= 1.0 && isCarMaterialReplaced && f1CarGroup) {
               if (revertHologramMaterial(f1CarGroup)) {
                   isCarMaterialReplaced = false; // Prevents calling it every frame
+                  // The restored GLB materials have different target-specific
+                  // programs from the hologram clones. Validate them now, while
+                  // the clean hold still precedes the first glitch pulse.
+                  revalidateGlitchAfterModelInjection?.();
               }
           }
       } else {
@@ -930,12 +1022,28 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
 
       // ── Render Dual Pass ──
       const activeGlitchProgress = stateRef.current.glitchProgress;
+      const activeGlitchPulse = activeGlitchProgress === null
+        ? 0
+        : getF1GlitchPulse(activeGlitchProgress);
       glitchPostProcess = renderF1GlitchFrame({
         glitchPostProcess,
         progress: activeGlitchProgress,
         renderShowroom,
-        onUnavailable: warnF1GlitchPostProcessUnavailable,
+        onUnavailable: markGlitchPostProcessUnavailable,
       });
+      if (activeGlitchProgress !== null && !glitchPostProcess) {
+        rendererAudit.directFallbackFrames += 1;
+      }
+      if (activeGlitchPulse > 0 && glitchPostProcess) {
+        rendererAudit.activePulseFrames += 1;
+        if (expectsPrewarmedFirstPulse) {
+          rendererAudit.firstPulseProgramDeltas.push(
+            renderer.info.programs.length - prewarmProgramCount,
+          );
+          expectsPrewarmedFirstPulse = false;
+        }
+        rendererAudit.status = 'active';
+      }
     };
 
     animate(performance.now());
@@ -955,10 +1063,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       if (glitchPostProcess) {
         try {
           glitchPostProcess.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio);
-          glitchPostProcess.prewarm(renderShowroom);
+          glitchPostProcess.prewarm(renderShowroomForGlitchPrewarm);
         } catch {
           disableGlitchPostProcess();
-          warnF1GlitchPostProcessUnavailable();
+          markGlitchPostProcessUnavailable();
         }
       }
       // godRays.resize(window.innerWidth, window.innerHeight);
@@ -998,6 +1106,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       studioLighting.dispose();
       reflection.dispose();
       if (glitchPostProcess) glitchPostProcess.dispose();
+      delete auditCanvas.__f1RendererAudit;
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);

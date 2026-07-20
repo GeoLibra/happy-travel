@@ -144,11 +144,26 @@ assert.match(particleSource, /glitchPostProcess\.dispose\(\)/);
 assert.match(glitchPostSource, /webglcontextlost/);
 assert.match(glitchPostSource, /webglcontextrestored/);
 assert.match(particleSource, /bindF1GlitchContextRecovery/);
-assert.match(particleSource, /prewarm\(renderShowroom\)/);
+assert.match(particleSource, /prewarm\(renderShowroomForGlitchPrewarm\)/);
+assert.match(
+  particleSource,
+  /renderF1GlitchPrewarmSource\([\s\S]*?source:\s*f1CarGroup/,
+  'the actual late GLB must be made renderable only inside the target-bound prewarm pass',
+);
 assert.match(
   particleSource,
   /revalidateGlitchAfterModelInjection/,
   'late GLB injection must prewarm the car source shaders before glitch activation',
+);
+assert.match(
+  particleSource,
+  /revertHologramMaterial\(f1CarGroup\)[\s\S]*?revalidateGlitchAfterModelInjection\?\.\(\)/,
+  'restoring the original GLB materials must prewarm their offscreen shader variants before the first pulse',
+);
+assert.match(
+  particleSource,
+  /__f1RendererAudit/,
+  'the mounted showroom canvas must expose a focused context-loss integration probe',
 );
 assert.match(glitchPostSource, /new THREE\.WebGLRenderTarget/);
 assert.match(glitchPostSource, /getF1GlitchPulse/);
@@ -274,6 +289,124 @@ class FakeGlitchRenderer {
     }
   }
 }
+
+assert.equal(
+  typeof (glitchPostProcessModule as Record<string, unknown>).renderF1GlitchPrewarmSource,
+  'function',
+  'target-bound source prewarming must be behaviorally testable',
+);
+const prewarmRenderer = new FakeGlitchRenderer();
+const prewarmPreviousTarget = new THREE.WebGLRenderTarget(2, 2);
+const prewarmTarget = new THREE.WebGLRenderTarget(4, 4);
+prewarmRenderer.setRenderTarget(prewarmPreviousTarget);
+const prewarmSource = new THREE.Group();
+prewarmSource.visible = false;
+const prewarmMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial(),
+);
+const originalBeforeRender = prewarmMesh.onBeforeRender;
+prewarmMesh.frustumCulled = true;
+prewarmSource.add(prewarmMesh);
+let prewarmObservedBoundTarget = false;
+const prewarmResult = (
+  glitchPostProcessModule as unknown as {
+    renderF1GlitchPrewarmSource(input: {
+      renderer: THREE.WebGLRenderer;
+      target: THREE.WebGLRenderTarget;
+      source: THREE.Object3D | null;
+      renderSource(target: THREE.WebGLRenderTarget): void;
+    }): { sourcePassParticipated: boolean };
+  }
+).renderF1GlitchPrewarmSource({
+  renderer: prewarmRenderer as unknown as THREE.WebGLRenderer,
+  target: prewarmTarget,
+  source: prewarmSource,
+  renderSource: (target) => {
+    assert.equal(target, prewarmTarget);
+    assert.equal(prewarmRenderer.getRenderTarget(), prewarmTarget);
+    assert.equal(prewarmSource.visible, true);
+    assert.equal(prewarmMesh.frustumCulled, false);
+    prewarmObservedBoundTarget = true;
+    prewarmMesh.onBeforeRender(
+      prewarmRenderer as unknown as THREE.WebGLRenderer,
+      new THREE.Scene(),
+      new THREE.Camera(),
+      prewarmMesh.geometry,
+      prewarmMesh.material,
+      null,
+    );
+  },
+});
+assert.equal(prewarmObservedBoundTarget, true);
+assert.equal(prewarmResult.sourcePassParticipated, true, 'a real model mesh draw must participate');
+assert.equal(prewarmSource.visible, false, 'hidden late models must remain hidden after prewarm');
+assert.equal(prewarmMesh.frustumCulled, true, 'mesh culling state must be restored after prewarm');
+assert.equal(prewarmMesh.onBeforeRender, originalBeforeRender, 'mesh callbacks must be restored after prewarm');
+assert.equal(
+  prewarmRenderer.getRenderTarget(),
+  prewarmPreviousTarget,
+  'prewarm must restore the renderer target even though its source pass is target-bound',
+);
+assert.throws(
+  () => (
+    glitchPostProcessModule as unknown as {
+      renderF1GlitchPrewarmSource(input: {
+        renderer: THREE.WebGLRenderer;
+        target: THREE.WebGLRenderTarget;
+        source: THREE.Object3D | null;
+        renderSource(target: THREE.WebGLRenderTarget): void;
+      }): { sourcePassParticipated: boolean };
+    }
+  ).renderF1GlitchPrewarmSource({
+    renderer: prewarmRenderer as unknown as THREE.WebGLRenderer,
+    target: prewarmTarget,
+    source: prewarmSource,
+    renderSource: () => { throw new Error('injected source failure'); },
+  }),
+  /injected source failure/,
+);
+assert.equal(prewarmSource.visible, false, 'failed prewarm must restore model visibility');
+assert.equal(prewarmMesh.frustumCulled, true, 'failed prewarm must restore mesh culling');
+assert.equal(prewarmRenderer.getRenderTarget(), prewarmPreviousTarget, 'failed prewarm must restore target');
+prewarmPreviousTarget.dispose();
+prewarmTarget.dispose();
+prewarmMesh.geometry.dispose();
+prewarmMesh.material.dispose();
+
+const constructionFailureRenderer = new FakeGlitchRenderer();
+const ownedTarget = new THREE.WebGLRenderTarget(4, 4);
+const ownedMaterial = new THREE.ShaderMaterial();
+const ownedGeometry = new THREE.PlaneGeometry(2, 2);
+let ownedTargetDisposals = 0;
+let ownedMaterialDisposals = 0;
+let ownedGeometryDisposals = 0;
+ownedTarget.dispose = () => { ownedTargetDisposals += 1; };
+ownedMaterial.dispose = () => { ownedMaterialDisposals += 1; };
+ownedGeometry.dispose = () => { ownedGeometryDisposals += 1; };
+const injectedConstructionFailure = new Error('injected mesh construction failure');
+assert.throws(
+  () => createF1GlitchPostProcess(
+    constructionFailureRenderer as unknown as THREE.WebGLRenderer,
+    4,
+    4,
+    1,
+    { mobile: false, prefersReducedMotion: false },
+    {
+      createRenderTarget: () => ownedTarget,
+      createShaderMaterial: () => ownedMaterial,
+      createGeometry: () => ownedGeometry,
+      createMesh: () => { throw injectedConstructionFailure; },
+    },
+  ),
+  (error) => error === injectedConstructionFailure,
+  'construction failure must rethrow the original error',
+);
+assert.deepEqual(
+  [ownedTargetDisposals, ownedMaterialDisposals, ownedGeometryDisposals],
+  [1, 1, 1],
+  'render target, material, and geometry must be transactionally released before create returns',
+);
 
 const shaderFailureRenderer = new FakeGlitchRenderer();
 shaderFailureRenderer.autoClear = true;
