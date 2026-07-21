@@ -64,27 +64,16 @@ async page => {
   };
 
   const loseContextOnNextActivePulse = async (previousActivePulseFrames) => {
-    const triggered = await page.evaluate(({ selector, previousFrames }) => new Promise((resolve, reject) => {
-      const deadline = performance.now() + 15_000;
-      const attempt = () => {
-        const canvas = document.querySelector(selector);
-        const audit = canvas?.__f1RendererAudit;
-        if (!audit) {
-          reject(new Error('real showroom renderer audit unavailable'));
-          return;
-        }
-        if (audit.snapshot().activePulseFrames > previousFrames) {
-          resolve(audit.loseContext());
-          return;
-        }
-        if (performance.now() >= deadline) {
-          reject(new Error('timed out waiting to lose context during an active pulse'));
-          return;
-        }
-        requestAnimationFrame(attempt);
-      };
-      requestAnimationFrame(attempt);
-    }), { selector: canvasSelector, previousFrames: previousActivePulseFrames });
+    await page.waitForFunction(({ selector, previousFrames }) => {
+      const canvas = document.querySelector(selector);
+      return (canvas?.__f1RendererAudit?.snapshot().activePulseFrames ?? 0) > previousFrames;
+    }, { selector: canvasSelector, previousFrames: previousActivePulseFrames }, {
+      timeout: 15_000,
+    });
+    const triggered = await page.evaluate((selector) => {
+      const canvas = document.querySelector(selector);
+      return canvas?.__f1RendererAudit?.loseContext() ?? false;
+    }, canvasSelector);
     if (!triggered) throw new Error('WEBGL_lose_context unavailable during active pulse');
   };
 
