@@ -1,0 +1,24 @@
+{
+  "capturedAt": "2026-07-20T23:35:11+08:00",
+  "url": "http://127.0.0.1:3000/scripts/f1-glitch-webgl-probe.html",
+  "playwrightSession": "f1-final-webgl-final",
+  "status": "PASS",
+  "renderer": "WebKit WebGL",
+  "targetType": "HalfFloatType",
+  "directRgba": [255, 198, 139, 94],
+  "pulseZeroRgba": [255, 198, 139, 94],
+  "pulseZeroMaxChannelDelta": 0,
+  "activePulseRgba": [255, 183, 112, 94],
+  "contextLossEvents": 1,
+  "contextRestoreEvents": 1,
+  "restorePrewarms": 1,
+  "restoredPulseRgba": [255, 183, 112, 94],
+  "console": {
+    "errors": 0,
+    "warnings": 0,
+    "expectedInfo": [
+      "THREE.WebGLRenderer: Context Lost.",
+      "THREE.WebGLRenderer: Context Restored."
+    ]
+  }
+}

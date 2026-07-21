@@ -28,9 +28,27 @@ import {
 import { advanceF1AirflowTime, createF1Airflow } from './effects/f1Airflow';
 import { createF1StudioLighting } from './effects/f1StudioLighting';
 import { createStudioReflection } from './effects/studioReflection';
+import {
+  bindF1GlitchContextRecovery,
+  createF1GlitchPostProcess,
+  measureF1RendererProgramDelta,
+  renderF1GlitchPrewarmSource,
+  renderF1GlitchFrame,
+  restoreF1GlitchPostProcess,
+  type F1GlitchPostProcess,
+} from '../lib/f1-glitch-postprocess';
+import { getF1GlitchPulse } from '../lib/f1-glitch-sequence';
 import { CPU_PARTICLE_COUNT, SPEED_LINE_COUNT, TOTAL_LINES } from './showroom/showroom-constants';
 import { createCpuParticleField, createSpeedLineField, createTrailField } from './showroom/showroom-particles';
 import { createShowroomTrack } from './showroom/showroom-track';
+
+let hasWarnedF1GlitchPostProcessUnavailable = false;
+
+const warnF1GlitchPostProcessUnavailable = () => {
+  if (hasWarnedF1GlitchPostProcessUnavailable) return;
+  hasWarnedF1GlitchPostProcessUnavailable = true;
+  console.warn('[F1 glitch] Post-process unavailable');
+};
 
 interface ParticleBackgroundProps {
   isPressing: boolean;
@@ -40,7 +58,29 @@ interface ParticleBackgroundProps {
   onCarClick?: () => void;
   onCarManualInteraction?: () => void;
   exploded?: boolean;
+  glitchProgress?: number | null;
 }
+
+interface F1RendererAuditSnapshot {
+  status: string;
+  sourcePrewarms: number;
+  modelSourcePrewarms: number;
+  modelSourceMisses: number;
+  contextLosses: number;
+  contextRestores: number;
+  directFallbackFrames: number;
+  activePulseFrames: number;
+  unavailableCount: number;
+  firstPulseProgramDeltas: number[];
+}
+
+type F1RendererAuditCanvas = HTMLCanvasElement & {
+  __f1RendererAudit?: {
+    snapshot(): F1RendererAuditSnapshot;
+    loseContext(): boolean;
+    restoreContext(): boolean;
+  };
+};
 
 const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
   isPressing,
@@ -50,6 +90,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
   onCarClick,
   onCarManualInteraction,
   exploded = false,
+  glitchProgress = null,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const spaceKeyArmedRef = useRef(false);
@@ -60,6 +101,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     carHeld: false,
     progress,
     exploded,
+    glitchProgress,
     explosionTime: 0,
     mouse: { x: 0, y: 0, targetX: 0, targetY: 0 },
     baseUniforms: {
@@ -84,6 +126,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     stateRef.current.exploded = exploded;
     if (exploded) stateRef.current.carHeld = false;
   }, [exploded]);
+
+  useEffect(() => {
+    stateRef.current.glitchProgress = glitchProgress;
+  }, [glitchProgress]);
 
   const onCarClickRef = useRef(onCarClick);
   useEffect(() => {
@@ -143,8 +189,51 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
+    const rendererAuditEnabled = new URLSearchParams(window.location.search)
+      .get('f1RendererAudit') === '1';
+    const rendererAudit: F1RendererAuditSnapshot = {
+      status: 'initializing',
+      sourcePrewarms: 0,
+      modelSourcePrewarms: 0,
+      modelSourceMisses: 0,
+      contextLosses: 0,
+      contextRestores: 0,
+      directFallbackFrames: 0,
+      activePulseFrames: 0,
+      unavailableCount: 0,
+      firstPulseProgramDeltas: [],
+    };
+    let expectsPrewarmedFirstPulse = false;
+    const contextLossExtension = rendererAuditEnabled
+      ? renderer.getContext().getExtension('WEBGL_lose_context')
+      : null;
+    const auditCanvas = renderer.domElement as F1RendererAuditCanvas;
+    if (rendererAuditEnabled) {
+      auditCanvas.__f1RendererAudit = {
+        snapshot: () => ({
+          ...rendererAudit,
+          firstPulseProgramDeltas: [...rendererAudit.firstPulseProgramDeltas],
+        }),
+        loseContext: () => {
+          if (!contextLossExtension) return false;
+          contextLossExtension.loseContext();
+          return true;
+        },
+        restoreContext: () => {
+          if (!contextLossExtension) return false;
+          contextLossExtension.restoreContext();
+          return true;
+        },
+      };
+    }
+
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const usesLowPowerAirflow = prefersReducedMotion || window.innerWidth < 768;
+    const glitchProfile = {
+      mobile: window.innerWidth < 768,
+      prefersReducedMotion,
+    };
+    let glitchPostProcess: F1GlitchPostProcess | null = null;
     const studioLighting = createF1StudioLighting(scene);
     const reflection = createStudioReflection({
       renderer,
@@ -218,6 +307,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     const screenStableOrbitTarget = new THREE.Vector3();
     let isCarMaterialReplaced = false;
     const racingMotion: F1MotionState = { speed: 0, wheelAngle: 0 };
+    let revalidateGlitchAfterModelInjection: (() => void) | null = null;
 
     // We'll check for modelRef.current dynamically in the animate loop to support late arrivals
     const checkModelInjection = () => {
@@ -253,6 +343,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         if (renderer && scene && camera) {
           renderer.compile(scene, camera);
         }
+        revalidateGlitchAfterModelInjection?.();
       }
     };
 
@@ -508,6 +599,90 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     let studioReveal = 0;
     let frameId = 0;
 
+    const renderShowroom = (target: THREE.WebGLRenderTarget | null) => {
+      renderer.setRenderTarget(target);
+      renderer.clear();
+      // 1. Render background lines with stable camera.
+      renderer.render(bgScene, bgCamera);
+      // 2. Update the reflection and restore the requested composition target.
+      const previousAutoClear = renderer.autoClear;
+      renderer.autoClear = true;
+      try {
+        reflection.render();
+      } finally {
+        renderer.autoClear = previousAutoClear;
+        renderer.setRenderTarget(target);
+      }
+      renderer.render(scene, camera);
+    };
+
+    const renderShowroomForGlitchPrewarm = (target: THREE.WebGLRenderTarget) => {
+      const result = renderF1GlitchPrewarmSource({
+        renderer,
+        target,
+        source: f1CarGroup,
+        renderSource: renderShowroom,
+      });
+      rendererAudit.sourcePrewarms += 1;
+      if (f1CarGroup) {
+        if (!result.sourcePassParticipated) {
+          rendererAudit.modelSourceMisses += 1;
+          throw new Error('F1 glitch model source did not participate in target prewarm');
+        }
+        rendererAudit.modelSourcePrewarms += 1;
+      }
+      expectsPrewarmedFirstPulse = true;
+    };
+
+    const markGlitchPostProcessUnavailable = () => {
+      rendererAudit.unavailableCount += 1;
+      rendererAudit.status = 'fallback';
+      warnF1GlitchPostProcessUnavailable();
+    };
+
+    const disableGlitchPostProcess = () => {
+      if (!glitchPostProcess) return;
+      glitchPostProcess.dispose();
+      glitchPostProcess = null;
+    };
+
+    const initializeGlitchPostProcess = () => {
+      glitchPostProcess = restoreF1GlitchPostProcess({
+        glitchPostProcess,
+        create: () => createF1GlitchPostProcess(
+          renderer,
+          window.innerWidth,
+          window.innerHeight,
+          window.devicePixelRatio,
+          glitchProfile,
+        ),
+        renderSource: renderShowroomForGlitchPrewarm,
+        onUnavailable: markGlitchPostProcessUnavailable,
+      });
+      if (glitchPostProcess) rendererAudit.status = 'prewarmed';
+    };
+    revalidateGlitchAfterModelInjection = initializeGlitchPostProcess;
+
+    // Three restores its renderer state first because it registered its canvas
+    // listener during construction. Rebuild and fully prewarm our driver-era
+    // resources only after that restoration event reaches this later listener.
+    const removeGlitchContextRecovery = bindF1GlitchContextRecovery(renderer.domElement, {
+      onContextLost: () => {
+        // The browser has already invalidated and released this context's GPU
+        // handles. Drop the JS owner without issuing stale-context deletes;
+        // restoration creates and validates a completely new resource set.
+        glitchPostProcess = null;
+        rendererAudit.contextLosses += 1;
+        rendererAudit.status = 'context-lost';
+      },
+      onContextRestored: () => {
+        rendererAudit.contextRestores += 1;
+        initializeGlitchPostProcess();
+      },
+    });
+    checkModelInjection();
+    if (!f1CarGroup) initializeGlitchPostProcess();
+
     const animate = (timestamp: number) => {
       frameId = requestAnimationFrame(animate);
       checkModelInjection();
@@ -587,6 +762,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
           if (hologramProgress >= 1.0 && isCarMaterialReplaced && f1CarGroup) {
               if (revertHologramMaterial(f1CarGroup)) {
                   isCarMaterialReplaced = false; // Prevents calling it every frame
+                  // The restored GLB materials have different target-specific
+                  // programs from the hologram clones. Validate them now, while
+                  // the clean hold still precedes the first glitch pulse.
+                  revalidateGlitchAfterModelInjection?.();
               }
           }
       } else {
@@ -843,16 +1022,38 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       }
 
       // ── Render Dual Pass ──
-      renderer.setRenderTarget(null);
-      renderer.clear();
-      // 1. Render background lines with stable camera
-      renderer.render(bgScene, bgCamera);
-      // 2. Render car with OrbitControls camera on top
-      const previousAutoClear = renderer.autoClear;
-      renderer.autoClear = true;
-      reflection.render();
-      renderer.autoClear = previousAutoClear;
-      renderer.render(scene, camera);
+      const activeGlitchProgress = stateRef.current.glitchProgress;
+      const activeGlitchPulse = activeGlitchProgress === null
+        ? 0
+        : getF1GlitchPulse(activeGlitchProgress);
+      const glitchFrameInput = {
+        glitchPostProcess,
+        progress: activeGlitchProgress,
+        renderShowroom,
+        onUnavailable: markGlitchPostProcessUnavailable,
+      };
+      let firstPulseProgramDelta: number | null = null;
+      if (activeGlitchPulse > 0 && glitchPostProcess && expectsPrewarmedFirstPulse) {
+        const measurement = measureF1RendererProgramDelta(
+          () => renderer.info.programs.length,
+          () => renderF1GlitchFrame(glitchFrameInput),
+        );
+        glitchPostProcess = measurement.result;
+        firstPulseProgramDelta = measurement.delta;
+      } else {
+        glitchPostProcess = renderF1GlitchFrame(glitchFrameInput);
+      }
+      if (activeGlitchProgress !== null && !glitchPostProcess) {
+        rendererAudit.directFallbackFrames += 1;
+      }
+      if (activeGlitchPulse > 0 && glitchPostProcess) {
+        rendererAudit.activePulseFrames += 1;
+        if (firstPulseProgramDelta !== null) {
+          rendererAudit.firstPulseProgramDeltas.push(firstPulseProgramDelta);
+          expectsPrewarmedFirstPulse = false;
+        }
+        rendererAudit.status = 'active';
+      }
     };
 
     animate(performance.now());
@@ -864,8 +1065,20 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       bgCamera.aspect = window.innerWidth / window.innerHeight;
       bgCamera.updateProjectionMatrix();
 
+      const nextPixelRatio = Math.min(window.devicePixelRatio, 2);
+      renderer.setPixelRatio(nextPixelRatio);
       renderer.setSize(window.innerWidth, window.innerHeight);
+      stateRef.current.baseUniforms.uPixelRatio.value = nextPixelRatio;
       reflection.resize(window.innerWidth, window.innerHeight);
+      if (glitchPostProcess) {
+        try {
+          glitchPostProcess.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio);
+          glitchPostProcess.prewarm(renderShowroomForGlitchPrewarm);
+        } catch {
+          disableGlitchPostProcess();
+          markGlitchPostProcessUnavailable();
+        }
+      }
       // godRays.resize(window.innerWidth, window.innerHeight);
     };
 
@@ -875,6 +1088,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     // ── Cleanup ──
     return () => {
       cancelAnimationFrame(frameId);
+      removeGlitchContextRecovery();
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('blur', handleWindowBlur);
@@ -901,6 +1115,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       controls.dispose();
       studioLighting.dispose();
       reflection.dispose();
+      if (glitchPostProcess) glitchPostProcess.dispose();
+      delete auditCanvas.__f1RendererAudit;
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);

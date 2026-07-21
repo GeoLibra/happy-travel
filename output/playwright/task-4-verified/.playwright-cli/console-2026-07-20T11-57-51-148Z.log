@@ -1,0 +1,18 @@
+[     206ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:4174/node_modules/.vite/deps/react-dom_client.js?v=6cbb6fad:20102
+[     295ms] [ERROR] AMap Loader Error: 请填写key @ http://127.0.0.1:4174/src/components/MapComponent.tsx:208
+[     303ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:4174/favicon.ico:0
+[     674ms] [LOG] %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit @ https://va.vercel-scripts.com/v1/script.debug.js:0
+[     674ms] [LOG] %c[Vercel Web Analytics]%c [view] http://127.0.0.1:4174/ color: rgb(120, 120, 120) color: inherit {o: http://127.0.0.1:4174/, sv: 0.1.3, sdkn: @vercel/analytics/react, sdkv: 2.0.1, ts: 1784548671821} /_vercel/insights/view @ https://va.vercel-scripts.com/v1/script.debug.js:0
+[     676ms] [LOG] [ModelLoader] Fetching /models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2 from server @ http://127.0.0.1:4174/src/lib/model-loader.ts:27
+[     676ms] [LOG] [ModelLoader] Fetching /models/rose.glb?v=guided-bud-3 from server @ http://127.0.0.1:4174/src/lib/model-loader.ts:27
+[     676ms] [LOG] [ModelLoader] Fetching /models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2 from server @ http://127.0.0.1:4174/src/lib/model-loader.ts:27
+[     676ms] [LOG] [ModelLoader] Fetching /models/rose.glb?v=guided-bud-3 from server @ http://127.0.0.1:4174/src/lib/model-loader.ts:27
+[   24650ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:4174/node_modules/.vite/deps/react-dom_client.js?v=6cbb6fad:20102
+[   24745ms] [ERROR] AMap Loader Error: 请填写key @ http://127.0.0.1:4174/src/components/MapComponent.tsx:208
+[   24918ms] [LOG] %c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit @ https://va.vercel-scripts.com/v1/script.debug.js:0
+[   24919ms] [LOG] %c[Vercel Web Analytics]%c [view] http://127.0.0.1:4174/ color: rgb(120, 120, 120) color: inherit {o: http://127.0.0.1:4174/, sv: 0.1.3, sdkn: @vercel/analytics/react, sdkv: 2.0.1, ts: 1784548696066} /_vercel/insights/view @ https://va.vercel-scripts.com/v1/script.debug.js:0
+[   25224ms] [LOG] [ModelLoader] Loading /models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2 from cache @ http://127.0.0.1:4174/src/lib/model-loader.ts:15
+[   25743ms] [LOG] [ModelLoader] Loading /models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2 from cache @ http://127.0.0.1:4174/src/lib/model-loader.ts:15
+[   26624ms] [LOG] [ModelLoader] Loading /models/rose.glb?v=guided-bud-3 from cache @ http://127.0.0.1:4174/src/lib/model-loader.ts:15
+[   26766ms] [LOG] [ModelLoader] Loading /models/rose.glb?v=guided-bud-3 from cache @ http://127.0.0.1:4174/src/lib/model-loader.ts:15
+[   31015ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:4174/favicon.ico:0

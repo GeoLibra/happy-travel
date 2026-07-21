@@ -1,0 +1,10 @@
+$ git rev-parse HEAD
+0414057ed165e3ec120989712b77fc940b490020
+
+$ git rev-parse 0450c44^{commit}
+0450c44503b2311ac8b491133a8181190f48c023
+
+$ git diff --quiet 0450c44503b2311ac8b491133a8181190f48c023 0414057ed165e3ec120989712b77fc940b490020 -- src public scripts package.json package-lock.json
+exit status: 0
+
+Interpretation: the 14-command acceptance run tested the product tree whose latest Task 4 implementation commit is 0450c44503b2311ac8b491133a8181190f48c023. Commits 988401c and 0414057 are evidence/docs-only successors; 0414057 was the checkout HEAD before this evidence correction.

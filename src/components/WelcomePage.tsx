@@ -9,6 +9,10 @@ import ParticleBackground from './ParticleBackground';
 import { loadModelWithCache } from '../lib/model-loader';
 import { ROSE_MODEL_URL } from '../lib/rose-animation';
 import { markF1ManualInteraction } from '../lib/f1-showroom-interaction';
+import {
+  createF1WelcomeSequence,
+  type F1WelcomeSequence,
+} from '../lib/f1-welcome-sequence';
 import { useI18n } from '../i18n';
 
 const F1_SHOWROOM_MODEL_URL = '/models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2';
@@ -43,7 +47,6 @@ interface WelcomeProps {
   onPrepareEnter?: () => void | Promise<void>;
 }
 
-const HOLOGRAM_REVEAL_MS = 4600;
 const REASSEMBLY_BEFORE_ENTER_MS = 1600;
 
 const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
@@ -57,11 +60,28 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const [loadedModel, setLoadedModel] = useState<THREE.Group | null>(null);
   const [isCarExploded, setIsCarExploded] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [glitchProgress, setGlitchProgress] = useState<number | null>(null);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoExplodeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const glitchFrameRef = React.useRef<number | null>(null);
+  const automaticSequenceRef = React.useRef<F1WelcomeSequence | null>(null);
   const hasManualInteractionRef = React.useRef(false);
   const hasStartedEntryRef = React.useRef(false);
+
+  const cancelAutomaticShowroomSequence = useCallback(() => {
+    if (autoExplodeTimerRef.current) {
+      clearTimeout(autoExplodeTimerRef.current);
+      autoExplodeTimerRef.current = null;
+    }
+    if (glitchFrameRef.current !== null) {
+      cancelAnimationFrame(glitchFrameRef.current);
+      glitchFrameRef.current = null;
+    }
+    automaticSequenceRef.current?.cancel();
+    automaticSequenceRef.current = null;
+    setGlitchProgress(null);
+  }, []);
 
   const handleCarManualInteraction = useCallback(() => {
     markF1ManualInteraction(
@@ -69,7 +89,8 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
       autoExplodeTimerRef,
       clearTimeout,
     );
-  }, []);
+    cancelAutomaticShowroomSequence();
+  }, [cancelAutomaticShowroomSequence]);
 
   const toggleExplodedView = useCallback(() => {
     if (isTransitioning) return;
@@ -81,12 +102,13 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const enterAfterReassembly = useCallback(() => {
     if (isTransitioning) return;
 
+    cancelAutomaticShowroomSequence();
     setIsTransitioning(true);
     setIsCarExploded(false);
     enterTimerRef.current = setTimeout(() => {
       onEnter();
     }, REASSEMBLY_BEFORE_ENTER_MS);
-  }, [isTransitioning, onEnter]);
+  }, [cancelAutomaticShowroomSequence, isTransitioning, onEnter]);
 
   const handleEnter = useCallback(() => {
     if (progress < 100 || hasStartedEntryRef.current) return;
@@ -143,24 +165,48 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
 
   useEffect(() => () => {
     if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
-    if (autoExplodeTimerRef.current) clearTimeout(autoExplodeTimerRef.current);
-  }, []);
+    cancelAutomaticShowroomSequence();
+  }, [cancelAutomaticShowroomSequence]);
 
   useEffect(() => {
-    if (progress < 100 || isTransitioning || hasManualInteractionRef.current) return;
+    if (
+      progress < 100
+      || isTransitioning
+      || hasManualInteractionRef.current
+      || automaticSequenceRef.current
+    ) return;
 
-    autoExplodeTimerRef.current = setTimeout(() => {
-      autoExplodeTimerRef.current = null;
-      setIsCarExploded(true);
-    }, HOLOGRAM_REVEAL_MS);
+    let sequence: F1WelcomeSequence;
+    sequence = createF1WelcomeSequence({
+      requestAnimationFrame: (callback) => {
+        const frame = requestAnimationFrame((now) => {
+          glitchFrameRef.current = null;
+          callback(now);
+        });
+        glitchFrameRef.current = frame;
+        return frame;
+      },
+      cancelAnimationFrame: (frame) => {
+        cancelAnimationFrame(frame);
+        if (glitchFrameRef.current === frame) glitchFrameRef.current = null;
+      },
+      onGlitchProgress: setGlitchProgress,
+      onExplode: () => {
+        automaticSequenceRef.current = null;
+        setIsCarExploded(true);
+      },
+    });
+    automaticSequenceRef.current = sequence;
+    sequence.start(performance.now());
 
     return () => {
-      if (autoExplodeTimerRef.current) {
-        clearTimeout(autoExplodeTimerRef.current);
-        autoExplodeTimerRef.current = null;
+      sequence.cancel();
+      if (automaticSequenceRef.current === sequence) {
+        automaticSequenceRef.current = null;
       }
+      glitchFrameRef.current = null;
     };
-  }, [progress, isTransitioning]);
+  }, [isTransitioning, progress]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -240,6 +286,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
         audioRef={audioRef}
         loadedModel={loadedModel}
         exploded={isCarExploded}
+        glitchProgress={glitchProgress}
         onCarClick={toggleExplodedView}
         onCarManualInteraction={handleCarManualInteraction}
       />
