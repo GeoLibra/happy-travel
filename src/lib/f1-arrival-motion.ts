@@ -50,14 +50,17 @@ export const getF1ArrivalRotationTargets = (
 ): { x: number; y: number; z: number } => {
   const progressFactor = Math.min(1, Math.max(0, progress / 100));
   const turnFactor = Math.min(1, progressFactor * 1.25);
+  const leanFade = 1 - THREE.MathUtils.smoothstep(progressFactor, 0.8, 1);
   return {
     x: 0,
     y: turnFactor * (Math.PI * 0.25),
     z: progress >= 100
       ? 0
-      : turnFactor * 0.05
-        + Math.sin(time * 10) * 0.008 * racingSpeed
-        + Math.sin(time * 26) * 0.004 * racingSpeed,
+      : (
+          turnFactor * 0.05
+          + Math.sin(time * 10) * 0.008 * racingSpeed
+          + Math.sin(time * 26) * 0.004 * racingSpeed
+        ) * leanFade,
   };
 };
 

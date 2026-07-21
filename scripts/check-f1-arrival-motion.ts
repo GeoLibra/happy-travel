@@ -22,6 +22,12 @@ assert.equal(dampF1ArrivalValue(1, 3, 0, 8), 1, 'zero delta must preserve the cu
 assert.equal(getF1ArrivalRotationTargets(100, 1, 12).x, 0, 'stopped arrival must flatten pitch');
 assert.equal(getF1ArrivalRotationTargets(100, 1, 12).z, 0, 'stopped arrival must clear transient roll');
 assert.equal(getF1ArrivalRotationTargets(80, 0.5, 12).z !== 0, true, 'in-flight arrival may retain a subtle lean');
+const cruisingLean = Math.abs(getF1ArrivalRotationTargets(80, 0, 12).z);
+const nearStopLean = Math.abs(getF1ArrivalRotationTargets(98, 0, 12).z);
+assert(
+  nearStopLean < cruisingLean * 0.05,
+  'arrival lean must fade almost completely before the 100% stop frame',
+);
 const stoppedRotation = new THREE.Euler(0.08, 0.4, 0.05);
 applyF1ArrivalRotation(stoppedRotation, 100, 1, 12);
 assert.equal(stoppedRotation.x, 0, 'the 100% frame must lock pitch instead of damping it after stop');
