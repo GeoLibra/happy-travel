@@ -591,7 +591,7 @@ let failingPostProcess: glitchPostProcessModule.F1GlitchPostProcess | null = {
 };
 failingPostProcess = renderF1GlitchFrame({
   glitchPostProcess: failingPostProcess,
-  progress: 0.5,
+  progress: 0.28,
   renderShowroom: (target) => fallbackTargets.push(target),
   onUnavailable: () => { fallbackWarnings += 1; },
 });
@@ -661,7 +661,7 @@ assert.deepEqual(
 desktopRenderer.events.length = 0;
 let desktopTarget: THREE.WebGLRenderTarget | null = null;
 desktopPostProcess.render({
-  progress: 0.5,
+  progress: 0.28,
   renderSource: (target) => {
     desktopRenderer.events.push('source');
     desktopTarget = target;
@@ -714,11 +714,10 @@ const readDesktopGlitchState = (progress: number) => {
   };
 };
 
-const firstPulseState = readDesktopGlitchState(0.16);
-const secondPulseState = readDesktopGlitchState(0.5);
-const thirdPulseState = readDesktopGlitchState(0.82);
-for (const state of [firstPulseState, secondPulseState, thirdPulseState]) {
-  assert.equal(state.pulse, 1, 'each of the three pulse centers must fully activate');
+const firstPulseState = readDesktopGlitchState(0.28);
+const secondPulseState = readDesktopGlitchState(0.72);
+for (const state of [firstPulseState, secondPulseState]) {
+  assert.equal(state.pulse, 1, 'each of the two pulse centers must fully activate');
   assert(state.spatialAmount > 0, 'each pulse must activate spatial artifacts');
   assert.equal(new Set([state.blockSeed, state.scanSeed, state.noiseSeed]).size, 3);
 }
@@ -727,9 +726,13 @@ assert.notDeepEqual(
   [secondPulseState.blockSeed, secondPulseState.scanSeed, secondPulseState.noiseSeed],
   'independent glitch seeds must evolve between pulses',
 );
-const betweenPulseState = readDesktopGlitchState(0.32);
-assert.equal(betweenPulseState.pulse, 0);
-assert.equal(betweenPulseState.spatialAmount, 0, 'block, scan, and grain artifacts must stop between pulses');
+const betweenPulseState = readDesktopGlitchState(0.5);
+assert(betweenPulseState.pulse > 0 && betweenPulseState.pulse < 0.1);
+assert(
+  betweenPulseState.spatialAmount > 0
+    && betweenPulseState.spatialAmount < firstPulseState.spatialAmount * 0.1,
+  'the midpoint must retain only a low-energy bridge between the broad pulses',
+);
 
 let targetDisposals = 0;
 let geometryDisposals = 0;
@@ -817,7 +820,7 @@ const sourceGlErrorTargets: Array<THREE.WebGLRenderTarget | null> = [];
 let sourceGlErrorWarnings = 0;
 sourceGlErrorPostProcess = renderF1GlitchFrame({
   glitchPostProcess: sourceGlErrorPostProcess,
-  progress: 0.5,
+  progress: 0.28,
   renderShowroom: (target) => {
     sourceGlErrorTargets.push(target);
     sourceGlErrorRenderer.setRenderTarget(target);
@@ -843,7 +846,7 @@ let compositeGlErrorPostProcess: glitchPostProcessModule.F1GlitchPostProcess | n
 const compositeGlErrorTargets: Array<THREE.WebGLRenderTarget | null> = [];
 compositeGlErrorPostProcess = renderF1GlitchFrame({
   glitchPostProcess: compositeGlErrorPostProcess,
-  progress: 0.5,
+  progress: 0.28,
   renderShowroom: (target) => {
     compositeGlErrorTargets.push(target);
     compositeGlErrorRenderer.setRenderTarget(target);
@@ -869,7 +872,7 @@ lostContextRenderer.context.contextLost = true;
 const lostContextTargets: Array<THREE.WebGLRenderTarget | null> = [];
 lostContextPostProcess = renderF1GlitchFrame({
   glitchPostProcess: lostContextPostProcess,
-  progress: 0.5,
+  progress: 0.28,
   renderShowroom: (target) => lostContextTargets.push(target),
   onUnavailable: () => undefined,
 });
@@ -961,7 +964,7 @@ let mobileTarget: THREE.WebGLRenderTarget | null = null;
   mobileTarget = target;
   mobileRenderer.setRenderTarget(target);
 });
-mobilePostProcess.render({ progress: 0.5, renderSource: (target) => { mobileTarget = target; } });
+mobilePostProcess.render({ progress: 0.28, renderSource: (target) => { mobileTarget = target; } });
 assert(mobileTarget);
 assert.equal(mobileTarget.width, 100, 'mobile target DPR must be capped at 1');
 assert.equal(mobileTarget.height, 50);
@@ -980,7 +983,7 @@ assert(
     && Math.abs(mobileQuad.material.uniforms.uReducedNoise.value) <= 0.01,
   'reduced motion must retain only low-amplitude non-spatial noise flicker',
 );
-mobilePostProcess.render({ progress: 0.32, renderSource: () => undefined });
+mobilePostProcess.render({ progress: 0, renderSource: () => undefined });
 assert.equal(mobileQuad.material.uniforms.uReducedBrightness.value, 0);
 assert.equal(mobileQuad.material.uniforms.uReducedNoise.value, 0);
 mobilePostProcess.resize(1000, 500, 3);
@@ -990,7 +993,7 @@ mobilePostProcess.resize(1000, 500, 3);
 assert.equal(mobileTarget.width, 2000, 'crossing to desktop must raise the live target DPR cap to 2');
 assert.equal(mobileTarget.height, 1000);
 assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 1, 'desktop resize must restore full amplitude');
-mobilePostProcess.render({ progress: 0.5, renderSource: () => undefined });
+mobilePostProcess.render({ progress: 0.28, renderSource: () => undefined });
 assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 1);
 mobilePostProcess.resize(390, 844, 3);
 (mobilePostProcess as unknown as {
@@ -999,7 +1002,7 @@ mobilePostProcess.resize(390, 844, 3);
 assert.equal(mobileTarget.width, 390, 'crossing back to mobile must restore the 1x DPR cap');
 assert.equal(mobileTarget.height, 844);
 assert.equal(mobileQuad.material.uniforms.uAmplitude.value, 0.65);
-mobilePostProcess.render({ progress: 0.5, renderSource: () => undefined });
+mobilePostProcess.render({ progress: 0.28, renderSource: () => undefined });
 assert.equal(mobileQuad.material.uniforms.uSpatialAmount.value, 0);
 mobilePostProcess.dispose();
 

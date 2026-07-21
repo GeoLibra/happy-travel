@@ -1,5 +1,5 @@
 async page => {
-  const outputRoot = '/Users/hgis/myproject/happy-travel/.worktrees/f1-post-hologram-glitch/output/playwright/final-fixes';
+  const outputRoot = '/Users/hgis/myproject/happy-travel/output/playwright/final-fixes';
   await page.goto('http://127.0.0.1:3000/', { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.getByText('RACE PREP IN PROGRESS').waitFor({ state: 'hidden', timeout: 45000 }).catch(() => {});
   const startButton = page.locator('[data-f1-welcome-action="enter"]');
@@ -49,8 +49,8 @@ async page => {
     phaseOffsetsMs: {
       hologramComplete: progressComplete - videoStart + 4500,
       glitchStart: progressComplete - videoStart + 4600,
-      glitchEnd: progressComplete - videoStart + 6400,
-      explodeEligible: progressComplete - videoStart + 6434,
+      glitchEnd: progressComplete - videoStart + 5800,
+      explodeEligible: progressComplete - videoStart + 5834,
       reassemblyStarted: reassemblyStarted - videoStart,
     },
     startInput: { type: 'trusted mouse hold released at 35%', point: startPoint },

@@ -4,7 +4,7 @@ Date: 2026-07-21
 
 ## Result
 
-PASS. The automatic welcome sequence renders the 4.5-second hologram, a 100 ms clean hold, a 1.8-second three-pulse canvas glitch, and a clean direct-render frame scheduled by `requestAnimationFrame` before automatic model explosion. No product timer owns the sequence.
+PASS. The automatic welcome sequence renders the 4.5-second hologram, a 100 ms clean hold, a 1.2-second two-pulse canvas glitch, and a clean direct-render frame scheduled by `requestAnimationFrame` before automatic model explosion. No product timer owns the sequence.
 
 ## Real WebGL lifecycle probe
 
@@ -36,7 +36,7 @@ Local ignored recordings:
 - `output/playwright/final-fixes/mobile-arrival-final.webm`
 - `output/playwright/final-fixes/reduced-arrival-final.webm`
 
-The result clocks recorded the phase contract relative to startup completion: hologram complete at +4500 ms, glitch start at +4600 ms, glitch end at +6400 ms, and explosion eligibility only after the subsequent clean rAF frame.
+After the 2026-07-21 tuning pass, the phase contract relative to startup completion is: hologram complete at +4500 ms, glitch start at +4600 ms, glitch end at +5800 ms, and explosion eligibility only after the subsequent clean rAF frame.
 
 ## Fresh required checks
 
