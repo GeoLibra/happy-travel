@@ -259,6 +259,37 @@ assert.doesNotMatch(
   /firstPulseProgramDeltas\.length\s*<\s*2/,
   'one sequence must not be required to produce both initial and restored pulse samples',
 );
+assert.doesNotMatch(
+  glitchProbeSource,
+  /(?:drawImage|getImageData|sampleCanvas|nonBlack)/,
+  'the probe must not treat preserveDrawingBuffer:false canvas readback as visible-frame evidence',
+);
+const probeScreenshotCalls = glitchProbeSource.match(/page\.screenshot\(\{/g) ?? [];
+assert.equal(
+  probeScreenshotCalls.length,
+  2,
+  'each deterministic restoration scenario must capture one browser screenshot artifact',
+);
+assert.equal(
+  (glitchProbeSource.match(/fullPage:\s*true/g) ?? []).length,
+  2,
+  'restoration artifacts must capture the complete mounted welcome viewport',
+);
+assert.match(
+  glitchProbeSource,
+  /restoreBeforeSequenceScreenshotPath[\s\S]*?lossDuringActivePulseScreenshotPath/,
+  'the probe result must return both restoration screenshot paths',
+);
+assert.match(
+  glitchProbeSource,
+  /return \{ beforeLoss, afterRestore, afterFirstPulse, restoreBeforeSequenceScreenshotPath \};/,
+  'the restored-first-pulse result must return its screenshot path',
+);
+assert.match(
+  glitchProbeSource,
+  /return \{[\s\S]*?lossDuringActivePulseScreenshotPath,[\s\S]*?interactionContinuity:/,
+  'the active-loss restoration result must return its screenshot path',
+);
 assert.match(glitchPostSource, /new THREE\.WebGLRenderTarget/);
 assert.match(glitchPostSource, /getF1GlitchPulse/);
 assert.match(glitchPostSource, /prefersReducedMotion/);

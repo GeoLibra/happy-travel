@@ -110,3 +110,44 @@ The build emitted only the pre-existing chunk-size advisory and completed in 1 m
 The parent task explicitly directed this subtask not to run the browser after the shell could not start the sandboxed Vite listener. Therefore the rewritten two-scenario mounted-WebGL probe was syntax-checked and contract-checked but not executed here. Its real-browser result remains the sole unverified item in this subtask and should be recorded with the final commit SHA when the owning task runs it.
 
 `git diff --check` passed. The F1 welcome asset and interaction invariants remain untouched.
+
+## Canvas-readback follow-up
+
+A real rerun of commit `9a9c6c8` passed the lifecycle and first-pulse timing checks, then stopped at:
+
+```text
+restored first-pulse showroom frame was black/transparent
+```
+
+The renderer is created with Three.js's default `preserveDrawingBuffer: false`. Copying its canvas into a 2D canvas with `drawImage` and inspecting `getImageData` after presentation is therefore not a valid visible-frame assertion. A Playwright viewport screenshot captured at the same failed state visibly showed the restored car and showroom, confirming that the failure belonged to the probe readback rather than the restored renderer.
+
+Follow-up RED:
+
+```text
+npm run check:f1-welcome
+AssertionError [ERR_ASSERTION]: the probe must not treat preserveDrawingBuffer:false canvas readback as visible-frame evidence
+```
+
+The focused probe fix removes only `sampleCanvas`, `drawImage`, `getImageData`, and the derived pixel-count assertions. It preserves the context loss/restore counters, direct-fallback count, newer post-loss model prewarm, zero restored first-pulse program delta, unavailable count, welcome URL, and keyboard reassembly assertions.
+
+Each deterministic restoration scenario now captures and returns one full-page Playwright screenshot path:
+
+```text
+output/playwright/f1-glitch-probe-restore-before-sequence.png
+output/playwright/f1-glitch-probe-active-loss-restored.png
+```
+
+Recorded video plus `blackdetect`, rather than undefined WebGL canvas readback, remains responsible for black-frame evidence. Per instruction, this follow-up did not run the browser probe.
+
+Fresh follow-up GREEN evidence:
+
+```text
+node --check scripts/run-f1-glitch-webgl-probe.mjs  # exit 0
+npm run check:f1-welcome                            # exit 0
+npm run check:f1-glitch                             # exit 0
+npm run lint                                        # exit 0, tsc --noEmit
+npm run build                                       # exit 0, 2131 modules transformed
+git diff --check                                    # exit 0
+```
+
+The build completed in 1 minute 51 seconds with only the existing chunk-size advisory.
