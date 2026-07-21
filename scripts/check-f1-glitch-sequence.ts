@@ -11,7 +11,7 @@ import {
 
 assert.equal(HOLOGRAM_REVEAL_MS, 4500);
 assert.equal(GLITCH_CLEAN_HOLD_MS, 100);
-assert.equal(GLITCH_DURATION_MS, 1800);
+assert.equal(GLITCH_DURATION_MS, 1200);
 assert(GLITCH_CLEAN_FRAME_MS > 0);
 assert.equal(
   AUTO_EXPLODE_DELAY_MS,
@@ -32,5 +32,9 @@ const samples = Array.from({ length: 101 }, (_, index) => getF1GlitchPulse(index
 const peaks = samples.filter((value, index) => (
   index > 0 && index < samples.length - 1 && value > samples[index - 1] && value >= samples[index + 1] && value > 0.9
 ));
-assert.equal(peaks.length, 3, 'the glitch envelope must contain exactly three pronounced pulses');
+assert.equal(peaks.length, 2, 'the glitch envelope must contain exactly two pronounced pulses');
+assert(
+  samples.filter((value) => value > 0.5).length >= 34,
+  'the two pulses must stay broad enough to avoid rapid flicker',
+);
 assert(samples.every((value) => value >= 0 && value <= 1));
