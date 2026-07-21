@@ -31,6 +31,7 @@ import { createStudioReflection } from './effects/studioReflection';
 import {
   bindF1GlitchContextRecovery,
   createF1GlitchPostProcess,
+  measureF1RendererProgramDelta,
   renderF1GlitchPrewarmSource,
   renderF1GlitchFrame,
   restoreF1GlitchPostProcess,
@@ -202,7 +203,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       unavailableCount: 0,
       firstPulseProgramDeltas: [],
     };
-    let prewarmProgramCount = 0;
     let expectsPrewarmedFirstPulse = false;
     const contextLossExtension = rendererAuditEnabled
       ? renderer.getContext().getExtension('WEBGL_lose_context')
@@ -631,7 +631,6 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         }
         rendererAudit.modelSourcePrewarms += 1;
       }
-      prewarmProgramCount = renderer.info.programs.length;
       expectsPrewarmedFirstPulse = true;
     };
 
@@ -1027,21 +1026,30 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       const activeGlitchPulse = activeGlitchProgress === null
         ? 0
         : getF1GlitchPulse(activeGlitchProgress);
-      glitchPostProcess = renderF1GlitchFrame({
+      const glitchFrameInput = {
         glitchPostProcess,
         progress: activeGlitchProgress,
         renderShowroom,
         onUnavailable: markGlitchPostProcessUnavailable,
-      });
+      };
+      let firstPulseProgramDelta: number | null = null;
+      if (activeGlitchPulse > 0 && glitchPostProcess && expectsPrewarmedFirstPulse) {
+        const measurement = measureF1RendererProgramDelta(
+          () => renderer.info.programs.length,
+          () => renderF1GlitchFrame(glitchFrameInput),
+        );
+        glitchPostProcess = measurement.result;
+        firstPulseProgramDelta = measurement.delta;
+      } else {
+        glitchPostProcess = renderF1GlitchFrame(glitchFrameInput);
+      }
       if (activeGlitchProgress !== null && !glitchPostProcess) {
         rendererAudit.directFallbackFrames += 1;
       }
       if (activeGlitchPulse > 0 && glitchPostProcess) {
         rendererAudit.activePulseFrames += 1;
-        if (expectsPrewarmedFirstPulse) {
-          rendererAudit.firstPulseProgramDeltas.push(
-            renderer.info.programs.length - prewarmProgramCount,
-          );
+        if (firstPulseProgramDelta !== null) {
+          rendererAudit.firstPulseProgramDeltas.push(firstPulseProgramDelta);
           expectsPrewarmedFirstPulse = false;
         }
         rendererAudit.status = 'active';

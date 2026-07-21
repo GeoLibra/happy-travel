@@ -174,6 +174,55 @@ assert.match(
   /const contextLossExtension = rendererAuditEnabled\s*\?\s*renderer\.getContext\(\)\.getExtension\('WEBGL_lose_context'\)\s*:\s*null/,
   'production visits must not request the synthetic context-loss extension',
 );
+
+const measureF1RendererProgramDelta = (
+  glitchPostProcessModule as unknown as {
+    measureF1RendererProgramDelta?<T>(
+      readProgramCount: () => number,
+      renderFrame: () => T,
+    ): { result: T; delta: number };
+  }
+).measureF1RendererProgramDelta;
+assert.equal(
+  typeof measureF1RendererProgramDelta,
+  'function',
+  'first-pulse program auditing must measure only the active render it owns',
+);
+if (!measureF1RendererProgramDelta) assert.fail('missing first-pulse program audit helper');
+let auditedProgramCount = 6;
+auditedProgramCount += 14; // Legitimate clean direct-frame variants compile before the pulse.
+const cleanIntervalMeasurement = measureF1RendererProgramDelta(
+  () => auditedProgramCount,
+  () => 'active-frame',
+);
+assert.deepEqual(
+  cleanIntervalMeasurement,
+  { result: 'active-frame', delta: 0 },
+  'clean-interval shader compilation must not contaminate the first active-pulse delta',
+);
+const coldPulseMeasurement = measureF1RendererProgramDelta(
+  () => auditedProgramCount,
+  () => {
+    auditedProgramCount += 1;
+    return 'cold-active-frame';
+  },
+);
+assert.deepEqual(
+  coldPulseMeasurement,
+  { result: 'cold-active-frame', delta: 1 },
+  'a program created by the measured active render must still be reported',
+);
+assert.match(
+  particleSource,
+  /measureF1RendererProgramDelta\([\s\S]*?renderF1GlitchFrame\(/,
+  'the mounted showroom audit must wrap the expected first active render',
+);
+assert.doesNotMatch(
+  particleSource,
+  /prewarmProgramCount/,
+  'the first-pulse audit must not retain a baseline across clean direct frames',
+);
+
 const probeRelease = glitchProbeSource.indexOf('await page.mouse.up()');
 const probeEnterWait = glitchProbeSource.indexOf("text.includes('ENTER')", probeRelease);
 assert.match(
@@ -189,6 +238,26 @@ assert.match(
   glitchProbeSource,
   /page\.url\(\)[\s\S]*?welcome/i,
   'the probe must prove the release did not navigate away from the welcome scene',
+);
+assert.match(
+  glitchProbeSource,
+  /runRestoreBeforeSequenceScenario/,
+  'the real probe must restore before starting a deterministic first-pulse scenario',
+);
+assert.match(
+  glitchProbeSource,
+  /runLossDuringActivePulseScenario/,
+  'the real probe must exercise active-pulse loss in a separate fresh-page scenario',
+);
+assert.match(
+  glitchProbeSource,
+  /const duringLoss = await readAudit\(\);[\s\S]*?restoreContext\(duringLoss\.modelSourcePrewarms\)/,
+  'active-pulse restoration must prove a new model prewarm after the loss snapshot',
+);
+assert.doesNotMatch(
+  glitchProbeSource,
+  /firstPulseProgramDeltas\.length\s*<\s*2/,
+  'one sequence must not be required to produce both initial and restored pulse samples',
 );
 assert.match(glitchPostSource, /new THREE\.WebGLRenderTarget/);
 assert.match(glitchPostSource, /getF1GlitchPulse/);

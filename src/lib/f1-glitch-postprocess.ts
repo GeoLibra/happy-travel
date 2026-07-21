@@ -18,6 +18,18 @@ export interface F1GlitchPostProcess {
   dispose(): void;
 }
 
+export function measureF1RendererProgramDelta<T>(
+  readProgramCount: () => number,
+  renderFrame: () => T,
+): { result: T; delta: number } {
+  const before = readProgramCount();
+  const result = renderFrame();
+  return {
+    result,
+    delta: readProgramCount() - before,
+  };
+}
+
 const getFrameSeed = (frame: number, salt: number): number => {
   const value = Math.sin((frame + salt) * 12.9898) * 43758.5453;
   return value - Math.floor(value);

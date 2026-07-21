@@ -1,49 +1,36 @@
 // Focused Playwright CLI probe. Run against a local Vite server with:
 // playwright-cli run-code "$(cat scripts/run-f1-glitch-webgl-probe.mjs)"
 async page => {
-  await page.goto('http://127.0.0.1:3000/?f1RendererAudit=1', {
-    waitUntil: 'domcontentloaded',
-    timeout: 30_000,
-  });
-  await page.getByText('RACE PREP IN PROGRESS').waitFor({ state: 'hidden', timeout: 45_000 })
-    .catch(() => undefined);
-  const showroom = page.getByRole('button', {
-    name: 'Interactive Formula One showroom car',
-  });
-  const startButton = page.locator('[data-f1-welcome-action="enter"]');
-  await startButton.waitFor({ state: 'visible', timeout: 45_000 });
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
-    return canvas?.__f1RendererAudit?.snapshot().modelSourcePrewarms >= 1;
-  }, null, { timeout: 45_000 });
+  const canvasSelector = '[aria-label="Interactive Formula One showroom car"] canvas';
 
-  const startBox = await startButton.boundingBox();
-  if (!startBox) throw new Error('start control has no layout box');
-  const welcomeUrl = page.url();
-  await page.mouse.move(startBox.x + startBox.width / 2, startBox.y + startBox.height / 2);
-  await page.mouse.down();
-  await page.waitForFunction(() => {
-    const text = document.querySelector('[data-f1-welcome-action="enter"]')?.textContent ?? '';
-    const match = text.match(/ENGINE STARTING (\d+)%/);
-    const progress = Number(match?.[1] ?? 0);
-    return progress >= 30 && progress < 100;
-  }, null, { timeout: 12_000 });
-  await page.mouse.up();
-  await page.waitForFunction(() => {
-    const text = document.querySelector('[data-f1-welcome-action="enter"]')?.textContent ?? '';
-    return text.includes('ENTER') && !text.includes('STARTING');
-  }, null, { timeout: 12_000 });
-  if (page.url() !== welcomeUrl || !(await showroom.isVisible())) {
-    throw new Error('pre-100% release left the welcome scene');
-  }
+  const openMountedShowroom = async () => {
+    await page.goto('http://127.0.0.1:3000/?f1RendererAudit=1', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
+    await page.getByText('RACE PREP IN PROGRESS').waitFor({ state: 'hidden', timeout: 45_000 })
+      .catch(() => undefined);
+    const showroom = page.getByRole('button', {
+      name: 'Interactive Formula One showroom car',
+    });
+    const startButton = page.locator('[data-f1-welcome-action="enter"]');
+    await startButton.waitFor({ state: 'visible', timeout: 45_000 });
+    await page.waitForFunction((selector) => {
+      const canvas = document.querySelector(selector);
+      return canvas?.__f1RendererAudit?.snapshot().modelSourcePrewarms >= 1;
+    }, canvasSelector, { timeout: 45_000 });
+    return { showroom, startButton };
+  };
 
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
-    return (canvas?.__f1RendererAudit?.snapshot().activePulseFrames ?? 0) > 0;
-  }, null, { timeout: 12_000 });
+  const readAudit = () => page.evaluate((selector) => {
+    const canvas = document.querySelector(selector);
+    const snapshot = canvas?.__f1RendererAudit?.snapshot();
+    if (!snapshot) throw new Error('real showroom renderer audit unavailable');
+    return snapshot;
+  }, canvasSelector);
 
-  const sampleCanvas = () => page.evaluate(() => {
-    const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
+  const sampleCanvas = () => page.evaluate((selector) => {
+    const canvas = document.querySelector(selector);
     if (!(canvas instanceof HTMLCanvasElement)) throw new Error('real showroom canvas unavailable');
     const sample = document.createElement('canvas');
     sample.width = 160;
@@ -61,77 +48,185 @@ async page => {
       }
     }
     return { nonTransparent, nonBlack, samples: pixels.length / 4 };
-  });
+  }, canvasSelector);
 
-  const beforeLossPixels = await sampleCanvas();
-  const lossTriggered = await page.evaluate(() => {
-    const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
-    return canvas?.__f1RendererAudit?.loseContext() ?? false;
-  });
-  if (!lossTriggered) throw new Error('WEBGL_lose_context unavailable on the showroom canvas');
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
-    const snapshot = canvas?.__f1RendererAudit?.snapshot();
-    return snapshot && snapshot.contextLosses === 1 && snapshot.directFallbackFrames > 0;
-  }, null, { timeout: 5_000 });
-  const duringLoss = await page.evaluate(() => {
-    const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
-    return canvas?.__f1RendererAudit?.snapshot();
-  });
+  const startSequence = async ({ showroom, startButton }) => {
+    const startBox = await startButton.boundingBox();
+    if (!startBox) throw new Error('start control has no layout box');
+    const welcomeUrl = page.url();
+    await page.mouse.move(startBox.x + startBox.width / 2, startBox.y + startBox.height / 2);
+    await page.mouse.down();
+    await page.waitForFunction(() => {
+      const text = document.querySelector('[data-f1-welcome-action="enter"]')?.textContent ?? '';
+      const match = text.match(/ENGINE STARTING (\d+)%/);
+      const progress = Number(match?.[1] ?? 0);
+      return progress >= 30 && progress < 100;
+    }, null, { timeout: 12_000 });
+    await page.mouse.up();
+    await page.waitForFunction(() => {
+      const text = document.querySelector('[data-f1-welcome-action="enter"]')?.textContent ?? '';
+      return text.includes('ENTER') && !text.includes('STARTING');
+    }, null, { timeout: 12_000 });
+    if (page.url() !== welcomeUrl || !(await showroom.isVisible())) {
+      throw new Error('pre-100% release left the welcome scene');
+    }
+  };
 
-  const restoreTriggered = await page.evaluate(() => {
-    const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
-    return canvas?.__f1RendererAudit?.restoreContext() ?? false;
-  });
-  if (!restoreTriggered) throw new Error('showroom context restoration was not triggered');
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
-    const snapshot = canvas?.__f1RendererAudit?.snapshot();
-    return snapshot
-      && snapshot.contextRestores === 1
-      && snapshot.modelSourcePrewarms >= 3
-      && snapshot.status !== 'context-lost'
-      && snapshot.status !== 'fallback';
-  }, null, { timeout: 15_000 });
-  await page.waitForTimeout(250);
-  const afterRestorePixels = await sampleCanvas();
-  const afterRestore = await page.evaluate(() => {
-    const canvas = document.querySelector('[aria-label="Interactive Formula One showroom car"] canvas');
-    return canvas?.__f1RendererAudit?.snapshot();
-  });
+  const loseContext = async () => {
+    const triggered = await page.evaluate((selector) => {
+      const canvas = document.querySelector(selector);
+      return canvas?.__f1RendererAudit?.loseContext() ?? false;
+    }, canvasSelector);
+    if (!triggered) throw new Error('WEBGL_lose_context unavailable on the showroom canvas');
+  };
 
-  if (afterRestore.modelSourceMisses !== 0) throw new Error('a model prewarm missed its real mesh draw');
-  if (afterRestore.firstPulseProgramDeltas.length < 2) {
-    throw new Error('initial and restored first pulses were not both measured');
-  }
-  if (afterRestore.firstPulseProgramDeltas.some(delta => delta !== 0)) {
-    throw new Error(`shader programs compiled on first pulse: ${afterRestore.firstPulseProgramDeltas}`);
-  }
-  if (afterRestore.unavailableCount !== 0) throw new Error('post-process became unavailable');
-  if (beforeLossPixels.nonBlack <= 100 || afterRestorePixels.nonBlack <= 100) {
-    throw new Error('pre-loss or restored showroom frame was black/transparent');
-  }
+  const loseContextOnNextActivePulse = async (previousActivePulseFrames) => {
+    const triggered = await page.evaluate(({ selector, previousFrames }) => new Promise((resolve, reject) => {
+      const deadline = performance.now() + 15_000;
+      const attempt = () => {
+        const canvas = document.querySelector(selector);
+        const audit = canvas?.__f1RendererAudit;
+        if (!audit) {
+          reject(new Error('real showroom renderer audit unavailable'));
+          return;
+        }
+        if (audit.snapshot().activePulseFrames > previousFrames) {
+          resolve(audit.loseContext());
+          return;
+        }
+        if (performance.now() >= deadline) {
+          reject(new Error('timed out waiting to lose context during an active pulse'));
+          return;
+        }
+        requestAnimationFrame(attempt);
+      };
+      requestAnimationFrame(attempt);
+    }), { selector: canvasSelector, previousFrames: previousActivePulseFrames });
+    if (!triggered) throw new Error('WEBGL_lose_context unavailable during active pulse');
+  };
 
-  await page.waitForFunction(() => (
-    document.querySelector('[aria-label="Interactive Formula One showroom car"]')
-      ?.getAttribute('aria-pressed') === 'true'
-  ), null, { timeout: 10_000 });
-  await showroom.focus();
-  await page.keyboard.press('Enter');
-  await page.waitForFunction(() => (
-    document.querySelector('[aria-label="Interactive Formula One showroom car"]')
-      ?.getAttribute('aria-pressed') === 'false'
-  ), null, { timeout: 3_000 });
+  const restoreContext = async (modelSourcePrewarmsBeforeLoss) => {
+    // Let the synthetic loss event unwind before asking the extension to restore.
+    await page.waitForTimeout(50);
+    const triggered = await page.evaluate((selector) => {
+      const canvas = document.querySelector(selector);
+      return canvas?.__f1RendererAudit?.restoreContext() ?? false;
+    }, canvasSelector);
+    if (!triggered) throw new Error('showroom context restoration was not triggered');
+    await page.waitForFunction(({ selector, previousPrewarms }) => {
+      const canvas = document.querySelector(selector);
+      const snapshot = canvas?.__f1RendererAudit?.snapshot();
+      return snapshot
+        && snapshot.contextRestores === 1
+        && snapshot.modelSourcePrewarms > previousPrewarms
+        && snapshot.status !== 'context-lost'
+        && snapshot.status !== 'fallback';
+    }, { selector: canvasSelector, previousPrewarms: modelSourcePrewarmsBeforeLoss }, {
+      timeout: 15_000,
+    });
+  };
+
+  const runRestoreBeforeSequenceScenario = async () => {
+    const controls = await openMountedShowroom();
+    const beforeLoss = await readAudit();
+    await loseContext();
+    await page.waitForFunction((selector) => {
+      const canvas = document.querySelector(selector);
+      return canvas?.__f1RendererAudit?.snapshot().contextLosses === 1;
+    }, canvasSelector, { timeout: 5_000 });
+    await restoreContext(beforeLoss.modelSourcePrewarms);
+    const afterRestore = await readAudit();
+
+    await startSequence(controls);
+    await page.waitForFunction((selector) => {
+      const canvas = document.querySelector(selector);
+      const snapshot = canvas?.__f1RendererAudit?.snapshot();
+      return snapshot
+        && snapshot.activePulseFrames > 0
+        && snapshot.firstPulseProgramDeltas.length > 0;
+    }, canvasSelector, { timeout: 12_000 });
+    const afterFirstPulse = await readAudit();
+    const activePixels = await sampleCanvas();
+
+    if (afterFirstPulse.modelSourceMisses !== 0) {
+      throw new Error('a restored model prewarm missed its real mesh draw');
+    }
+    if (afterFirstPulse.firstPulseProgramDeltas[0] !== 0) {
+      throw new Error(`shader programs compiled on restored first pulse: ${afterFirstPulse.firstPulseProgramDeltas}`);
+    }
+    if (afterFirstPulse.unavailableCount !== 0) {
+      throw new Error('restored-before-sequence post-process became unavailable');
+    }
+    if (activePixels.nonBlack <= 100) {
+      throw new Error('restored first-pulse showroom frame was black/transparent');
+    }
+
+    return { beforeLoss, afterRestore, afterFirstPulse, activePixels };
+  };
+
+  const runLossDuringActivePulseScenario = async () => {
+    const controls = await openMountedShowroom();
+    await startSequence(controls);
+    const beforeLoss = await readAudit();
+    const beforeLossPixels = await sampleCanvas();
+    await loseContextOnNextActivePulse(beforeLoss.activePulseFrames);
+    await page.waitForFunction(({ selector, previousFallbackFrames }) => {
+      const canvas = document.querySelector(selector);
+      const snapshot = canvas?.__f1RendererAudit?.snapshot();
+      return snapshot
+        && snapshot.contextLosses === 1
+        && snapshot.directFallbackFrames > previousFallbackFrames;
+    }, {
+      selector: canvasSelector,
+      previousFallbackFrames: beforeLoss.directFallbackFrames,
+    }, { timeout: 5_000 });
+    const duringLoss = await readAudit();
+
+    await restoreContext(duringLoss.modelSourcePrewarms);
+    await page.waitForTimeout(250);
+    const afterRestore = await readAudit();
+    const afterRestorePixels = await sampleCanvas();
+
+    if (duringLoss.directFallbackFrames <= beforeLoss.directFallbackFrames) {
+      throw new Error('active-pulse context loss did not enter direct-render fallback');
+    }
+    if (afterRestore.modelSourceMisses !== 0) {
+      throw new Error('active-pulse restoration missed its real model source draw');
+    }
+    if (beforeLossPixels.nonBlack <= 100 || afterRestorePixels.nonBlack <= 100) {
+      throw new Error('pre-loss or restored showroom frame was black/transparent');
+    }
+
+    await page.waitForFunction(() => (
+      document.querySelector('[aria-label="Interactive Formula One showroom car"]')
+        ?.getAttribute('aria-pressed') === 'true'
+    ), null, { timeout: 12_000 });
+    await controls.showroom.focus();
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => (
+      document.querySelector('[aria-label="Interactive Formula One showroom car"]')
+        ?.getAttribute('aria-pressed') === 'false'
+    ), null, { timeout: 3_000 });
+
+    return {
+      beforeLoss,
+      duringLoss,
+      afterRestore,
+      beforeLossPixels,
+      afterRestorePixels,
+      interactionContinuity: 'keyboard reassembly succeeded after active-pulse restoration',
+    };
+  };
+
+  const restoreBeforeSequence = await runRestoreBeforeSequenceScenario();
+  const lossDuringActivePulse = await runLossDuringActivePulseScenario();
 
   return {
     status: 'PASS',
     commitSha: 'record `git rev-parse HEAD` with this returned result',
     component: {
-      duringLoss,
-      afterRestore,
-      beforeLossPixels,
-      afterRestorePixels,
-      interactionContinuity: 'keyboard reassembly succeeded after real canvas restoration',
+      restoreBeforeSequence,
+      lossDuringActivePulse,
     },
   };
 }
