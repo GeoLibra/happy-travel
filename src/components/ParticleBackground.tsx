@@ -792,6 +792,11 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       bgCamera.lookAt(0, 0, 0);
 
       if (s.progress >= 100) {
+        // Smoothly interpolate the orbit target from (0,0,0) to the car center
+        // to prevent a sudden viewing-angle shift that makes the car dip.
+        if (hasSetOrbitTarget) {
+          controls.target.lerp(screenStableOrbitTarget, 1 - Math.exp(-delta * 4));
+        }
         if (s.carHeld || !isOrbitInteractionReady) {
           controls.enabled = false;
         } else {
@@ -907,7 +912,9 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
             assembledCenter,
             screenStableOrbitTarget,
           );
-          controls.target.copy(screenStableOrbitTarget);
+          // Don't snap controls.target — smoothly interpolate it in the
+          // camera section below to avoid a sudden viewing-angle shift
+          // that makes the car appear to dip (nose down, rear up).
           hasSetOrbitTarget = true;
         }
 

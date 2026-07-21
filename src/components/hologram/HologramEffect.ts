@@ -26,6 +26,7 @@ export function applyHologramMaterial(f1CarGroup: THREE.Group) {
     f1CarGroup.position.copy(origPos);
     f1CarGroup.rotation.copy(origRot);
     f1CarGroup.scale.copy(origScale);
+    f1CarGroup.updateMatrixWorld(true);
 
     // 2. Traverse and replace materials
     f1CarGroup.traverse((child) => {
