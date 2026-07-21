@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 export const ARRIVAL_SETTLED_FRAMES = 4;
 export const ARRIVAL_HOLD_MS = 120;
+export const F1_ORBIT_MAX_POLAR_ANGLE = Math.PI / 2 + 0.05;
 
 export const getF1ScreenStableOrbitTarget = (
   cameraPosition: THREE.Vector3,
@@ -58,6 +59,23 @@ export const getF1ArrivalRotationTargets = (
         + Math.sin(time * 10) * 0.008 * racingSpeed
         + Math.sin(time * 26) * 0.004 * racingSpeed,
   };
+};
+
+export const applyF1ArrivalRotation = (
+  rotation: THREE.Euler,
+  progress: number,
+  racingSpeed: number,
+  time: number,
+): void => {
+  const target = getF1ArrivalRotationTargets(progress, racingSpeed, time);
+  rotation.y += (target.y - rotation.y) * 0.1;
+  if (progress >= 100) {
+    rotation.x = target.x;
+    rotation.z = target.z;
+    return;
+  }
+  rotation.x += (target.x - rotation.x) * 0.1;
+  rotation.z += (target.z - rotation.z) * 0.05;
 };
 
 export const stepF1ArrivalState = (

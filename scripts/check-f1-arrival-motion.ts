@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   ARRIVAL_HOLD_MS,
   ARRIVAL_SETTLED_FRAMES,
+  F1_ORBIT_MAX_POLAR_ANGLE,
+  applyF1ArrivalRotation,
   createF1ArrivalState,
   dampF1ArrivalValue,
   getF1ScreenStableOrbitTarget,
@@ -20,6 +22,14 @@ assert.equal(dampF1ArrivalValue(1, 3, 0, 8), 1, 'zero delta must preserve the cu
 assert.equal(getF1ArrivalRotationTargets(100, 1, 12).x, 0, 'stopped arrival must flatten pitch');
 assert.equal(getF1ArrivalRotationTargets(100, 1, 12).z, 0, 'stopped arrival must clear transient roll');
 assert.equal(getF1ArrivalRotationTargets(80, 0.5, 12).z !== 0, true, 'in-flight arrival may retain a subtle lean');
+const stoppedRotation = new THREE.Euler(0.08, 0.4, 0.05);
+applyF1ArrivalRotation(stoppedRotation, 100, 1, 12);
+assert.equal(stoppedRotation.x, 0, 'the 100% frame must lock pitch instead of damping it after stop');
+assert.equal(stoppedRotation.z, 0, 'the 100% frame must lock roll instead of damping it after stop');
+assert(
+  F1_ORBIT_MAX_POLAR_ANGLE >= Math.PI / 2 + 0.04,
+  'the first orbit update must not clamp the level arrival camera when the floor appears',
+);
 
 const cameraPosition = new THREE.Vector3(0, 0, 50);
 const originalViewTarget = new THREE.Vector3(0, 0, 0);

@@ -8,9 +8,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { HologramShaderUniforms, applyHologramMaterial, revertHologramMaterial } from './hologram/HologramEffect';
 import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '../lib/f1-motion';
 import {
+  F1_ORBIT_MAX_POLAR_ANGLE,
+  applyF1ArrivalRotation,
   createF1ArrivalState,
   dampF1ArrivalValue,
-  getF1ArrivalRotationTargets,
   getF1ScreenStableOrbitTarget,
   stepF1ArrivalState,
 } from '../lib/f1-arrival-motion';
@@ -354,7 +355,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     controls.dampingFactor = 0.05;
     controls.enablePan = false;
     controls.minPolarAngle = Math.PI / 3;
-    controls.maxPolarAngle = Math.PI / 2 - 0.04;
+    controls.maxPolarAngle = F1_ORBIT_MAX_POLAR_ANGLE;
     controls.minDistance = 28;
     controls.maxDistance = 68;
     controls.enabled = false;
@@ -881,10 +882,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
 
         // Rotation: keep the arrival lean in flight, then settle both pitch and
         // roll back to a level pose before the studio floor is revealed.
-        const rotationTargets = getF1ArrivalRotationTargets(s.progress, racingSpeed, time);
-        f1CarGroup.rotation.y += (rotationTargets.y - f1CarGroup.rotation.y) * 0.1;
-        f1CarGroup.rotation.x += (rotationTargets.x - f1CarGroup.rotation.x) * 0.1;
-        f1CarGroup.rotation.z += (rotationTargets.z - f1CarGroup.rotation.z) * 0.05;
+        applyF1ArrivalRotation(f1CarGroup.rotation, s.progress, racingSpeed, time);
 
         if (f1AssembledLocalBounds) {
           f1CarGroup.updateMatrixWorld(true);
