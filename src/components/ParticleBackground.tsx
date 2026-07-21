@@ -10,6 +10,7 @@ import { getF1Depth, getTargetSpeed, stepF1Motion, type F1MotionState } from '..
 import {
   createF1ArrivalState,
   dampF1ArrivalValue,
+  getF1ArrivalRotationTargets,
   getF1ScreenStableOrbitTarget,
   stepF1ArrivalState,
 } from '../lib/f1-arrival-motion';
@@ -878,25 +879,12 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         const settledScale = dampF1ArrivalValue(f1CarGroup.scale.x, targetScale, delta, 8);
         f1CarGroup.scale.setScalar(settledScale);
 
-        // Rotation: Background Match turn without tilting the car into the floor
-        if (s.progress < 100) {
-            const turnFactor = Math.min(1, progressFactor * 1.25);
-
-            // Y-axis: From 0 to 135 degrees (3/4 rear-to-side view)
-            const targetRotY = turnFactor * (Math.PI * 0.25);
-            f1CarGroup.rotation.y += (targetRotY - f1CarGroup.rotation.y) * 0.1;
-
-            // X-axis: Stay flat on the road (remove tilt)
-            f1CarGroup.rotation.x += (0 - f1CarGroup.rotation.x) * 0.1;
-
-            // Z-axis: Subtle dynamic lean
-            const targetRotZ =
-              turnFactor * 0.05 +
-              Math.sin(time * 10) * 0.008 * racingSpeed +
-              Math.sin(time * 26) * 0.004 * racingSpeed;
-            f1CarGroup.rotation.z += (targetRotZ - f1CarGroup.rotation.z) * 0.05;
-        }
-        // When progress >= 100, we just keep the final rotation values intact so it doesn't snap!
+        // Rotation: keep the arrival lean in flight, then settle both pitch and
+        // roll back to a level pose before the studio floor is revealed.
+        const rotationTargets = getF1ArrivalRotationTargets(s.progress, racingSpeed, time);
+        f1CarGroup.rotation.y += (rotationTargets.y - f1CarGroup.rotation.y) * 0.1;
+        f1CarGroup.rotation.x += (rotationTargets.x - f1CarGroup.rotation.x) * 0.1;
+        f1CarGroup.rotation.z += (rotationTargets.z - f1CarGroup.rotation.z) * 0.05;
 
         if (f1AssembledLocalBounds) {
           f1CarGroup.updateMatrixWorld(true);

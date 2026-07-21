@@ -6,6 +6,7 @@ import {
   createF1ArrivalState,
   dampF1ArrivalValue,
   getF1ScreenStableOrbitTarget,
+  getF1ArrivalRotationTargets,
   stepF1ArrivalState,
 } from '../src/lib/f1-arrival-motion';
 import * as THREE from 'three';
@@ -16,6 +17,9 @@ assert.equal(ARRIVAL_HOLD_MS, 120);
 const first = dampF1ArrivalValue(-2, 0, 1 / 60, 8);
 assert(first > -2 && first < 0, 'arrival damping must approach without snapping');
 assert.equal(dampF1ArrivalValue(1, 3, 0, 8), 1, 'zero delta must preserve the current value');
+assert.equal(getF1ArrivalRotationTargets(100, 1, 12).x, 0, 'stopped arrival must flatten pitch');
+assert.equal(getF1ArrivalRotationTargets(100, 1, 12).z, 0, 'stopped arrival must clear transient roll');
+assert.equal(getF1ArrivalRotationTargets(80, 0.5, 12).z !== 0, true, 'in-flight arrival may retain a subtle lean');
 
 const cameraPosition = new THREE.Vector3(0, 0, 50);
 const originalViewTarget = new THREE.Vector3(0, 0, 0);
