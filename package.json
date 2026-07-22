@@ -14,6 +14,7 @@
     "check:showroom-director": "node --import tsx scripts/check-showroom-director.ts",
     "check:showroom-asset-manager": "node --import tsx scripts/check-showroom-asset-manager.ts",
     "check:showroom-materials": "node --import tsx scripts/check-showroom-materials.ts",
+    "check:showroom-effects": "node --import tsx scripts/check-showroom-effects.ts",
     "check:f1-motion": "node --import tsx scripts/check-f1-motion.ts",
     "check:f1-glitch": "node --import tsx scripts/check-f1-glitch-sequence.ts",
     "check:f1-wheel-hold": "node --import tsx scripts/check-f1-wheel-hold.ts",
