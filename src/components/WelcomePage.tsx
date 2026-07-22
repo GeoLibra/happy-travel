@@ -6,14 +6,13 @@ import * as THREE from 'three';
 import bgImage from '../img/IMG_9596.jpg';
 import f1EngineSound from '../audio/f1-engine.mp3';
 import ParticleBackground from './ParticleBackground';
-import { loadModelWithCache } from '../lib/model-loader';
-import { ROSE_MODEL_URL } from '../lib/rose-animation';
 import { markF1ManualInteraction } from '../lib/f1-showroom-interaction';
 import {
   createF1WelcomeSequence,
   type F1WelcomeSequence,
 } from '../lib/f1-welcome-sequence';
 import { ShowroomAudioEngine } from './showroom/audio-engine';
+import { ShowroomAssetManager } from './showroom/asset-manager';
 import { useI18n } from '../i18n';
 
 const F1_SHOWROOM_MODEL_URL = '/models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2';
@@ -147,31 +146,26 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
 
   useEffect(() => {
     setMounted(true);
+    const assetManager = new ShowroomAssetManager();
 
-    let carProg = 0;
-    let roseProg = 0;
-
-    const updateCombinedProgress = () => {
-      setModelProgress(Math.round((carProg + roseProg) / 2));
-    };
-
-    Promise.all([
-      loadModelWithCache(F1_SHOWROOM_MODEL_URL, (p) => {
-        carProg = p;
-        updateCombinedProgress();
-      }),
-      loadModelWithCache(ROSE_MODEL_URL, (p) => {
-        roseProg = p;
-        updateCombinedProgress();
-      })
-    ]).then(([carGltf]) => {
-      setLoadedModel(carGltf.scene);
-      setTimeout(() => setModelLoading(false), 500);
+    assetManager.loadModel<{ scene: THREE.Group }>(F1_SHOWROOM_MODEL_URL, (p) => {
+      setModelProgress(p);
+    }).then((result) => {
+      if (result.success && result.data?.scene) {
+        setLoadedModel(result.data.scene);
+        setTimeout(() => setModelLoading(false), 500);
+      } else {
+        console.error("[WelcomePage] Model preloading failed:", result.error);
+        setModelLoading(false);
+      }
     }).catch((err) => {
       console.error("[WelcomePage] Model preloading failed:", err);
       setModelLoading(false);
     });
 
+    return () => {
+      assetManager.dispose();
+    };
   }, []);
 
   useEffect(() => () => {
