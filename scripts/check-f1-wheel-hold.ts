@@ -83,7 +83,8 @@ assert.doesNotMatch(particleBackgroundSource, /stepF1WheelMotion\(wheelMotion, s
 assert.match(particleBackgroundSource, /new THREE\.Raycaster\(\)/);
 assert.match(particleBackgroundSource, /raycaster\.intersectObject\(f1CarGroup, true\)/);
 assert.match(particleBackgroundSource, /controls\.minPolarAngle = Math\.PI \/ 3/);
-assert.match(particleBackgroundSource, /controls\.maxPolarAngle = Math\.PI \/ 2 - 0\.04/);
+assert.match(particleBackgroundSource, /F1_ORBIT_MAX_POLAR_ANGLE/);
+assert.match(particleBackgroundSource, /controls\.maxPolarAngle = F1_ORBIT_MAX_POLAR_ANGLE/);
 assert.match(particleBackgroundSource, /controls\.enablePan = false/);
 assert.match(particleBackgroundSource, /reflection\.setReveal\(studioReveal\)/);
 assert.match(particleBackgroundSource, /updateF1ExplodedParts\([\s\S]*?floorY: reflection\.floor\.position\.y/);
@@ -146,9 +147,8 @@ const stableOrbitTargetProjection = particleBackgroundSource.indexOf(
   'getF1ScreenStableOrbitTarget(',
   finalScale,
 );
-const orbitTargetCommit = particleBackgroundSource.indexOf(
-  'controls.target.copy(screenStableOrbitTarget);',
-  stableOrbitTargetProjection,
+const orbitTargetLerp = particleBackgroundSource.indexOf(
+  'controls.target.lerp(screenStableOrbitTarget, 1 - Math.exp(-delta * 4));',
 );
 const floorPlacementCommit = particleBackgroundSource.indexOf(
   'hasPlacedStudioFloor = true;',
@@ -156,11 +156,11 @@ const floorPlacementCommit = particleBackgroundSource.indexOf(
 );
 const revealAdvance = particleBackgroundSource.indexOf(
   'studioReveal = stepStudioReveal(',
-  orbitTargetCommit,
+  floorPlacementCommit,
 );
 const stoppedPoseGate = particleBackgroundSource.indexOf(
   '&& arrivalState.ready',
-  orbitTargetCommit,
+  stableOrbitTargetProjection,
 );
 const orbitInteractionReadyCommit = particleBackgroundSource.indexOf(
   'isOrbitInteractionReady = true;',
@@ -172,17 +172,22 @@ assert(finalStoppedY >= 0, 'the final assembled Y must be damped instead of snap
 assert(finalStoppedZ < finalStoppedY, 'depth damping must run before final Y/scale damping');
 assert(finalScale > finalStoppedY, 'final scale damping must run after final assembled Y');
 assert(
-  stableOrbitTargetProjection > finalScale && orbitTargetCommit > stableOrbitTargetProjection,
-  'orbit target must be projected onto the unchanged arrival view ray before it is committed',
+  stableOrbitTargetProjection > finalScale && orbitTargetLerp >= 0,
+  'orbit target must be projected onto the unchanged arrival view ray and lerped only after the target is ready',
+);
+assert.match(
+  particleBackgroundSource,
+  /if \(hasSetOrbitTarget\) \{[\s\S]*?controls\.target\.lerp\(screenStableOrbitTarget, 1 - Math\.exp\(-delta \* 4\)\);[\s\S]*?\}/,
+  'orbit target lerp must be gated by the once-computed stable target',
 );
 assert(
-  floorPlacement > orbitTargetCommit
+  floorPlacement > stableOrbitTargetProjection
     && floorPlacementCommit > floorPlacement
     && revealAdvance > floorPlacementCommit,
   'the final camera target and floor placement must both commit before positive reveal',
 );
 assert(
-  stoppedPoseGate > orbitTargetCommit && orbitInteractionReadyCommit > stoppedPoseGate,
+  stoppedPoseGate > stableOrbitTargetProjection && orbitInteractionReadyCommit > stoppedPoseGate,
   'user OrbitControls enablement must remain separately gated on arrival readiness after target setup',
 );
 assert.match(
