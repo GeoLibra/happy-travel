@@ -17,9 +17,17 @@ assert.equal(isRuntimeWheelSpinNode('WheelSpin_FL'), true);
 assert.equal(isRuntimeWheelSpinNode('WheelSpin_FR'), true);
 assert.equal(isRuntimeWheelSpinNode('WheelSpin_RL'), true);
 assert.equal(isRuntimeWheelSpinNode('WheelSpin_RR'), true);
-assert.equal(isRuntimeWheelSpinNode('WheelSpin_FL_Aero'), false);
+assert.equal(isRuntimeWheelSpinNode('WheelSpin_FL_extra'), false);
+assert.equal(isRuntimeWheelSpinNode('FrontWheelArchAeroPanel'), false);
+assert.equal(isRuntimeWheelSpinNode('WheelAdjacentBodywork'), false);
 
 assert.equal(identifyVehicleRole('WheelSpin_FL'), 'wheel');
+assert.notEqual(identifyVehicleRole('WheelSpin_FL_extra'), 'wheel', 'WheelSpin_FL_extra must not be classified as wheel');
+assert.notEqual(identifyVehicleRole('FrontWheelArchAeroPanel'), 'wheel', 'FrontWheelArchAeroPanel must not be classified as wheel');
+assert.notEqual(identifyVehicleRole('WheelAdjacentBodywork'), 'wheel', 'WheelAdjacentBodywork must not be classified as wheel');
+
+assert.equal(identifyVehicleRole('FrontWheelArchAeroPanel'), 'wing');
+assert.equal(identifyVehicleRole('WheelAdjacentBodywork'), 'body');
 assert.equal(identifyVehicleRole('RearHardRockAeroPanel'), 'wing');
 assert.equal(identifyVehicleRole('tyre_front_left'), 'tyre');
 assert.equal(identifyVehicleRole('halo_frame'), 'halo');
