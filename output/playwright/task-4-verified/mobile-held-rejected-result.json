@@ -1,9 +1,0 @@
-{
-  "status": "REJECTED",
-  "reason": "The continuous held-touch attempt repeated a hologram frame through the expected glitch/explosion window, so it cannot prove the complete timeline.",
-  "artifact": "mobile-arrival-touch-held-rejected.webm",
-  "viewport": { "width": 390, "height": 844 },
-  "progressCompleteVideoOffsetMs": 6904.39999999851,
-  "startInput": "trusted CDP touchStart held through 100%, then touchCancel",
-  "touchEnvironment": { "maxTouchPoints": 1, "coarsePointer": true }
-}
