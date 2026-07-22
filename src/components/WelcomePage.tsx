@@ -14,6 +14,8 @@ import {
 import { ShowroomAudioEngine } from './showroom/audio-engine';
 import { ShowroomAssetManager } from './showroom/asset-manager';
 import { useI18n } from '../i18n';
+import { useIgnition } from './showroom/useIgnition';
+import { ShowroomOverlay } from './showroom/ShowroomOverlay';
 
 const F1_SHOWROOM_MODEL_URL = '/models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2';
 
@@ -45,13 +47,28 @@ const StartLights = ({ progress, isPressing }: { progress: number, isPressing: b
 interface WelcomeProps {
   onEnter: () => void;
   onPrepareEnter?: () => void | Promise<void>;
+  useShowroomScaffold?: boolean;
 }
 
 const REASSEMBLY_BEFORE_ENTER_MS = 1600;
 
-const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
+const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowroomScaffold }) => {
   const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
+
+  const isShowroomScaffoldActive = useShowroomScaffold || (
+    typeof window !== 'undefined' && (
+      new URLSearchParams(window.location.search).get('showroom') === 'v2' ||
+      new URLSearchParams(window.location.search).get('mode') === 'showroom'
+    )
+  );
+
+  const showroomIgnition = useIgnition({
+    onIgnitionComplete: () => {
+      onEnter();
+    },
+    autoLockScroll: isShowroomScaffoldActive,
+  });
   const [isPressing, setIsPressing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [simplyLovely, setSimplyLovely] = useState(false);
@@ -512,6 +529,17 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
           </div>
         </div>
       </div>
+
+      {isShowroomScaffoldActive && (
+        <ShowroomOverlay
+          progress={showroomIgnition.progress}
+          ignitionStatus={showroomIgnition.status}
+          onPressStart={showroomIgnition.onPressStart}
+          onPressEnd={showroomIgnition.onPressEnd}
+          onSkip={onEnter}
+          onEnter={onEnter}
+        />
+      )}
     </div>
   );
 };

@@ -62,6 +62,7 @@ export class CinematicRenderer {
     this.renderer = options.renderer;
     if (this.renderer) {
       this.renderer.setPixelRatio(this.config.pixelRatio);
+      this.renderer.outputColorSpace = this.config.outputColorSpace;
       this.renderer.toneMapping = this.config.toneMapping;
       this.renderer.toneMappingExposure = this.config.toneMappingExposure;
       this.renderer.shadowMap.enabled = this.config.shadowsEnabled;

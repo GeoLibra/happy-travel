@@ -103,4 +103,26 @@ assert.equal(rendererInstance.isRendererDisposed, true);
 rendererInstance.dispose();
 assert.equal(rendererInstance.isRendererDisposed, true);
 
+// 7. Test CinematicRenderer outputColorSpace application when renderer is provided
+let appliedPixelRatio = 1;
+const mockWebGLRenderer = {
+  setPixelRatio: (dpr: number) => { appliedPixelRatio = dpr; },
+  outputColorSpace: '',
+  toneMapping: 0,
+  toneMappingExposure: 1,
+  shadowMap: { enabled: false, type: 0 },
+} as unknown as THREE.WebGLRenderer;
+
+const rendererWithMock = new CinematicRenderer({
+  qualityOptions: { forceLevel: 'high' },
+  renderer: mockWebGLRenderer,
+});
+
+assert.equal(
+  mockWebGLRenderer.outputColorSpace,
+  rendererWithMock.configuration.outputColorSpace,
+  'CinematicRenderer must apply config.outputColorSpace when renderer is provided',
+);
+rendererWithMock.dispose();
+
 console.log('check:showroom-renderer-config passed cleanly.');

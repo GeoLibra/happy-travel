@@ -35,6 +35,11 @@ const messages = {
     'driver.achievement.2022': '卫冕成功',
     'driver.achievement.2023': '统治赛季 (19胜)',
     'driver.achievement.2024': '四冠王',
+    'showroom.ignition.hold': '按住空格/回车或点击启动引擎',
+    'showroom.ignition.starting': '引擎启动中',
+    'showroom.ignition.ready': '狂欢开启',
+    'showroom.skip': '跳过动画',
+    'showroom.chapter': '章节',
   },
   en: {
     'app.title': 'Shanghai Weekend Itinerary',
@@ -65,6 +70,11 @@ const messages = {
     'driver.achievement.2022': 'Back-to-back Champion',
     'driver.achievement.2023': 'Dominant Season (19 Wins)',
     'driver.achievement.2024': 'Four-time Champion',
+    'showroom.ignition.hold': 'Hold Space/Enter or Click to Start Engine',
+    'showroom.ignition.starting': 'Engine Starting',
+    'showroom.ignition.ready': 'Enter Showroom',
+    'showroom.skip': 'Skip Intro',
+    'showroom.chapter': 'Chapter',
   },
 } as const;
 
