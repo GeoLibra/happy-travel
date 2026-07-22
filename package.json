@@ -7,6 +7,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "check:showroom-resources": "node --import tsx scripts/check-showroom-resources.ts",
+    "check:showroom-audio": "node --import tsx scripts/check-showroom-audio.ts",
     "check:f1-motion": "node --import tsx scripts/check-f1-motion.ts",
     "check:f1-glitch": "node --import tsx scripts/check-f1-glitch-sequence.ts",
     "check:f1-wheel-hold": "node --import tsx scripts/check-f1-wheel-hold.ts",

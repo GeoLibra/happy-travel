@@ -13,6 +13,7 @@ import {
   createF1WelcomeSequence,
   type F1WelcomeSequence,
 } from '../lib/f1-welcome-sequence';
+import { ShowroomAudioEngine } from './showroom/audio-engine';
 import { useI18n } from '../i18n';
 
 const F1_SHOWROOM_MODEL_URL = '/models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2';
@@ -62,12 +63,22 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [glitchProgress, setGlitchProgress] = useState<number | null>(null);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const audioEngineRef = React.useRef<ShowroomAudioEngine | null>(null);
   const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoExplodeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const glitchFrameRef = React.useRef<number | null>(null);
   const automaticSequenceRef = React.useRef<F1WelcomeSequence | null>(null);
   const hasManualInteractionRef = React.useRef(false);
   const hasStartedEntryRef = React.useRef(false);
+
+  useEffect(() => {
+    const engine = new ShowroomAudioEngine({ audioElement: audioRef.current, src: f1EngineSound });
+    audioEngineRef.current = engine;
+    return () => {
+      audioEngineRef.current?.dispose();
+      audioEngineRef.current = null;
+    };
+  }, []);
 
   const cancelAutomaticShowroomSequence = useCallback(() => {
     if (autoExplodeTimerRef.current) {
@@ -215,27 +226,22 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
       // 按住时增加进度
       interval = setInterval(() => {
         setProgress((prev) => {
-          if (prev >= 100) {
-            return 100;
-          }
-          return prev + 1;
+          const next = prev >= 100 ? 100 : prev + 1;
+          audioEngineRef.current?.update(next / 100);
+          return next;
         });
       }, 50);
     } else if (!isPressing && progress > 0 && progress < 30) {
       // 松手且进度<30%：重置进度
       setProgress(0);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
+      audioEngineRef.current?.reset();
     } else if (!isPressing && progress >= 30 && progress < 100) {
       // 松手但进度>=30%：自动继续增长
       interval = setInterval(() => {
         setProgress((prev) => {
-          if (prev >= 100) {
-            return 100;
-          }
-          return prev + 1;
+          const next = prev >= 100 ? 100 : prev + 1;
+          audioEngineRef.current?.update(next / 100);
+          return next;
         });
       }, 50);
     }
@@ -431,10 +437,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
               data-f1-welcome-action="enter"
               onPointerDown={() => {
                 setIsPressing(true);
-                if (audioRef.current) {
-                  audioRef.current.currentTime = 0;
-                  audioRef.current.play().catch(() => {});
-                }
+                audioEngineRef.current?.start();
               }}
               onPointerUp={() => {
                 setIsPressing(false);
