@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: Typecheck, focused checks, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run deterministic checks
+        run: |
+          npm run check:showroom-ui
+          npm run check:showroom-renderer-config
+          npm run check:showroom-story
+          npm run check:showroom-quality
+          npm run check:showroom-route
+          npm run check:showroom-director
+          npm run check:showroom-asset-manager
+          npm run check:showroom-materials
+          npm run check:showroom-effects
+          npm run check:showroom-audio
+          npm run check:f1-motion
+          npm run check:f1-glitch
+          npm run check:f1-wheel-hold
+          npm run check:f1-airflow
+          npm run check:f1-model
+          npm run check:f1-welcome
+          npm run check:f1-studio
+          npm run check:f1-showroom-interaction
+          npm run check:f1-arrival-motion
+          npm run check:f1-reflection
+          npm run check:rose-animation
+          npm run check:i18n
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

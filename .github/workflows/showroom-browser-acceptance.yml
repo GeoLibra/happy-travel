@@ -1,0 +1,74 @@
+name: Showroom Browser Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/showroom-browser-acceptance.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'index.html'
+      - 'src/App.tsx'
+      - 'src/i18n.tsx'
+      - 'src/components/WelcomePage.tsx'
+      - 'src/components/ParticleBackground.tsx'
+      - 'src/components/showroom/**'
+      - 'src/lib/f1-*.ts'
+      - 'src/lib/showroom-*.ts'
+      - 'scripts/check-showroom-acceptance.ts'
+      - 'public/models/2024_redbull_rb20_showroom_v5.glb'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/showroom-browser-acceptance.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'index.html'
+      - 'src/App.tsx'
+      - 'src/i18n.tsx'
+      - 'src/components/WelcomePage.tsx'
+      - 'src/components/ParticleBackground.tsx'
+      - 'src/components/showroom/**'
+      - 'src/lib/f1-*.ts'
+      - 'src/lib/showroom-*.ts'
+      - 'scripts/check-showroom-acceptance.ts'
+      - 'public/models/2024_redbull_rb20_showroom_v5.glb'
+  workflow_dispatch:
+
+concurrency:
+  group: showroom-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium-acceptance:
+    name: Chromium desktop and mobile viewport acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run showroom browser acceptance
+        run: npm run check:showroom-acceptance
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: showroom-browser-acceptance
+          path: output/playwright/
+          if-no-files-found: ignore
+          retention-days: 7
