@@ -94,9 +94,16 @@ export function useIgnition(options: UseIgnitionOptions = {}) {
   const { onIgnitionComplete, autoLockScroll = true } = options;
   const [ignitionState, setIgnitionState] = useState<IgnitionState>(INITIAL_IGNITION_STATE);
   const controllerRef = useRef<PureIgnitionController | null>(null);
+  const onIgnitionCompleteRef = useRef(onIgnitionComplete);
+
+  useEffect(() => {
+    onIgnitionCompleteRef.current = onIgnitionComplete;
+  }, [onIgnitionComplete]);
 
   if (!controllerRef.current) {
-    controllerRef.current = new PureIgnitionController(0, onIgnitionComplete);
+    controllerRef.current = new PureIgnitionController(0, () => {
+      onIgnitionCompleteRef.current?.();
+    });
   }
 
   const handlePressStart = useCallback(() => {

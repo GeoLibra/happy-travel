@@ -12,6 +12,8 @@ export interface ShowroomOverlayProps {
   ignitionStatus: IgnitionStatus;
   onPressStart: () => void;
   onPressEnd: () => void;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  onKeyUp?: (e: React.KeyboardEvent) => void;
   onSkip?: () => void;
   onEnter?: () => void;
   showSkipButton?: boolean;
@@ -23,6 +25,8 @@ export const ShowroomOverlay: React.FC<ShowroomOverlayProps> = ({
   ignitionStatus,
   onPressStart,
   onPressEnd,
+  onKeyDown,
+  onKeyUp,
   onSkip,
   onEnter,
   showSkipButton = true,
@@ -110,6 +114,8 @@ export const ShowroomOverlay: React.FC<ShowroomOverlayProps> = ({
           onPointerUp={onPressEnd}
           onPointerLeave={onPressEnd}
           onPointerCancel={onPressEnd}
+          onKeyDown={onKeyDown}
+          onKeyUp={onKeyUp}
           onClick={() => {
             if (isIgnited && onEnter) {
               onEnter();

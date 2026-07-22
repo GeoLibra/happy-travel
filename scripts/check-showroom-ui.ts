@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import React from 'react';
 import * as THREE from 'three';
 
 import { translate } from '../src/i18n.tsx';
 import { CinematicRenderer } from '../src/components/showroom/cinematic-renderer.ts';
+import { ShowroomOverlay } from '../src/components/showroom/ShowroomOverlay.tsx';
 import {
   isIgnitionKey,
   shouldLockScroll,
@@ -108,7 +110,7 @@ assert.equal(
 );
 rendererScaffold.dispose();
 
-// 6. Source-level UI Accessibility & Data Attributes Check
+// 6. Source-level UI Accessibility & Keyboard Wiring Check
 const overlaySource = readFileSync('src/components/showroom/ShowroomOverlay.tsx', 'utf8');
 const welcomeSource = readFileSync('src/components/WelcomePage.tsx', 'utf8');
 
@@ -118,8 +120,67 @@ assert.match(overlaySource, /aria-label=/, 'ShowroomOverlay must provide aria-la
 assert.match(overlaySource, /aria-live="polite"/, 'ShowroomOverlay must include live region for screen readers');
 assert.match(overlaySource, /tabIndex=\{0\}/, 'ShowroomOverlay controls must be focusable');
 
+// Keyboard ignition handler prop & button wiring assertions
+assert.match(overlaySource, /onKeyDown\?:/, 'ShowroomOverlayProps must expose onKeyDown prop');
+assert.match(overlaySource, /onKeyUp\?:/, 'ShowroomOverlayProps must expose onKeyUp prop');
+assert.match(overlaySource, /data-showroom-action="ignition"[\s\S]*?onKeyDown=\{onKeyDown\}/, 'ShowroomOverlay ignition button must attach onKeyDown handler');
+assert.match(overlaySource, /data-showroom-action="ignition"[\s\S]*?onKeyUp=\{onKeyUp\}/, 'ShowroomOverlay ignition button must attach onKeyUp handler');
+
 assert.match(welcomeSource, /ShowroomOverlay/, 'WelcomePage must incorporate ShowroomOverlay scaffold');
 assert.match(welcomeSource, /useIgnition/, 'WelcomePage must incorporate useIgnition hook scaffold');
+assert.match(welcomeSource, /onKeyDown=\{showroomIgnition\.onKeyDown\}/, 'WelcomePage must pass showroomIgnition.onKeyDown to ShowroomOverlay');
+assert.match(welcomeSource, /onKeyUp=\{showroomIgnition\.onKeyUp\}/, 'WelcomePage must pass showroomIgnition.onKeyUp to ShowroomOverlay');
+assert.match(welcomeSource, /triggerPreparedEnter/, 'WelcomePage must use prepared handoff callback for showroom completion and skip');
+
+// Lightweight VNode render test verifying prop wiring on rendered elements
+function findVNode(node: any, predicate: (n: any) => boolean): any {
+  if (!node) return null;
+  if (predicate(node)) return node;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findVNode(child, predicate);
+      if (found) return found;
+    }
+  } else if (typeof node === 'object' && node.props) {
+    const children = node.props.children;
+    if (Array.isArray(children)) {
+      for (const child of children) {
+        const found = findVNode(child, predicate);
+        if (found) return found;
+      }
+    } else if (children) {
+      return findVNode(children, predicate);
+    }
+  }
+  return null;
+}
+
+const dummyKeyDown = () => {};
+const dummyKeyUp = () => {};
+
+const origConsoleError = console.error;
+console.error = () => {};
+let overlayVNode: any;
+try {
+  overlayVNode = (ShowroomOverlay as any)({
+    progress: 0,
+    ignitionStatus: 'ready',
+    onPressStart: () => {},
+    onPressEnd: () => {},
+    onKeyDown: dummyKeyDown,
+    onKeyUp: dummyKeyUp,
+  });
+} finally {
+  console.error = origConsoleError;
+}
+
+const ignitionBtnNode = findVNode(
+  overlayVNode,
+  (node) => node?.props?.['data-showroom-action'] === 'ignition',
+);
+assert(ignitionBtnNode, 'ShowroomOverlay component must render ignition button element with data-showroom-action="ignition"');
+assert.equal(ignitionBtnNode.props.onKeyDown, dummyKeyDown, 'ShowroomOverlay ignition button element must have onKeyDown prop bound');
+assert.equal(ignitionBtnNode.props.onKeyUp, dummyKeyUp, 'ShowroomOverlay ignition button element must have onKeyUp prop bound');
 
 // 7. Verify Chapter Story definition integration
 const chStart = getShowroomChapter(0.0);

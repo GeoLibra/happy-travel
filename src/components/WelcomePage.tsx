@@ -63,12 +63,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowr
     )
   );
 
-  const showroomIgnition = useIgnition({
-    onIgnitionComplete: () => {
-      onEnter();
-    },
-    autoLockScroll: isShowroomScaffoldActive,
-  });
   const [isPressing, setIsPressing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [simplyLovely, setSimplyLovely] = useState(false);
@@ -137,8 +131,8 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowr
     }, REASSEMBLY_BEFORE_ENTER_MS);
   }, [cancelAutomaticShowroomSequence, isTransitioning, onEnter]);
 
-  const handleEnter = useCallback(() => {
-    if (progress < 100 || hasStartedEntryRef.current) return;
+  const triggerPreparedEnter = useCallback(() => {
+    if (hasStartedEntryRef.current) return;
     hasStartedEntryRef.current = true;
 
     try {
@@ -152,7 +146,17 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowr
       console.error('[WelcomePage] Entry preparation failed:', error);
     }
     enterAfterReassembly();
-  }, [enterAfterReassembly, onPrepareEnter, progress]);
+  }, [enterAfterReassembly, onPrepareEnter]);
+
+  const showroomIgnition = useIgnition({
+    onIgnitionComplete: triggerPreparedEnter,
+    autoLockScroll: isShowroomScaffoldActive,
+  });
+
+  const handleEnter = useCallback(() => {
+    if (progress < 100 || hasStartedEntryRef.current) return;
+    triggerPreparedEnter();
+  }, [progress, triggerPreparedEnter]);
 
   const handleTagClick = () => {
     setSimplyLovely(true);
@@ -536,8 +540,10 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowr
           ignitionStatus={showroomIgnition.status}
           onPressStart={showroomIgnition.onPressStart}
           onPressEnd={showroomIgnition.onPressEnd}
-          onSkip={onEnter}
-          onEnter={onEnter}
+          onKeyDown={showroomIgnition.onKeyDown}
+          onKeyUp={showroomIgnition.onKeyUp}
+          onSkip={triggerPreparedEnter}
+          onEnter={triggerPreparedEnter}
         />
       )}
     </div>
