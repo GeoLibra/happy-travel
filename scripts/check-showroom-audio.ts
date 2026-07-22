@@ -80,7 +80,36 @@ assert.equal(engine.isEngineDisposed, true, 'isEngineDisposed must be true after
 assert.equal(engine.isStarted, false, 'isStarted must be false after dispose()');
 assert.equal(engine.audio, null, 'audio reference must be cleared on dispose()');
 
-// 3. Source code anti-regression checks on WelcomePage.tsx
+// 3. Verify StrictMode double-mount behavior (setup -> cleanup -> setup)
+const strictModeMockAudio = new MockAudioElement() as unknown as HTMLAudioElement;
+const dummySrc = 'test-engine.mp3';
+
+// First mount setup & cleanup
+const firstEngine = new ShowroomAudioEngine({ audioElement: strictModeMockAudio, src: dummySrc });
+firstEngine.dispose();
+
+assert.equal(
+  strictModeMockAudio.src,
+  dummySrc,
+  'dispose() must not clear src on external DOM audio elements in StrictMode cleanup',
+);
+
+// Second mount setup
+const secondEngine = new ShowroomAudioEngine({ audioElement: strictModeMockAudio, src: dummySrc });
+assert.equal(secondEngine.isStarted, false);
+assert.equal(strictModeMockAudio.src, dummySrc, 'second engine must preserve/restore valid src');
+
+// User gesture playback on remounted engine
+const secondStartResult = secondEngine.start();
+assert.equal(secondStartResult, true);
+assert.equal(secondEngine.isStarted, true);
+assert.equal(
+  (strictModeMockAudio as unknown as MockAudioElement).playCount,
+  1,
+  'playback works after StrictMode remount',
+);
+
+// 4. Source code anti-regression checks on WelcomePage.tsx
 const welcomePagePath = join(process.cwd(), 'src', 'components', 'WelcomePage.tsx');
 const welcomeSource = readFileSync(welcomePagePath, 'utf8');
 

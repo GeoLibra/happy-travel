@@ -28,12 +28,21 @@ export interface ShowroomAudioEngineOptions {
 
 export class ShowroomAudioEngine {
   private audioElement: HTMLAudioElement | null = null;
+  private isExternalAudioElement = false;
   private isUserGestureStarted = false;
   private isDisposed = false;
 
   constructor(options: ShowroomAudioEngineOptions = {}) {
     if (options.audioElement) {
       this.audioElement = options.audioElement;
+      this.isExternalAudioElement = true;
+      if (options.src && (!this.audioElement.src || this.audioElement.src !== options.src)) {
+        try {
+          this.audioElement.src = options.src;
+        } catch {
+          // Ignore src assignment errors
+        }
+      }
     } else if (options.src && typeof Audio !== 'undefined') {
       this.audioElement = new Audio(options.src);
     }
@@ -106,7 +115,9 @@ export class ShowroomAudioEngine {
       try {
         this.audioElement.pause();
         this.audioElement.currentTime = 0;
-        this.audioElement.src = '';
+        if (!this.isExternalAudioElement) {
+          this.audioElement.src = '';
+        }
       } catch {
         // Ignore errors on disposal
       }
