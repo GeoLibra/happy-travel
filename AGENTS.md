@@ -10,3 +10,10 @@
 - Every F1 model or visual change requires the focused asset, motion, wheel, airflow, studio, reflection, interaction, and model checks plus desktop and mobile browser evidence.
 - Browser evidence must include the complete arrival timeline, not only the final stopped frame, so car pose, camera framing, floor placement, and floor reveal jumps remain visible to reviewers.
 - Explode and reassemble verification must prove every part stays above the floor for the entire motion and that wheel-adjacent bodywork follows its semantic body group.
+
+## Testing and CI workflow
+
+- For showroom, welcome, F1 interaction, or handoff changes, run `npm run check:showroom-acceptance` and treat `output/playwright/showroom-acceptance-summary.json` or the GitHub Actions artifact as the reviewable evidence.
+- Chromium mobile coverage in CI is viewport and touch emulation only; it does not replace real-device Safari/Chrome checks when shipping materially new mobile WebGL behavior.
+- Prefer `node --import tsx <script>` in npm scripts over the bare `tsx` CLI so local sandbox runs and GitHub Actions behave consistently.
+- Canonical implementation plans and design specs must live in the main checkout under `docs/superpowers/**`; `.worktrees/**` and `output/**` are disposable execution artifacts, not the long-term source of truth.

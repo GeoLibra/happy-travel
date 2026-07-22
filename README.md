@@ -6,6 +6,7 @@
 - `Showroom Browser Acceptance` runs only when showroom/F1/browser-relevant files change, or manually from GitHub Actions. It uses Chromium desktop plus Chromium mobile viewport emulation; this is not a physical mobile device or real Safari/WebKit.
 - Vercel deployment is handled by Vercel Git Integration: PR/non-production branches create Preview deployments, and `main` creates Production deployments after GitHub checks.
 - Local browser evidence: `npm run check:showroom-acceptance`. Screenshots and JSON are written to ignored `output/playwright/`.
+- Detailed CI/CD references live in [docs/superpowers/specs/2026-07-21-ci-cd-testing-platform-design.md](docs/superpowers/specs/2026-07-21-ci-cd-testing-platform-design.md) and [docs/superpowers/plans/2026-07-21-ci-cd-testing-platform.md](docs/superpowers/plans/2026-07-21-ci-cd-testing-platform.md).
 
 <img width="1511" height="734" alt="Screenshot 2026-05-22 at 11 01 50 AM" src="https://github.com/user-attachments/assets/4c13599d-7bac-4a9b-9982-66926ce0ec8e" />
 <img width="3024" height="1492" alt="image" src="https://github.com/user-attachments/assets/49a6d995-4b4d-476f-81ca-4c826724a194" />
