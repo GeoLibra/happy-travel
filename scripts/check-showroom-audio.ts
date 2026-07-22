@@ -115,20 +115,14 @@ const welcomeSource = readFileSync(welcomePagePath, 'utf8');
 
 assert.match(
   welcomeSource,
-  /import\s+.*ShowroomAudioEngine.*from\s+['"].\/showroom\/audio-engine['"]/,
-  'WelcomePage.tsx must import ShowroomAudioEngine',
+  /onPointerDown=\{\(\) => \{[\s\S]*?audioRef\.current\.play\(\)/,
+  'WelcomePage.tsx must play audio directly inside the pointer gesture',
 );
 
-assert.match(
+assert.doesNotMatch(
   welcomeSource,
-  /audioEngineRef\.current\?\.start\(\)/,
-  'WelcomePage.tsx must call start() on user gesture path',
-);
-
-assert.match(
-  welcomeSource,
-  /audioEngineRef\.current\?\.dispose\(\)/,
-  'WelcomePage.tsx must call dispose() on cleanup/unmount',
+  /audioEngineRef\.current\?\.update/,
+  'WelcomePage.tsx must not fade the audible engine to near-zero during hold progress',
 );
 
 // Ensure no direct loose autoplay on mount

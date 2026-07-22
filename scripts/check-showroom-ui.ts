@@ -126,11 +126,9 @@ assert.match(overlaySource, /onKeyUp\?:/, 'ShowroomOverlayProps must expose onKe
 assert.match(overlaySource, /data-showroom-action="ignition"[\s\S]*?onKeyDown=\{onKeyDown\}/, 'ShowroomOverlay ignition button must attach onKeyDown handler');
 assert.match(overlaySource, /data-showroom-action="ignition"[\s\S]*?onKeyUp=\{onKeyUp\}/, 'ShowroomOverlay ignition button must attach onKeyUp handler');
 
-assert.match(welcomeSource, /ShowroomOverlay/, 'WelcomePage must incorporate ShowroomOverlay scaffold');
-assert.match(welcomeSource, /useIgnition/, 'WelcomePage must incorporate useIgnition hook scaffold');
-assert.match(welcomeSource, /onKeyDown=\{showroomIgnition\.onKeyDown\}/, 'WelcomePage must pass showroomIgnition.onKeyDown to ShowroomOverlay');
-assert.match(welcomeSource, /onKeyUp=\{showroomIgnition\.onKeyUp\}/, 'WelcomePage must pass showroomIgnition.onKeyUp to ShowroomOverlay');
-assert.match(welcomeSource, /triggerPreparedEnter/, 'WelcomePage must use prepared handoff callback for showroom completion and skip');
+assert.doesNotMatch(welcomeSource, /ShowroomOverlay/, 'WelcomePage must keep the proven single welcome CTA runtime');
+assert.doesNotMatch(welcomeSource, /useIgnition/, 'WelcomePage must not run a second ignition progress loop');
+assert.match(welcomeSource, /audioRef\.current\.play\(\)/, 'Welcome CTA must start audio directly in the pointer gesture');
 
 // Lightweight VNode render test verifying prop wiring on rendered elements
 function findVNode(node: any, predicate: (n: any) => boolean): any {

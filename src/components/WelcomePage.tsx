@@ -11,11 +11,8 @@ import {
   createF1WelcomeSequence,
   type F1WelcomeSequence,
 } from '../lib/f1-welcome-sequence';
-import { ShowroomAudioEngine } from './showroom/audio-engine';
 import { ShowroomAssetManager } from './showroom/asset-manager';
 import { useI18n } from '../i18n';
-import { useIgnition } from './showroom/useIgnition';
-import { ShowroomOverlay } from './showroom/ShowroomOverlay';
 
 const F1_SHOWROOM_MODEL_URL = '/models/2024_redbull_rb20_showroom_v5.glb?v=native-parts-2';
 
@@ -47,21 +44,13 @@ const StartLights = ({ progress, isPressing }: { progress: number, isPressing: b
 interface WelcomeProps {
   onEnter: () => void;
   onPrepareEnter?: () => void | Promise<void>;
-  useShowroomScaffold?: boolean;
 }
 
 const REASSEMBLY_BEFORE_ENTER_MS = 1600;
 
-const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowroomScaffold }) => {
+const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const { t } = useI18n();
   const [mounted, setMounted] = useState(false);
-
-  const isShowroomScaffoldActive = useShowroomScaffold || (
-    typeof window !== 'undefined' && (
-      new URLSearchParams(window.location.search).get('showroom') === 'v2' ||
-      new URLSearchParams(window.location.search).get('mode') === 'showroom'
-    )
-  );
 
   const [isPressing, setIsPressing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -73,22 +62,12 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowr
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [glitchProgress, setGlitchProgress] = useState<number | null>(null);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
-  const audioEngineRef = React.useRef<ShowroomAudioEngine | null>(null);
   const enterTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoExplodeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const glitchFrameRef = React.useRef<number | null>(null);
   const automaticSequenceRef = React.useRef<F1WelcomeSequence | null>(null);
   const hasManualInteractionRef = React.useRef(false);
   const hasStartedEntryRef = React.useRef(false);
-
-  useEffect(() => {
-    const engine = new ShowroomAudioEngine({ audioElement: audioRef.current, src: f1EngineSound });
-    audioEngineRef.current = engine;
-    return () => {
-      audioEngineRef.current?.dispose();
-      audioEngineRef.current = null;
-    };
-  }, []);
 
   const cancelAutomaticShowroomSequence = useCallback(() => {
     if (autoExplodeTimerRef.current) {
@@ -147,11 +126,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowr
     }
     enterAfterReassembly();
   }, [enterAfterReassembly, onPrepareEnter]);
-
-  const showroomIgnition = useIgnition({
-    onIgnitionComplete: triggerPreparedEnter,
-    autoLockScroll: isShowroomScaffoldActive,
-  });
 
   const handleEnter = useCallback(() => {
     if (progress < 100 || hasStartedEntryRef.current) return;
@@ -242,20 +216,21 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowr
       interval = setInterval(() => {
         setProgress((prev) => {
           const next = prev >= 100 ? 100 : prev + 1;
-          audioEngineRef.current?.update(next / 100);
           return next;
         });
       }, 50);
     } else if (!isPressing && progress > 0 && progress < 30) {
       // 松手且进度<30%：重置进度
       setProgress(0);
-      audioEngineRef.current?.reset();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
     } else if (!isPressing && progress >= 30 && progress < 100) {
       // 松手但进度>=30%：自动继续增长
       interval = setInterval(() => {
         setProgress((prev) => {
           const next = prev >= 100 ? 100 : prev + 1;
-          audioEngineRef.current?.update(next / 100);
           return next;
         });
       }, 50);
@@ -452,17 +427,14 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowr
               data-f1-welcome-action="enter"
               onPointerDown={() => {
                 setIsPressing(true);
-                audioEngineRef.current?.start();
+                if (audioRef.current) {
+                  audioRef.current.currentTime = 0;
+                  audioRef.current.play().catch(() => {});
+                }
               }}
-              onPointerUp={() => {
-                setIsPressing(false);
-              }}
-              onPointerLeave={() => {
-                setIsPressing(false);
-              }}
-              onPointerCancel={() => {
-                setIsPressing(false);
-              }}
+              onPointerUp={() => setIsPressing(false)}
+              onPointerLeave={() => setIsPressing(false)}
+              onPointerCancel={() => setIsPressing(false)}
               onClick={handleEnter}
               className="group relative z-[90] inline-flex items-center justify-center gap-2 px-10 py-4 w-[280px] sm:w-[360px] bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl uppercase tracking-wider transform -skew-x-12 pointer-events-auto cursor-pointer select-none"
             >
@@ -534,18 +506,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter, useShowr
         </div>
       </div>
 
-      {isShowroomScaffoldActive && (
-        <ShowroomOverlay
-          progress={showroomIgnition.progress}
-          ignitionStatus={showroomIgnition.status}
-          onPressStart={showroomIgnition.onPressStart}
-          onPressEnd={showroomIgnition.onPressEnd}
-          onKeyDown={showroomIgnition.onKeyDown}
-          onKeyUp={showroomIgnition.onKeyUp}
-          onSkip={triggerPreparedEnter}
-          onEnter={triggerPreparedEnter}
-        />
-      )}
     </div>
   );
 };
