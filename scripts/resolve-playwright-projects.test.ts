@@ -42,7 +42,7 @@ test('acceptance infrastructure and dependency changes select the complete safet
   assert.deepEqual(
     resolveAffectedPlaywrightProjects([
       'playwright.config.ts',
-      'package-lock.json',
+      'pnpm-lock.yaml',
       '.github/workflows/showroom-browser-acceptance.yml',
     ]),
     ALL_PLAYWRIGHT_PROJECTS,

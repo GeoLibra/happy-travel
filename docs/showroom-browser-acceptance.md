@@ -5,15 +5,15 @@ Showroom 与 WelcomePage 浏览器验收脚本用于为 F1 welcome、Canvas 交�
 ## 本地运行
 
 ```bash
-npm run check:showroom-acceptance
+pnpm check:showroom-acceptance
 ```
 
-脚本默认检查 `http://127.0.0.1:3000`。如果该地址没有现成服务，它会启动本地 Vite dev server (`npm run dev`)，并在测试结束时自动关闭。
+脚本默认检查 `http://127.0.0.1:3000`。如果该地址没有现成服务，它会启动本地 Vite dev server (`pnpm dev`)，并在测试结束时自动关闭。
 
 也可以复用已有服务：
 
 ```bash
-APP_URL=http://127.0.0.1:5173 npm run check:showroom-acceptance
+APP_URL=http://127.0.0.1:5173 pnpm check:showroom-acceptance
 ```
 
 ## 覆盖范围与运行目标
@@ -25,12 +25,13 @@ APP_URL=http://127.0.0.1:5173 npm run check:showroom-acceptance
 
 ## Playwright 项目矩阵与 Worker 策略
 
-Playwright 配置 (`playwright.config.ts`) 包含 4 个验收 Project：
+Playwright 配置 (`playwright.config.ts`) 包含 5 个验收 Project：
 
 1. `app-desktop-chromium`: 验证桌面默认路由主 App 无残留 overlay 阻挡。
 2. `showroom-desktop-chromium`: 验证桌面 WelcomePage、CTA 交互、到达帧与 Canvas 状态。
 3. `showroom-mobile-chromium`: 验证移动端 Viewport 下触控与 CTA 响应。
-4. `showroom-webkit-smoke`: 验证 Desktop Safari / WebKit 内核下的 Canvas 与基础渲染。
+4. `showroom-arrival-timeline-chromium`: 采集 F1 赛车到达过程中的 5 张时间点截图（T0~T4），并校验 Canvas 非空、中心构图、前后帧变化量与 CTA 可操作性。
+5. `showroom-webkit-smoke`: 验证 Desktop Safari / WebKit 内核下的 Canvas 与基础渲染。
 
 为了保证 WebGL、Canvas 和共享 Dev Server 的物理渲染稳定，`playwright.config.ts` 使用 `fullyParallel: false` 和 `workers: 1`。CI 中的并行执行通过 GitHub Actions Matrix Job 将不同 Playwright Project 分发给独立 Runner 完成。
 
@@ -57,18 +58,21 @@ container:
 
 该镜像预装了对应版本的 Chromium、WebKit 浏览器二进制及完整的 Linux 系统原生依赖库，因此工作流中无需再执行 `npx playwright install` 或配置浏览器级别的路径缓存。
 
-### 2. npm 依赖缓存
-容器环境仅包含浏览器与 OS 依赖，不包含项目 `node_modules`。通过 `actions/setup-node@v4` 的 `cache: 'npm'` 缓存 `~/.npm` 全局包下载目录，随后运行 `npm ci` 安装项目依赖：
+### 2. pnpm 依赖缓存
+容器环境仅包含浏览器与 OS 依赖，不包含项目 `node_modules`。通过 `actions/setup-node@v4` 的 `cache: 'pnpm'` 缓存 `pnpm` 全局包下载目录，随后运行 `pnpm install --frozen-lockfile` 安装项目依赖：
 
 ```yaml
+- name: Setup pnpm
+  uses: pnpm/action-setup@v4
+
 - name: Setup Node.js
   uses: actions/setup-node@v4
   with:
     node-version: 22
-    cache: npm
+    cache: pnpm
 
 - name: Install dependencies
-  run: npm ci
+  run: pnpm install --frozen-lockfile
 ```
 
 ### 3. 版本严格锁定契约

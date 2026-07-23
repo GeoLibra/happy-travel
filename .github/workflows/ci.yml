@@ -21,42 +21,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run deterministic checks
         run: |
-          npm run check:showroom-ui
-          npm run check:showroom-renderer-config
-          npm run check:showroom-story
-          npm run check:showroom-quality
-          npm run check:showroom-route
-          npm run check:showroom-director
-          npm run check:showroom-asset-manager
-          npm run check:showroom-materials
-          npm run check:showroom-effects
-          npm run check:showroom-audio
-          npm run check:f1-motion
-          npm run check:f1-glitch
-          npm run check:f1-wheel-hold
-          npm run check:f1-airflow
-          npm run check:f1-model
-          npm run check:f1-welcome
-          npm run check:f1-studio
-          npm run check:f1-showroom-interaction
-          npm run check:f1-arrival-motion
-          npm run check:f1-reflection
-          npm run check:rose-animation
-          npm run check:i18n
+          pnpm check:showroom-ui
+          pnpm check:showroom-renderer-config
+          pnpm check:showroom-story
+          pnpm check:showroom-quality
+          pnpm check:showroom-route
+          pnpm check:showroom-director
+          pnpm check:showroom-asset-manager
+          pnpm check:showroom-materials
+          pnpm check:showroom-effects
+          pnpm check:showroom-audio
+          pnpm check:f1-motion
+          pnpm check:f1-glitch
+          pnpm check:f1-wheel-hold
+          pnpm check:f1-airflow
+          pnpm check:f1-model
+          pnpm check:f1-welcome
+          pnpm check:f1-studio
+          pnpm check:f1-showroom-interaction
+          pnpm check:f1-arrival-motion
+          pnpm check:f1-reflection
+          pnpm check:rose-animation
+          pnpm check:i18n
 
       - name: Typecheck
-        run: npm run lint
+        run: pnpm lint
 
       - name: Build
-        run: npm run build
+        run: pnpm build

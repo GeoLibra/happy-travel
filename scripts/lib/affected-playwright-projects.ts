@@ -2,6 +2,7 @@ export const ALL_PLAYWRIGHT_PROJECTS = [
   'app-desktop-chromium',
   'showroom-desktop-chromium',
   'showroom-mobile-chromium',
+  'showroom-arrival-timeline-chromium',
   'showroom-webkit-smoke',
 ] as const;
 
@@ -14,7 +15,7 @@ const DOCUMENTATION_ONLY = [
 
 const FULL_MATRIX_PATHS = [
   /^\.github\/workflows\/showroom-browser-acceptance\.yml$/,
-  /^package(?:-lock)?\.json$/,
+  /^(?:package\.json|pnpm-lock\.yaml)$/,
   /^playwright\.config\.ts$/,
   /^tests\/e2e\//,
   /^scripts\/(?:check-showroom-acceptance|resolve-playwright-projects)(?:\.test)?\.ts$/,

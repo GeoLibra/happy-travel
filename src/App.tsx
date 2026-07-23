@@ -247,13 +247,19 @@ export default function App() {
 
         <div className="max-w-7xl mx-auto flex justify-between items-center mt-1">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#001A30] rounded-xl flex items-center justify-center text-[#FFB800] shadow-lg shadow-[#001A30]/20 border border-white/10 relative overflow-hidden group">
+            <button
+              type="button"
+              data-app-action="return-welcome"
+              onClick={() => setShowWelcome(true)}
+              aria-label="Return to Welcome"
+              className="w-10 h-10 bg-[#001A30] rounded-xl flex items-center justify-center text-[#FFB800] shadow-lg shadow-[#001A30]/20 border border-white/10 relative overflow-hidden group cursor-pointer"
+            >
               <MapPin size={24} className="relative z-10" />
               {/* MV1 Number Badge */}
               <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#E10600] rounded-tl-lg flex items-center justify-center text-white text-[8px] font-black italic opacity-0 group-hover:opacity-100 transition-opacity">
                 #1
               </div>
-            </div>
+            </button>
             <div onClick={handleSecretClick} className="cursor-pointer active:scale-95 transition-transform select-none">
               <h1 className="text-xl font-bold tracking-tight">{t('app.title')}</h1>
               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider flex items-center gap-2">

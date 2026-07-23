@@ -1,0 +1,47 @@
+name: Visual & Memory Audit (Nightly / Manual)
+
+on:
+  schedule:
+    # Run nightly at 03:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: memory-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory-leak-audit:
+    name: MemLab Heap Leak & WebGL Lifecycle Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Web Application
+        run: pnpm build
+
+      - name: Run MemLab Memory Leak Audit
+        run: pnpm test:memory
+
+      - name: Upload Memory & Heap Trace Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-leak-audit-report
+          path: output/test-results/memory/
+          retention-days: 14
