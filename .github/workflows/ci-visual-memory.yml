@@ -2,8 +2,8 @@ name: Visual & Memory Audit (Nightly / Manual)
 
 on:
   schedule:
-    # Run nightly at 03:00 UTC
-    - cron: '0 3 * * *'
+    # Run nightly at 03:00 CST (19:00 UTC)
+    - cron: '0 19 * * *'
   workflow_dispatch:
     inputs:
       suite:

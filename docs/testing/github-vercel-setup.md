@@ -34,7 +34,7 @@ This document describes the remote repository protection, GitHub Actions workflo
    - Matrix: Dynamically resolved Playwright projects.
 
 3. **`ci-visual-memory.yml` (`Visual & Memory Audit`)**:
-   - Triggers: Nightly schedule (`0 3 * * *`) and `workflow_dispatch` with manual inputs:
+   - Triggers: Nightly schedule (`0 19 * * *`, 03:00 CST / 19:00 UTC) and `workflow_dispatch` with manual inputs:
      - `suite`: `visual`, `memory`, or `all`.
      - `domain`: `f1`, `particles`, `rose`, or `all`.
    - Container: `mcr.microsoft.com/playwright:v1.61.1-jammy`.
