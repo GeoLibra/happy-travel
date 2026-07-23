@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>F1 Wheel and Racing Animation Summary</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background:#071421; color:#e9f2f8; }
+    body { margin:0; padding:32px; max-width:1000px; margin-inline:auto; }
+    header, section { background:#0d2133; border:1px solid #29465d; border-radius:16px; padding:24px; margin-bottom:18px; }
+    h1, h2 { margin-top:0; } h1 { color:#ffb800; } h2 { color:#77d7ff; }
+    .verdict { display:inline-block; padding:6px 10px; border-radius:999px; background:#174d38; color:#8ff0bc; font-weight:700; }
+    code { color:#ffd56a; } li { margin:8px 0; } a { color:#77d7ff; }
+    img { width:100%; border-radius:10px; border:1px solid #29465d; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="verdict">PASS WITH NOTES</div>
+    <h1>F1 Wheel and Racing Animation</h1>
+    <p>The baked Red Bull F1 model now has four independently transformable wheels, while the welcome page drives wheel spin, road flow, particles, trails, and body vibration from one smooth speed signal.</p>
+  </header>
+  <section>
+    <h2>What changed</h2>
+    <ul>
+      <li>Generated <code>red_bull_f1_rigged.glb</code> with four wheel pivots and four wheel meshes.</li>
+      <li>Added reproducible Blender extraction and GLB verification scripts.</li>
+      <li>Added frame-rate-independent runtime racing motion and graceful node resolution.</li>
+      <li>Preserved the original car-over-button visual layering after user review.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Validation</h2>
+    <p>GLB contract, deterministic motion checks, TypeScript, Vite production build, git whitespace check, Blender viewport review, and desktop browser flow passed.</p>
+    <img src="artifacts/screenshots/desktop-stopped.png" alt="Final stopped F1 car state">
+  </section>
+  <section>
+    <h2>Notes</h2>
+    <ul>
+      <li>The optimized GLB remains approximately 44 MB.</li>
+      <li>The project has a pre-existing missing favicon and large-bundle warning.</li>
+      <li>No commit, push, or pull request was created.</li>
+    </ul>
+  </section>
+</body>
+</html>

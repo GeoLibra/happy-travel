@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dynamic Playwright Matrix — PR Summary</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #09111f; color: #e6edf7; }
+    body { max-width: 980px; margin: 0 auto; padding: 40px 24px 80px; line-height: 1.55; }
+    h1, h2 { letter-spacing: -.02em; } h1 { font-size: 2.4rem; margin-bottom: .3rem; }
+    .lead { color: #a8b7cc; font-size: 1.12rem; max-width: 760px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 14px; margin: 28px 0; }
+    .card, details { background: #111d30; border: 1px solid #253855; border-radius: 14px; padding: 18px; }
+    .metric { font-size: 1.8rem; font-weight: 800; color: #63e6be; } .label { color: #9fb0c7; }
+    .note { border-left: 4px solid #f7b955; padding-left: 14px; color: #d8c89d; }
+    details { margin: 12px 0; } summary { cursor: pointer; font-weight: 700; }
+    code { color: #8bd5ff; } ul { padding-left: 22px; }
+  </style>
+</head>
+<body>
+  <h1>Affected-project Playwright matrix</h1>
+  <p class="lead">Browser CI now detects changed paths and runs only the Playwright projects needed for the change, while showroom/F1-sensitive paths conservatively select the complete safety matrix.</p>
+  <div class="grid">
+    <div class="card"><div class="metric">4</div><div class="label">Playwright projects</div></div>
+    <div class="card"><div class="metric">7/7</div><div class="label">Resolver tests</div></div>
+    <div class="card"><div class="metric">4/4</div><div class="label">Browser acceptance tests</div></div>
+    <div class="card"><div class="metric">PASS</div><div class="label">Typecheck and build</div></div>
+  </div>
+  <h2>What changed</h2>
+  <ul>
+    <li>Added desktop app, desktop showroom, mobile Chromium, and WebKit smoke projects.</li>
+    <li>Added a deterministic, unit-tested changed-path resolver.</li>
+    <li>Reworked GitHub Actions into detector → dynamic browser matrix → stable gate.</li>
+    <li>Kept <code>npm run check:showroom-acceptance</code> as the full local entry point.</li>
+    <li>Added project-local JSON summaries, screenshots, traces, videos, and HTML reports.</li>
+  </ul>
+  <p class="note"><strong>Acceptance note:</strong> the old custom script targeted an inactive <code>?showroom=v2</code> overlay/skip flow. The new specs target the currently shipped F1 <code>WelcomePage</code>. Hold-to-start handoff automation remains a separate follow-up.</p>
+  <details open><summary>Validation</summary>
+    <ul>
+      <li><code>npm run check:playwright-project-resolver</code> — 7 passed</li>
+      <li><code>npm run lint</code> — passed</li>
+      <li><code>npm run build</code> — passed</li>
+      <li><code>npm run check:showroom-acceptance</code> — 4 passed</li>
+    </ul>
+  </details>
+  <details><summary>Matrix behavior</summary>
+    <ul>
+      <li>Docs-only → no browser job; stable gate succeeds.</li>
+      <li>Ordinary <code>src/</code> change → app desktop Chromium.</li>
+      <li>Welcome, showroom, F1, GLB, test/config/dependency change → all projects.</li>
+      <li>Unknown implementation/config path → all projects.</li>
+      <li>Manual workflow dispatch → all projects.</li>
+    </ul>
+  </details>
+  <details><summary>Residual risks</summary>
+    <ul>
+      <li>Workflow event behavior receives its final execution validation on GitHub.</li>
+      <li>Mobile Chromium remains emulation, not real-device coverage.</li>
+      <li>WebKit is intentionally smoke-level.</li>
+    </ul>
+  </details>
+</body>
+</html>
