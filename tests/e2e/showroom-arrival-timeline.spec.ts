@@ -24,48 +24,55 @@ test('captures 5 arrival timeline frames and verifies canvas non-empty, centered
   const frames: { timeMs: number; name: string; metrics: CanvasFrameMetrics }[] = [];
 
   // T0: Initial load frame
+  const canvasLocator = page.locator('canvas').first();
+  await canvasLocator.waitFor({ state: 'visible' });
+
+  // T0: Initial load frame (Canvas only screenshot)
   const screenshotT0 = 'arrival-t0-initial.png';
-  const bufferT0 = await page.screenshot({ path: evidence.screenshotPath(screenshotT0), fullPage: true });
+  const bufferT0 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT0) });
   const metricsT0 = await analyzeCanvasScreenshot(page, bufferT0);
   frames.push({ timeMs: 0, name: screenshotT0, metrics: metricsT0 });
 
   // T1: Early motion frame (+300ms)
   await page.waitForTimeout(300);
   const screenshotT1 = 'arrival-t1-early-motion.png';
-  const bufferT1 = await page.screenshot({ path: evidence.screenshotPath(screenshotT1), fullPage: true });
+  const bufferT1 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT1) });
   const metricsT1 = await analyzeCanvasScreenshot(page, bufferT1);
   frames.push({ timeMs: 300, name: screenshotT1, metrics: metricsT1 });
 
   // T2: Mid arrival frame (+500ms -> total 800ms)
   await page.waitForTimeout(500);
   const screenshotT2 = 'arrival-t2-mid-motion.png';
-  const bufferT2 = await page.screenshot({ path: evidence.screenshotPath(screenshotT2), fullPage: true });
+  const bufferT2 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT2) });
   const metricsT2 = await analyzeCanvasScreenshot(page, bufferT2);
   frames.push({ timeMs: 800, name: screenshotT2, metrics: metricsT2 });
 
   // T3: Settled frame (+700ms -> total 1500ms)
   await page.waitForTimeout(700);
   const screenshotT3 = 'arrival-t3-settled.png';
-  const bufferT3 = await page.screenshot({ path: evidence.screenshotPath(screenshotT3), fullPage: true });
+  const bufferT3 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT3) });
   const metricsT3 = await analyzeCanvasScreenshot(page, bufferT3);
   frames.push({ timeMs: 1500, name: screenshotT3, metrics: metricsT3 });
 
   // T4: Studio post-arrival frame (+1000ms -> total 2500ms)
   await page.waitForTimeout(1000);
   const screenshotT4 = 'arrival-t4-studio.png';
-  const bufferT4 = await page.screenshot({ path: evidence.screenshotPath(screenshotT4), fullPage: true });
+  const bufferT4 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT4) });
   const metricsT4 = await analyzeCanvasScreenshot(page, bufferT4);
   frames.push({ timeMs: 2500, name: screenshotT4, metrics: metricsT4 });
 
-  // 1. Canvas Non-Empty Check
+  // Save full-page screenshot for visual evidence reporting
+  await page.screenshot({ path: evidence.screenshotPath('arrival-fullpage-settled.png'), fullPage: true });
+
+  // 1. Canvas Non-Empty Check (Isolated strictly to <canvas> WebGL pixels)
   for (const frame of frames) {
     expect(
       frame.metrics.nonEmptyPixelRatio,
-      `Canvas frame at ${frame.timeMs}ms (${frame.name}) must render non-empty content`,
+      `Canvas frame at ${frame.timeMs}ms (${frame.name}) must render non-empty WebGL content`,
     ).toBeGreaterThan(0.005);
   }
 
-  // 2. Centered Composition Check (Settled frame T3 & Studio frame T4)
+  // 2. Centered Composition Check (Settled frame T3 & Studio frame T4 on canvas)
   expect(
     metricsT3.centroidXRatio,
     'Settled car centroid must be centered horizontally within tolerance [0.30, 0.70]',
@@ -94,22 +101,16 @@ test('captures 5 arrival timeline frames and verifies canvas non-empty, centered
     'Frame change delta must stabilize after arrival settles',
   ).toBeLessThan(0.15);
 
-  // 4. CTA Operability Check
+  // 4. CTA Operability & Real Handoff Actionability Check
   const cta = page.locator('[data-f1-welcome-action="enter"]');
   await expect(cta).toBeVisible();
   await expect(cta).toBeEnabled();
 
-  // Test pointer interaction through car canvas overlay
-  await cta.hover();
-  const isCtaInteractive = await cta.evaluate((el) => {
-    const rect = el.getBoundingClientRect();
-    const targetEl = document.elementFromPoint(
-      rect.left + rect.width / 2,
-      rect.top + rect.height / 2,
-    );
-    return targetEl !== null && (el.contains(targetEl) || targetEl.closest('canvas') !== null);
-  });
-  expect(isCtaInteractive, 'CTA button must remain pointer interactive through canvas overlay').toBe(true);
+  // Test Playwright actionability check (verifies element is not blocked or hidden)
+  await cta.click({ trial: true });
+
+  // Perform real click to ensure CTA responds cleanly to user pointer interaction
+  await cta.click();
 
   evidence.record({
     name: 'F1 arrival timeline 5-frame sampling',

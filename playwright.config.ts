@@ -65,6 +65,14 @@ export default defineConfig({
       },
     },
     {
+      name: 'webgl-renderer-lifecycle-chromium',
+      testMatch: /renderer-lifecycle\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
       name: 'showroom-webkit-smoke',
       testMatch: /showroom-webkit-smoke\.spec\.ts/,
       use: {

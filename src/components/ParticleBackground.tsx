@@ -209,25 +209,31 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     const contextLossExtension = rendererAuditEnabled
       ? renderer.getContext().getExtension('WEBGL_lose_context')
       : null;
+    const getResourceAudit = () => ({
+      geometries: renderer.info.memory.geometries,
+      textures: renderer.info.memory.textures,
+      programs: renderer.info.programs ? renderer.info.programs.length : 0,
+      activeAnimationFrames: frameId !== null ? 1 : 0,
+      ...rendererAudit,
+      firstPulseProgramDeltas: [...rendererAudit.firstPulseProgramDeltas],
+    });
+
+    (window as any).__F1_SHOWROOM_RESOURCE_AUDIT__ = getResourceAudit;
+
     const auditCanvas = renderer.domElement as F1RendererAuditCanvas;
-    if (rendererAuditEnabled) {
-      auditCanvas.__f1RendererAudit = {
-        snapshot: () => ({
-          ...rendererAudit,
-          firstPulseProgramDeltas: [...rendererAudit.firstPulseProgramDeltas],
-        }),
-        loseContext: () => {
-          if (!contextLossExtension) return false;
-          contextLossExtension.loseContext();
-          return true;
-        },
-        restoreContext: () => {
-          if (!contextLossExtension) return false;
-          contextLossExtension.restoreContext();
-          return true;
-        },
-      };
-    }
+    auditCanvas.__f1RendererAudit = {
+      snapshot: getResourceAudit,
+      loseContext: () => {
+        if (!contextLossExtension) return false;
+        contextLossExtension.loseContext();
+        return true;
+      },
+      restoreContext: () => {
+        if (!contextLossExtension) return false;
+        contextLossExtension.restoreContext();
+        return true;
+      },
+    };
 
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const usesLowPowerAirflow = prefersReducedMotion || window.innerWidth < 768;
@@ -1109,6 +1115,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       studioLighting.dispose();
       reflection.dispose();
       if (glitchPostProcess) glitchPostProcess.dispose();
+      delete (window as any).__F1_SHOWROOM_RESOURCE_AUDIT__;
       delete auditCanvas.__f1RendererAudit;
       renderer.dispose();
       if (container.contains(renderer.domElement)) {

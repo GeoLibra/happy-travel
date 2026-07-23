@@ -43,6 +43,7 @@
     "check:rose-glb": "node scripts/verify-rose-glb.mjs public/models/rose.glb",
     "check:rose-animation": "node --import tsx scripts/check-rose-animation.ts",
     "check:i18n": "node --import tsx scripts/check-i18n.ts",
+    "check:webgl-lifecycle": "playwright test --project=webgl-renderer-lifecycle-chromium",
     "test:memory": "node scripts/ci/run-memlab.mjs"
   },
   "dependencies": {

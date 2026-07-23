@@ -243,8 +243,38 @@ const MapComponent: React.FC<MapProps> = ({
 
     return () => {
       observer.disconnect();
+      if (labelsLayer.current) {
+        try {
+          labelsLayer.current.clear();
+        } catch {}
+        labelsLayer.current = null;
+      }
+      Object.values(markersRef.current).forEach(({ marker, labelMarker }: any) => {
+        try { marker?.remove?.(); } catch {}
+        try { labelMarker?.remove?.(); } catch {}
+      });
+      markersRef.current = {};
+
       if (amapInstance.current) {
-        amapInstance.current.destroy();
+        try {
+          amapInstance.current.destroy();
+        } catch {}
+        amapInstance.current = null;
+      }
+      amapConstructor.current = null;
+      if (typeof window !== 'undefined' && (window as any).AMap) {
+        try {
+          const amap = (window as any).AMap;
+          if (amap.so?.images) {
+            Object.keys(amap.so.images).forEach((key) => {
+              try {
+                const img = amap.so.images[key];
+                if (img && typeof img.remove === 'function') img.remove();
+              } catch {}
+            });
+            amap.so.images = {};
+          }
+        } catch {}
       }
     };
   }, []);

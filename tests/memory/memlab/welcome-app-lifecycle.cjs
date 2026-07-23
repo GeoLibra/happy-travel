@@ -9,7 +9,34 @@ function url() {
   return process.env.TEST_TARGET_URL || 'http://localhost:3000/';
 }
 
+async function setup(page) {
+  if (!page || typeof page.evaluateOnNewDocument !== 'function') return;
+  // Guard against browser null pageerror events crashing MemLab's internal console parser
+  await page.evaluateOnNewDocument(() => {
+    window.addEventListener('error', (event) => {
+      if (event && !event.error) {
+        try {
+          Object.defineProperty(event, 'error', {
+            value: new Error(event.message || 'Unknown window error'),
+          });
+        } catch {}
+      }
+    }, true);
+    window.addEventListener('unhandledrejection', (event) => {
+      if (event && !event.reason) {
+        try {
+          Object.defineProperty(event, 'reason', {
+            value: new Error('Unhandled promise rejection'),
+          });
+        } catch {}
+      }
+    }, true);
+  });
+}
+
 async function action(page) {
+  await setup(page);
+
   // 1. Wait for WelcomePage CTA to be mounted
   await page.waitForSelector('button[data-f1-welcome-action="enter"]', {
     timeout: 30000,
@@ -28,6 +55,8 @@ async function action(page) {
 }
 
 async function back(page) {
+  await setup(page);
+
   // Return to WelcomePage within SPA (in-page transition) to allow MemLab to compare V8 heap diff
   await page.waitForSelector('button[data-app-action="return-welcome"]', {
     timeout: 5000,
@@ -45,6 +74,7 @@ async function back(page) {
 
 module.exports = {
   url,
+  setup,
   action,
   back,
 };
