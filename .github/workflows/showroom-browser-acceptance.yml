@@ -3,36 +3,8 @@ name: Showroom Browser Acceptance
 on:
   pull_request:
     branches: [main]
-    paths:
-      - '.github/workflows/showroom-browser-acceptance.yml'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'index.html'
-      - 'src/App.tsx'
-      - 'src/i18n.tsx'
-      - 'src/components/WelcomePage.tsx'
-      - 'src/components/ParticleBackground.tsx'
-      - 'src/components/showroom/**'
-      - 'src/lib/f1-*.ts'
-      - 'src/lib/showroom-*.ts'
-      - 'scripts/check-showroom-acceptance.ts'
-      - 'public/models/2024_redbull_rb20_showroom_v5.glb'
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/showroom-browser-acceptance.yml'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'index.html'
-      - 'src/App.tsx'
-      - 'src/i18n.tsx'
-      - 'src/components/WelcomePage.tsx'
-      - 'src/components/ParticleBackground.tsx'
-      - 'src/components/showroom/**'
-      - 'src/lib/f1-*.ts'
-      - 'src/lib/showroom-*.ts'
-      - 'scripts/check-showroom-acceptance.ts'
-      - 'public/models/2024_redbull_rb20_showroom_v5.glb'
   workflow_dispatch:
 
 concurrency:
@@ -40,10 +12,64 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  chromium-acceptance:
-    name: Chromium desktop and mobile viewport acceptance
+  detect-projects:
+    name: Detect affected Playwright projects
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+      has-projects: ${{ steps.resolve.outputs.has-projects }}
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Collect changed paths
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git diff --name-only "$PR_BASE_SHA" "$PR_HEAD_SHA" > changed-files.txt
+          elif [[ "$EVENT_NAME" == "push" && "$PUSH_BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            git diff --name-only "$PUSH_BASE_SHA" "$PUSH_HEAD_SHA" > changed-files.txt
+          else
+            : > changed-files.txt
+          fi
+          sed -n '1,200p' changed-files.txt
+
+      - name: Resolve affected projects
+        id: resolve
+        run: |
+          matrix="$(npm run --silent resolve:playwright-projects < changed-files.txt)"
+          has_projects="$(node -e 'const matrix = JSON.parse(process.argv[1]); process.stdout.write(String(matrix.include.length > 0))' "$matrix")"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "has-projects=$has_projects" >> "$GITHUB_OUTPUT"
+          echo "$matrix"
+
+  browser-acceptance:
+    name: ${{ matrix.project }}
+    needs: detect-projects
+    if: needs.detect-projects.outputs.has-projects == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect-projects.outputs.matrix) }}
 
     steps:
       - name: Checkout
@@ -58,17 +84,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Chromium browser
-        run: npx playwright install --with-deps chromium
+      - name: Install selected browser
+        run: npx playwright install --with-deps "${{ matrix.browser }}"
 
-      - name: Run showroom browser acceptance
-        run: npm run check:showroom-acceptance
+      - name: Run affected Playwright project
+        run: npm run check:showroom-acceptance -- --project="${{ matrix.project }}"
 
       - name: Upload Playwright evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: showroom-browser-acceptance
+          name: showroom-browser-${{ matrix.project }}
           path: output/playwright/
           if-no-files-found: ignore
           retention-days: 7
+
+  showroom-browser-gate:
+    name: Showroom browser acceptance
+    needs: [detect-projects, browser-acceptance]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify detector and selected projects
+        env:
+          DETECT_RESULT: ${{ needs.detect-projects.result }}
+          ACCEPTANCE_RESULT: ${{ needs.browser-acceptance.result }}
+        run: |
+          test "$DETECT_RESULT" = "success"
+          test "$ACCEPTANCE_RESULT" = "success" || test "$ACCEPTANCE_RESULT" = "skipped"

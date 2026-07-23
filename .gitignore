@@ -21,3 +21,4 @@ scripts/check_f1_ui.mjs
 .superpowers
 .pnpm-store
 output
+.claude/
