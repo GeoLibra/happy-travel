@@ -91,8 +91,18 @@ test('runs 5-cycle WebGL renderer lifecycle trend and verifies GPU resources do 
     await expect(enterCta).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(500);
 
-    // 4. Query WebGL renderer telemetry snapshot
+    // 4. Query WebGL renderer telemetry snapshot via window.__HAPPY_TRAVEL_TEST__
     const metrics = await page.evaluate(() => {
+      const testApi = (window as any).__HAPPY_TRAVEL_TEST__;
+      if (testApi && typeof testApi.snapshot === 'function') {
+        const snap = testApi.snapshot();
+        return {
+          geometries: Number(snap.geometries ?? snap.gpu?.geometries ?? 0),
+          textures: Number(snap.textures ?? snap.gpu?.textures ?? 0),
+          programs: Number(snap.programs ?? snap.gpu?.programs ?? 0),
+          activeAnimationFrames: Number(snap.activeAnimationFrames ?? snap.gpu?.activeAnimationFrames ?? 0),
+        };
+      }
       const audit = (window as any).__F1_SHOWROOM_RESOURCE_AUDIT__;
       if (typeof audit === 'function') {
         const data = audit();
@@ -108,7 +118,7 @@ test('runs 5-cycle WebGL renderer lifecycle trend and verifies GPU resources do 
 
     expect(
       metrics,
-      `WebGL Telemetry snapshot must be exposed on window.__F1_SHOWROOM_RESOURCE_AUDIT__ in cycle ${cycle}`,
+      `WebGL Telemetry snapshot must be exposed on window.__HAPPY_TRAVEL_TEST__.snapshot() in cycle ${cycle}`,
     ).not.toBeNull();
 
     if (metrics) {

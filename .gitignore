@@ -8,9 +8,14 @@ coverage/
 .env*
 !.env.example
 
-# Local browser/test artifacts
+# Local browser/test artifacts & memory traces
 .playwright-cli/
 output/
+playwright-report/
+test-results/
+*.heapsnapshot
+*.heaptimeline
+leaks.txt
 public/models/*-uncompressed.glb
 
 # One-off asset/UI verification scripts
@@ -19,5 +24,4 @@ scripts/verify-f1-glb.mjs
 scripts/check_f1_ui.mjs
 .superpowers
 .pnpm-store
-output
 .claude/

@@ -1,0 +1,40 @@
+{
+  "validators": [
+    {
+      "id": "showroom-assets",
+      "group": "showroom",
+      "description": "Check showroom 3D model assets and environment textures",
+      "command": "node scripts/check-showroom-assets.mjs"
+    },
+    {
+      "id": "f1-showroom-v3",
+      "group": "f1",
+      "description": "Verify F1 Showroom v3 GLB model hierarchy and wheel nodes",
+      "command": "node scripts/verify-f1-showroom-v2.mjs public/models/red_bull_f1_showroom_v3.glb"
+    },
+    {
+      "id": "f1-showroom-v4",
+      "group": "f1",
+      "description": "Verify F1 Showroom v4 GLB model hierarchy with inner shrouds",
+      "command": "node scripts/verify-f1-showroom-v2.mjs public/models/red_bull_f1_showroom_v4.glb --require-inner-shrouds"
+    },
+    {
+      "id": "f1-showroom-v5",
+      "group": "f1",
+      "description": "Verify RB20 Showroom v5 GLB model hierarchy",
+      "command": "node scripts/verify-rb20-showroom-v5.mjs public/models/2024_redbull_rb20_showroom_v5.glb"
+    },
+    {
+      "id": "rose-glb",
+      "group": "rose",
+      "description": "Verify Rose GLB structure and material contract",
+      "command": "node scripts/verify-rose-glb.mjs public/models/rose.glb"
+    },
+    {
+      "id": "rose-animation",
+      "group": "rose",
+      "description": "Verify Rose animation curve and timing contract",
+      "command": "node --import tsx scripts/check-rose-animation.ts"
+    }
+  ]
+}

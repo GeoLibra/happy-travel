@@ -13,7 +13,16 @@
 
 ## Testing and CI workflow
 
-- Run `pnpm check:showroom-acceptance` for code changes that affect the showroom or F1 handoff flow, including `src/App.tsx`, `src/components/WelcomePage.tsx`, `src/components/ParticleBackground.tsx`, files under `src/components/showroom/**`, files under `src/lib/showroom-*.ts`, or any change to ignition, skip, enter-app handoff, overlay visibility, scroll lock, or keyboard/pointer showroom controls. Treat `output/playwright/showroom-acceptance-summary.json` or the GitHub Actions artifact as the reviewable evidence.
+- The project uses `pnpm` (with `pnpm-lock.yaml`), Vitest for unit tests, and Playwright Test (running in the official `mcr.microsoft.com/playwright:v1.61.1-jammy` container in CI).
+- Standard testing commands:
+  - `pnpm test:fast`: Runs fast quality gate (lint, unit tests, assets check, build).
+  - `pnpm test:assets`: Runs specialized asset validation checks.
+  - `pnpm test:impact`: Resolves changed files and runs impacted Playwright browser suites.
+  - `pnpm test:unit`: Runs Vitest unit and contract tests.
+  - `pnpm test:e2e`: Runs full Playwright end-to-end tests across configured browser projects.
+  - `pnpm test:full`: Runs `pnpm test:fast` followed by `pnpm test:e2e`.
+  - `pnpm test:memory`: Runs WebGL lifecycle and memory audit checks.
+- Run `pnpm test:fast` or `pnpm check:showroom-acceptance` for code changes that affect the showroom or F1 handoff flow, including `src/App.tsx`, `src/components/WelcomePage.tsx`, `src/components/ParticleBackground.tsx`, files under `src/components/showroom/**`, files under `src/lib/showroom-*.ts`, or any change to ignition, skip, enter-app handoff, overlay visibility, scroll lock, or keyboard/pointer showroom controls. Treat `output/playwright/showroom-acceptance-summary.json` or the GitHub Actions artifact as the reviewable evidence.
 - Chromium mobile coverage in CI is viewport and touch emulation only; it does not replace real-device Safari/Chrome checks when shipping materially new mobile WebGL behavior.
-- Prefer `node --import tsx <script>` in npm scripts over the bare `tsx` CLI so local sandbox runs and GitHub Actions behave consistently.
+- Prefer `node --import tsx <script>` in pnpm scripts over bare `tsx` CLI so local sandbox runs and GitHub Actions behave consistently.
 - Canonical implementation plans and design specs must live in the main checkout under `docs/superpowers/**`; `.worktrees/**` and `output/**` are disposable execution artifacts, not the long-term source of truth.

@@ -5,6 +5,26 @@ on:
     # Run nightly at 03:00 UTC
     - cron: '0 3 * * *'
   workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Suite to run (visual, memory, all)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - visual
+          - memory
+      domain:
+        description: 'Domain to run (f1, particles, rose, all)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - f1
+          - particles
+          - rose
 
 concurrency:
   group: memory-audit-${{ github.ref }}
@@ -14,6 +34,9 @@ jobs:
   memory-leak-audit:
     name: MemLab Heap Leak & WebGL Lifecycle Audit
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-jammy
+      options: --ipc=host
     timeout-minutes: 30
 
     steps:

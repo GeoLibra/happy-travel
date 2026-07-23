@@ -13,8 +13,11 @@ concurrency:
 
 jobs:
   quality-gate:
-    name: Typecheck, focused checks, and build
+    name: Typecheck, deterministic checks, unit tests, and build
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-jammy
+      options: --ipc=host
     timeout-minutes: 15
 
     steps:
@@ -57,6 +60,9 @@ jobs:
           pnpm check:f1-reflection
           pnpm check:rose-animation
           pnpm check:i18n
+
+      - name: Fast Gate
+        run: pnpm test:fast
 
       - name: Typecheck
         run: pnpm lint

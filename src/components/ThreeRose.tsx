@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { registerScene } from "../lib/test-observability";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.js";
 import { loadModelWithCache } from "../lib/model-loader";
@@ -84,6 +85,20 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
     // 背景设为完全透明 (alpha = 0)
     renderer.setClearColor(0x000000, 0);
     mountRef.current.appendChild(renderer.domElement);
+
+    let currentPhase = 'assembling';
+
+    const unregisterRose = registerScene('rose', () => ({
+      sceneId: 'rose',
+      phase: currentPhase,
+      geometries: renderer.info.memory.geometries,
+      textures: renderer.info.memory.textures,
+      programs: renderer.info.programs ? renderer.info.programs.length : 0,
+      activeAnimationFrames: raf !== undefined ? 1 : 0,
+      activeListeners: 2,
+      activeRenderTargets: (renderer.info.memory as any).renderTargets ?? 0,
+      materials: (renderer.info.memory as any).materials ?? 0,
+    }));
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.2));
     const key = new THREE.DirectionalLight(0xfff0e0, 2.5);
@@ -320,6 +335,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
       }
 
       if (elapsed < ROSE_ASSEMBLY_MS) {
+        currentPhase = 'assembling';
         particleSystem.visible = true;
         modelGroup.visible = false;
         particleMaterial.opacity = 0.8;
@@ -351,6 +367,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
         sizeAttr.needsUpdate = true;
 
       } else if (elapsed < ROSE_HANDOFF_END_MS) {
+        currentPhase = 'handoff';
         const handoff = getRoseHandoffProgress(elapsed);
         particleSystem.visible = handoff < 0.99;
         particleMaterial.opacity = 0.8 * (1 - handoff);
@@ -360,6 +377,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
           material.opacity = opacity * handoff;
         });
       } else {
+        currentPhase = 'presented';
         particleSystem.visible = false;
         modelGroup.visible = true;
         materialStates.forEach(({ material, opacity, transparent }) => {
@@ -389,6 +407,7 @@ export default function ThreeRose({ isOpen, onClose }: ThreeRoseProps) {
 
     return () => {
       cancelled = true;
+      unregisterRose();
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       controls.dispose();

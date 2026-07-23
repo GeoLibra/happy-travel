@@ -25,7 +25,7 @@ test('captures 5 arrival timeline frames and verifies canvas non-empty, centered
 
   // T0: Initial load frame
   const canvasLocator = page.locator('canvas').first();
-  await canvasLocator.waitFor({ state: 'visible' });
+  await expect(canvasLocator).toBeVisible({ timeout: 15_000 });
 
   // T0: Initial load frame (Canvas only screenshot)
   const screenshotT0 = 'arrival-t0-initial.png';
@@ -33,29 +33,31 @@ test('captures 5 arrival timeline frames and verifies canvas non-empty, centered
   const metricsT0 = await analyzeCanvasScreenshot(page, bufferT0);
   frames.push({ timeMs: 0, name: screenshotT0, metrics: metricsT0 });
 
+  const startMark = await page.evaluate(() => performance.now());
+
   // T1: Early motion frame (+300ms)
-  await page.waitForTimeout(300);
+  await page.waitForFunction((start) => performance.now() - start >= 300, startMark);
   const screenshotT1 = 'arrival-t1-early-motion.png';
   const bufferT1 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT1) });
   const metricsT1 = await analyzeCanvasScreenshot(page, bufferT1);
   frames.push({ timeMs: 300, name: screenshotT1, metrics: metricsT1 });
 
   // T2: Mid arrival frame (+500ms -> total 800ms)
-  await page.waitForTimeout(500);
+  await page.waitForFunction((start) => performance.now() - start >= 800, startMark);
   const screenshotT2 = 'arrival-t2-mid-motion.png';
   const bufferT2 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT2) });
   const metricsT2 = await analyzeCanvasScreenshot(page, bufferT2);
   frames.push({ timeMs: 800, name: screenshotT2, metrics: metricsT2 });
 
   // T3: Settled frame (+700ms -> total 1500ms)
-  await page.waitForTimeout(700);
+  await page.waitForFunction((start) => performance.now() - start >= 1500, startMark);
   const screenshotT3 = 'arrival-t3-settled.png';
   const bufferT3 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT3) });
   const metricsT3 = await analyzeCanvasScreenshot(page, bufferT3);
   frames.push({ timeMs: 1500, name: screenshotT3, metrics: metricsT3 });
 
   // T4: Studio post-arrival frame (+1000ms -> total 2500ms)
-  await page.waitForTimeout(1000);
+  await page.waitForFunction((start) => performance.now() - start >= 2500, startMark);
   const screenshotT4 = 'arrival-t4-studio.png';
   const bufferT4 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT4) });
   const metricsT4 = await analyzeCanvasScreenshot(page, bufferT4);

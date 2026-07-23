@@ -2,10 +2,17 @@
 
 ## CI/CD and verification
 
-- `CI` runs on PRs and `main` pushes: deterministic `check:*` scripts, TypeScript, and production build.
-- `Showroom Browser Acceptance` runs only when showroom/F1/browser-relevant files change, or manually from GitHub Actions. It uses Chromium desktop plus Chromium mobile viewport emulation; this is not a physical mobile device or real Safari/WebKit.
+- Package manager: `pnpm` (lockfile `pnpm-lock.yaml`).
+- `CI` runs on PRs and `main` pushes: `pnpm test:fast` (deterministic checks, TypeScript, Vitest unit tests, asset verification, production build).
+- Container environment in CI uses official Playwright docker image `mcr.microsoft.com/playwright:v1.61.1-jammy`.
+- `Showroom Browser Acceptance` runs when showroom/F1/browser-relevant files change or manually via `pnpm test:impact` or GitHub Actions.
 - Vercel deployment is handled by Vercel Git Integration: PR/non-production branches create Preview deployments, and `main` creates Production deployments after GitHub checks.
-- Local browser evidence: `npm run check:showroom-acceptance`. Screenshots and JSON are written to ignored `output/playwright/`.
+- Standard commands:
+  - `pnpm test:fast`: Fast local quality gate (lint, unit, assets, build).
+  - `pnpm test:assets`: Specialized asset validation checks.
+  - `pnpm test:impact`: Affected Playwright browser suite execution.
+  - `pnpm test:e2e`: Full browser E2E test matrix.
+  - `pnpm check:showroom-acceptance`: Local browser evidence generation (written to ignored `output/playwright/`).
 - Detailed CI/CD references live in [docs/superpowers/specs/2026-07-21-ci-cd-testing-platform-design.md](docs/superpowers/specs/2026-07-21-ci-cd-testing-platform-design.md) and [docs/superpowers/plans/2026-07-21-ci-cd-testing-platform.md](docs/superpowers/plans/2026-07-21-ci-cd-testing-platform.md).
 
 <img width="1511" height="734" alt="Screenshot 2026-05-22 at 11 01 50 AM" src="https://github.com/user-attachments/assets/4c13599d-7bac-4a9b-9982-66926ce0ec8e" />

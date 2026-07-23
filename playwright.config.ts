@@ -10,7 +10,7 @@ export default defineConfig({
   },
   fullyParallel: false,
   workers: 1,
-  retries: process.env.CI ? 1 : 0,
+  retries: process.env.CI ? 0 : 0,
   forbidOnly: Boolean(process.env.CI),
   outputDir: 'output/playwright/test-results',
   reporter: [
@@ -26,7 +26,7 @@ export default defineConfig({
   webServer: process.env.APP_URL
     ? undefined
     : {
-        command: 'npm run dev',
+        command: 'pnpm run dev',
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 30_000,

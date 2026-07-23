@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
+import { registerScene } from '../lib/test-observability';
 import { GPUParticleSystem, GPUEffectUniforms } from './effects/gpuParticles';
 import { GodRays } from './effects/godRays';
 import { AudioVisualizer } from './effects/audioVisualizer';
@@ -178,6 +179,7 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     bgCamera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, premultipliedAlpha: false });
+    renderer.domElement.style.display = 'block';
     renderer.setSize(window.innerWidth, window.innerHeight);
     const pixelRatio = Math.min(window.devicePixelRatio, 2);
     renderer.setPixelRatio(pixelRatio);
@@ -219,6 +221,31 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
     });
 
     (window as any).__F1_SHOWROOM_RESOURCE_AUDIT__ = getResourceAudit;
+
+    const unregisterF1Scene = registerScene('f1-welcome', () => ({
+      sceneId: 'f1-welcome',
+      phase: progress >= 100 ? (exploded ? 'exploded' : 'settled') : 'arriving',
+      geometries: renderer.info.memory.geometries,
+      textures: renderer.info.memory.textures,
+      programs: renderer.info.programs ? renderer.info.programs.length : 0,
+      activeAnimationFrames: frameId !== null ? 1 : 0,
+      activeListeners: 5,
+      activeRenderTargets: (renderer.info.memory as any).renderTargets ?? 0,
+      materials: (renderer.info.memory as any).materials ?? 0,
+      details: getResourceAudit(),
+    }));
+
+    const unregisterParticlesScene = registerScene('particles', () => ({
+      sceneId: 'particles',
+      phase: 'active',
+      geometries: renderer.info.memory.geometries,
+      textures: renderer.info.memory.textures,
+      programs: renderer.info.programs ? renderer.info.programs.length : 0,
+      activeAnimationFrames: frameId !== null ? 1 : 0,
+      activeListeners: 5,
+      activeRenderTargets: (renderer.info.memory as any).renderTargets ?? 0,
+      materials: (renderer.info.memory as any).materials ?? 0,
+    }));
 
     const auditCanvas = renderer.domElement as F1RendererAuditCanvas;
     auditCanvas.__f1RendererAudit = {
@@ -1115,6 +1142,8 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       studioLighting.dispose();
       reflection.dispose();
       if (glitchPostProcess) glitchPostProcess.dispose();
+      unregisterF1Scene();
+      unregisterParticlesScene();
       delete (window as any).__F1_SHOWROOM_RESOURCE_AUDIT__;
       delete auditCanvas.__f1RendererAudit;
       renderer.dispose();

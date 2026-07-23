@@ -1,0 +1,55 @@
+{
+  "rules": [
+    {
+      "pattern": "^src/lib/f1-.*|src/components/showroom/.*|src/components/WelcomePage\\.tsx$",
+      "suites": {
+        "unit": ["tests/unit/f1"],
+        "assets": ["f1"],
+        "e2e": ["f1"],
+        "memory": ["f1"]
+      }
+    },
+    {
+      "pattern": "^src/lib/rose-.*|src/lib/shake-detection\\.ts|src/components/ThreeRose\\.tsx|src/components/RoseModal\\.tsx$",
+      "suites": {
+        "unit": ["tests/unit/rose"],
+        "assets": ["rose"],
+        "e2e": ["rose"],
+        "memory": ["rose"]
+      }
+    },
+    {
+      "pattern": "^src/lib/particle-.*|src/components/ParticleBackground\\.tsx|src/components/RaceCountdown\\.tsx$",
+      "suites": {
+        "unit": ["tests/unit/particles"],
+        "assets": [],
+        "e2e": ["itinerary-particles"],
+        "memory": ["particles"]
+      }
+    },
+    {
+      "pattern": "^src/i18n/.*|src/data/itinerary\\.json$",
+      "suites": {
+        "unit": ["tests/unit/i18n"],
+        "assets": [],
+        "e2e": ["smoke"],
+        "memory": []
+      }
+    },
+    {
+      "pattern": "^ci/.*|scripts/ci/.*$",
+      "suites": {
+        "unit": ["tests/unit/ci"],
+        "assets": ["all"],
+        "e2e": ["smoke"],
+        "memory": []
+      }
+    }
+  ],
+  "fullFallback": {
+    "unit": ["tests/unit/ci", "tests/unit/f1", "tests/unit/particles", "tests/unit/rose", "tests/unit/i18n"],
+    "assets": ["all"],
+    "e2e": ["f1", "itinerary-particles", "rose", "smoke"],
+    "memory": ["f1", "particles", "rose"]
+  }
+}

@@ -82,11 +82,11 @@ resolver 自身必须有 Vitest 覆盖，并在 Fast Gate 中始终执行。
 稳定入口：
 
 ```bash
-npm run test:unit
-npm run test:assets
-npm run test:fast
-npm run test:impact
-npm run test:full
+pnpm test:unit
+pnpm test:assets
+pnpm test:fast
+pnpm test:impact
+pnpm test:full
 ```
 
 使用 Playwright Test 运行真实浏览器交互。当前配置由 `playwright.config.ts` 配合 `npm run dev` 启动 Vite dev server，保证验收轻量与热重载诊断能力；若需要针对打包后静态产物验收，可指定 `APP_URL` 切换为 `vite preview`。
@@ -284,7 +284,7 @@ Spector.js 作为开发和失败诊断工具写入文档，不作为日常 CI �
 
 触发：`pull_request`、`push` 到 `main`、`workflow_dispatch`。
 
-步骤：checkout、Node 版本固定、npm cache、`npm ci`、`test:fast`、build、摘要。使用标准 `ubuntu-latest`，最小 `contents: read` 权限和明确 `timeout-minutes`。
+步骤：checkout、Node 版本固定、pnpm cache、`pnpm install --frozen-lockfile`、`pnpm test:fast`、build、摘要。使用标准 `ubuntu-latest`，最小 `contents: read` 权限和明确 `timeout-minutes`。
 
 ### 8.2 `ci-browser.yml`
 
@@ -312,7 +312,7 @@ CI 执行统一采用 Playwright 官方 Container 镜像（`mcr.microsoft.com/pl
 
 - 镜像预装对应版本的 Chromium、WebKit 浏览器二进制及 Linux 系统原生依赖库，工作流无需再进行浏览器二次下载或路径缓存。
 - `package.json` 中的 `playwright` 依赖版本严格锁定为 `"1.61.1"`，保证 Node 驱动端与容器预装浏览器版本 100% 契约匹配。
-- 项目 `npm` 依赖依然配置 `actions/setup-node@v4` 的 `cache: npm` 缓存 `~/.npm`，并配合 `npm ci` 安装。
+- 项目 `pnpm` 依赖配置 `actions/setup-node@v4` 的 `cache: pnpm`，并配合 `pnpm install --frozen-lockfile` 安装。
 
 不得使用付费 larger runner；并行度依据标准 runner 的实际计量调整。
 
@@ -357,7 +357,7 @@ GitHub `main` 规则要求：
 
 ## 12. 依赖与供应链
 
-增加 Dependabot 每周更新 npm 和 GitHub Actions。`npm ci` 使用 lockfile。安全扫描输出高危和严重漏洞摘要，但本任务不执行自动、可能破坏兼容性的 `npm audit fix --force`。当前基线存在 13 个审计结果（2 low、5 moderate、5 high、1 critical），需要在独立依赖治理任务中逐项确认直接/传递依赖、运行时可达性和升级影响。
+增加 Dependabot 每周更新 pnpm 和 GitHub Actions。`pnpm install --frozen-lockfile` 使用 `pnpm-lock.yaml`。安全扫描输出高危和严重漏洞摘要，但本任务不执行自动、可能破坏兼容性的 `pnpm audit` 或强制命令。当前基线存在 13 个审计结果（2 low、5 moderate、5 high、1 critical），需要在独立依赖治理任务中逐项确认直接/传递依赖、运行时可达性和升级影响。
 
 ## 13. 项目级 Codex 契约
 
@@ -367,10 +367,10 @@ GitHub `main` 规则要求：
 - unit、e2e、memory 测试放入约定目录并可被自动发现。
 - 生产路径变化必须更新 impact map；未知映射全量回退。
 - 浏览器测试禁止固定 sleep，必须等待可观察状态。
-- 提交前运行 `npm run test:impact`。
+- 提交前运行 `pnpm test:impact`。
 - F1/WebGL 变化必须包含 Chromium、WebKit 和资源生命周期覆盖。
 - 粒子或玫瑰变化必须更新相应 unit、真实交互、视觉/阶段和 lifecycle 测试；玫瑰 GLB/OBJ/Blender 变化必须运行专用资产验证器。
-- 模型资产变化必须在有 Blender 的本地环境运行 `npm run test:assets:deep` 并保留结果；模型未变化时不重复运行 Blender，GitHub 标准 runner 只运行 portable `npm run test:assets`。
+- 模型资产变化必须在有 Blender 的本地环境运行 `pnpm test:assets:deep` 并保留结果；模型未变化时不重复运行 Blender，GitHub 标准 runner 只运行 portable `pnpm test:assets`。
 - 浏览器媒体只在失败时上传。
 
 详细规则、示例、真机边界和故障调查流程写入 `docs/testing/ci-testing-policy.md`，避免让 `AGENTS.md` 过度膨胀。
