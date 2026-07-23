@@ -25,7 +25,11 @@ export class WelcomePage {
     await expect(this.canvas).toBeVisible();
   }
 
-  async holdToIgnite(durationMs: number) {
+  /**
+   * Hold enter button via real mouse input and wait for observable engine
+   * progress to reach the specified state (or timeout).
+   */
+  async holdToIgnite(): Promise<void> {
     const box = await this.enterButton.boundingBox();
     if (!box) throw new Error('Enter button bounding box not available');
     const x = box.x + box.width / 2;
@@ -33,7 +37,39 @@ export class WelcomePage {
 
     await this.page.mouse.move(x, y);
     await this.page.mouse.down();
-    await this.page.waitForTimeout(durationMs);
+
+    // Wait for observable engine progress → button text changes to ENTER or REASSEMBLING
+    await this.page.waitForFunction(() => {
+      const btn = document.querySelector('[data-f1-welcome-action="enter"]');
+      if (!btn) return false;
+      const text = btn.textContent || '';
+      return text.includes('ENTER') || text.includes('REASSEMBLING');
+    }, { timeout: 10_000 });
+
+    await this.page.mouse.up();
+  }
+
+  /**
+   * Hold enter button briefly (partial press, not reaching 100%).
+   * Uses observable check that progress has started but not completed.
+   */
+  async holdPartially(): Promise<void> {
+    const box = await this.enterButton.boundingBox();
+    if (!box) throw new Error('Enter button bounding box not available');
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+
+    await this.page.mouse.move(x, y);
+    await this.page.mouse.down();
+
+    // Wait for observable engine progress to start (button text contains ENGINE STARTING)
+    await this.page.waitForFunction(() => {
+      const btn = document.querySelector('[data-f1-welcome-action="enter"]');
+      if (!btn) return false;
+      const text = btn.textContent || '';
+      return text.includes('ENGINE STARTING');
+    }, { timeout: 5_000 });
+
     await this.page.mouse.up();
   }
 

@@ -153,15 +153,14 @@ export function snapshot(): HappyTravelTestSnapshot {
   };
 }
 
-// Expose API on window when in dev/test/non-prod mode
-const isTestOrDev =
+// Expose API on window only in dev/test mode. Never in production builds.
+// import.meta.env.PROD is statically replaced by Vite, enabling dead-code elimination.
+// For CI/Playwright running against a production build, set VITE_TEST_OBSERVABILITY=true
+// at build time to opt in.
+if (
   typeof window !== 'undefined' &&
-  (import.meta.env.MODE !== 'production' ||
-    import.meta.env.DEV ||
-    Boolean(window.__HAPPY_TRAVEL_TEST_MODE__) ||
-    true);
-
-if (typeof window !== 'undefined' && isTestOrDev) {
+  (!import.meta.env.PROD || import.meta.env.VITE_TEST_OBSERVABILITY === 'true')
+) {
   const testAPI: HappyTravelTestAPI = {
     snapshot,
     sceneAudit,
@@ -173,3 +172,4 @@ if (typeof window !== 'undefined' && isTestOrDev) {
   };
   window.__HAPPY_TRAVEL_TEST__ = testAPI;
 }
+

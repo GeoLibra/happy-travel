@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +18,21 @@ function getGitDiffFiles(base, head) {
   }
   return [];
 }
+
+// Map e2e suite names to Playwright project names or test directories
+const e2eSuiteToPlaywright = {
+  f1: ['--grep', '@f1', '--project', 'showroom-desktop-chromium'],
+  smoke: ['--project', 'app-desktop-chromium', '--project', 'showroom-desktop-chromium'],
+  'itinerary-particles': ['tests/e2e/itinerary-particles/'],
+  rose: ['tests/e2e/rose/'],
+};
+
+// Map memory suite names to memlab scenarios
+const memorySuiteToScenario = {
+  f1: 'f1',
+  particles: 'particles',
+  rose: 'rose',
+};
 
 export function runImpactTests() {
   const { files: inputFiles, all, base, head } = parseArgs(process.argv.slice(2));
@@ -73,6 +87,55 @@ export function runImpactTests() {
     }
   } else {
     console.log('\n>>> Skipping Asset Validators (No impacted asset suites) <<<');
+  }
+
+  // 3. Run E2E Tests via Playwright
+  if (selection.e2e.length > 0) {
+    console.log(`\n>>> Executing E2E Tests: ${selection.e2e.join(' ')} <<<`);
+    for (const suite of selection.e2e) {
+      const playwrightArgs = e2eSuiteToPlaywright[suite];
+      if (!playwrightArgs) {
+        console.warn(`  No Playwright mapping for e2e suite '${suite}', skipping.`);
+        continue;
+      }
+      console.log(`  Running e2e suite: ${suite}`);
+      const proc = spawnSync('npx', ['playwright', 'test', ...playwrightArgs], {
+        cwd: rootDir,
+        stdio: 'inherit',
+        shell: false,
+      });
+      if (proc.status !== 0) {
+        hasFailure = true;
+        console.error(`  E2E suite '${suite}' failed.`);
+      }
+    }
+  } else {
+    console.log('\n>>> Skipping E2E Tests (No impacted e2e suites) <<<');
+  }
+
+  // 4. Run Memory Tests via MemLab scenario selector
+  if (selection.memory.length > 0) {
+    const scenarios = selection.memory
+      .map((s) => memorySuiteToScenario[s])
+      .filter(Boolean);
+    if (scenarios.length > 0) {
+      // If all 3 domains selected, use 'all'; otherwise run individually
+      const scenarioArg = scenarios.length >= 3 ? 'all' : scenarios.join(',');
+      console.log(`\n>>> Executing Memory Tests: scenario=${scenarioArg} <<<`);
+      for (const scenario of (scenarioArg === 'all' ? ['all'] : scenarios)) {
+        const proc = spawnSync('node', ['scripts/ci/run-memlab.mjs', `--scenario=${scenario}`], {
+          cwd: rootDir,
+          stdio: 'inherit',
+          shell: false,
+        });
+        if (proc.status !== 0) {
+          hasFailure = true;
+          console.error(`  Memory scenario '${scenario}' failed.`);
+        }
+      }
+    }
+  } else {
+    console.log('\n>>> Skipping Memory Tests (No impacted memory suites) <<<');
   }
 
   if (hasFailure) {

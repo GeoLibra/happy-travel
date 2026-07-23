@@ -34,7 +34,8 @@ export class ItineraryPage {
   async triggerSecretRoseClicks(count = 5) {
     for (let i = 0; i < count; i++) {
       await this.roseTriggerHeader.click();
-      await this.page.waitForTimeout(50);
+      // Wait for a single animation frame to allow event processing
+      await this.page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
     }
   }
 

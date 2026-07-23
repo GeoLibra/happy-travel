@@ -16,7 +16,7 @@ test.describe('Itinerary Particles Behavior', () => {
     // Click return to welcome
     await itineraryPage.clickReturnToWelcome();
 
-    // Verify welcome page enter button is back
+    // Verify welcome page enter button is back (observable landmark)
     const enterBtn = page.locator('[data-f1-welcome-action="enter"]');
     await expect(enterBtn).toBeVisible({ timeout: 15_000 });
   });
@@ -25,18 +25,18 @@ test.describe('Itinerary Particles Behavior', () => {
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
-    // Resize viewport
+    // Resize viewport — wait for layout to stabilize via rAF
     await page.setViewportSize({ width: 800, height: 600 });
-    await page.waitForTimeout(300);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
 
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.waitForTimeout(300);
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
 
-    // Trigger orientationchange event
+    // Trigger orientationchange event and wait for processing
     await page.evaluate(() => {
       window.dispatchEvent(new Event('orientationchange'));
+      return new Promise(resolve => requestAnimationFrame(resolve));
     });
-    await page.waitForTimeout(300);
 
     expect(pageErrors).toEqual([]);
   });
@@ -47,16 +47,20 @@ test.describe('Itinerary Particles Behavior', () => {
       Object.defineProperty(document, 'hidden', { value: true, writable: true, configurable: true });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await page.waitForTimeout(500);
+
+    // Wait for hidden state processing via rAF
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
 
     // Dispatch visibilitychange visible
     await page.evaluate(() => {
       Object.defineProperty(document, 'hidden', { value: false, writable: true, configurable: true });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await page.waitForTimeout(500);
 
-    // Verify page remains interactive and healthy
+    // Wait for visible state processing via rAF
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+
+    // Verify page remains interactive and healthy (observable)
     await expect(itineraryPage.returnWelcomeButton).toBeVisible();
   });
 

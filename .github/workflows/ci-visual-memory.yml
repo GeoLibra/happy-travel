@@ -31,13 +31,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  memory-leak-audit:
-    name: MemLab Heap Leak & WebGL Lifecycle Audit
+  visual-memory-audit:
+    name: Visual & Memory Audit (${{ inputs.suite || 'all' }} / ${{ inputs.domain || 'all' }})
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-jammy
       options: --ipc=host
     timeout-minutes: 30
+
+    env:
+      AUDIT_SUITE: ${{ inputs.suite || 'all' }}
+      AUDIT_DOMAIN: ${{ inputs.domain || 'all' }}
 
     steps:
       - name: Checkout repository
@@ -58,13 +62,24 @@ jobs:
       - name: Build Web Application
         run: pnpm build
 
-      - name: Run MemLab Memory Leak Audit
-        run: pnpm test:memory
+      - name: Run Visual Audit (Playwright lifecycle & arrival timeline)
+        if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'visual'
+        run: pnpm check:showroom-acceptance
 
-      - name: Upload Memory & Heap Trace Artifacts
+      - name: Run WebGL Lifecycle Audit
+        if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'memory'
+        run: pnpm check:webgl-lifecycle
+
+      - name: Run MemLab Memory Leak Audit
+        if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'memory'
+        run: pnpm test:memory -- --scenario=${{ env.AUDIT_DOMAIN }}
+
+      - name: Upload Visual & Memory Audit Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: memory-leak-audit-report
-          path: output/test-results/memory/
+          name: visual-memory-audit-report-${{ env.AUDIT_SUITE }}-${{ env.AUDIT_DOMAIN }}
+          path: |
+            output/playwright/
+            output/test-results/memory/
           retention-days: 14

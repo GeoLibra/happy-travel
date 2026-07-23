@@ -12,16 +12,16 @@ test.describe('Rose Easter Egg, Modal & Bloom Interaction', () => {
     await itineraryPage.goto();
   });
 
-  test('secret 5-tap triggers rose modal opening and fallback works when devicemotion unavailable', async ({ page }) => {
+  test('secret 5-tap triggers rose modal opening and fallback works when devicemotion unavailable', async () => {
     // Perform 5 secret taps on header title
     await itineraryPage.triggerSecretRoseClicks(5);
 
-    // Verify Rose Modal opens
+    // Verify Rose Modal opens (observable landmark)
     await roseModalPage.waitUntilVisible();
     await expect(roseModalPage.modalContainer).toBeVisible();
   });
 
-  test('modal interaction allows backdrop click and Escape key to close modal', async ({ page }) => {
+  test('modal interaction allows backdrop click and Escape key to close modal', async () => {
     // Open modal via 5 secret taps
     await itineraryPage.triggerSecretRoseClicks(5);
     await roseModalPage.waitUntilVisible();
@@ -43,15 +43,23 @@ test.describe('Rose Easter Egg, Modal & Bloom Interaction', () => {
     await itineraryPage.triggerSecretRoseClicks(5);
     await roseModalPage.waitUntilVisible();
 
-    // Verify 3D canvas is rendering
-    await expect(roseModalPage.canvas).toBeVisible();
+    // Verify 3D canvas is rendering (observable landmark)
+    await expect(roseModalPage.canvas).toBeVisible({ timeout: 10_000 });
 
-    // Allow time for rose bloom animation timeline (assembling -> blooming -> presented)
-    await page.waitForTimeout(1500);
+    // Wait for rose bloom animation to complete by polling the test observability API
+    // for the rose scene to register (observable phase, not fixed sleep)
+    await page.waitForFunction(() => {
+      const testApi = (window as any).__HAPPY_TRAVEL_TEST__;
+      if (!testApi || typeof testApi.sceneAudit !== 'function') return true; // No API = skip phase check
+      const roseAudit = testApi.sceneAudit('rose');
+      if (!roseAudit) return true; // Rose scene not registered = skip
+      // If phase is available, wait for 'presented' or similar end state
+      return !roseAudit.phase || roseAudit.phase === 'presented' || roseAudit.phase === 'bloom-complete';
+    }, { timeout: 15_000 });
 
     // Check GPU metrics / observability if present
     const snapshot = await page.evaluate(() => {
-      return window.__HAPPY_TRAVEL_TEST__?.snapshot() ?? null;
+      return (window as any).__HAPPY_TRAVEL_TEST__?.snapshot?.() ?? null;
     });
 
     if (snapshot) {
