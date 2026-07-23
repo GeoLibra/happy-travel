@@ -89,18 +89,18 @@ npm run test:impact
 npm run test:full
 ```
 
-### 3.2 Browser Impact Gate
+使用 Playwright Test 运行真实浏览器交互。当前配置由 `playwright.config.ts` 配合 `npm run dev` 启动 Vite dev server，保证验收轻量与热重载诊断能力；若需要针对打包后静态产物验收，可指定 `APP_URL` 切换为 `vite preview`。
 
-使用 Playwright Test 对 production build 运行真实浏览器交互。CI 启动 `vite preview`，不以 dev server 作为验收环境。
+为了保证 WebGL / Canvas 渲染与 Dev Server 物理隔离与确定性，单个 Worker 内部使用 `fullyParallel: false` 和 `workers: 1`；并发能力由 GitHub Actions Matrix Job 分发到独立 Runner 物理并行实现。
 
-项目矩阵：
+项目矩阵（实际配置与当前测试框架一致）：
 
 | Project | 浏览器内核 | 配置 | 定位 |
 | --- | --- | --- | --- |
-| `chromium-desktop` | Chromium | 1440×900 | 桌面主门禁 |
-| `chromium-mobile` | Chromium | Pixel 设备参数 | Android Chrome 模拟 |
-| `webkit-desktop` | WebKit | 1440×900 | Desktop Safari 内核兼容 |
-| `webkit-mobile` | WebKit | iPhone 设备参数 | Mobile Safari 模拟 |
+| `app-desktop-chromium` | Chromium | 1280×800 | 桌面主 App 无残留 overlay 门禁 |
+| `showroom-desktop-chromium` | Chromium | 1280×800 | 桌面 WelcomePage、CTA 交互、到达帧与 Canvas |
+| `showroom-mobile-chromium` | Chromium | Pixel 7 (390×844) | Mobile touch / Viewport 模拟 |
+| `showroom-webkit-smoke` | WebKit | 1280×800 | Desktop Safari / WebKit 内核兼容 Smoke |
 
 移动项目只代表 viewport、DPR、User-Agent、touch、coarse pointer 和浏览器内核模拟，不宣称真机覆盖。发布前仍需要至少一台 iPhone Safari 和一台 Android Chrome 真机检查 WebGL、GPU 驱动、内存、发热、安全区和后台恢复。
 
@@ -308,7 +308,14 @@ concurrency:
   cancel-in-progress: true
 ```
 
-依赖和 Playwright 浏览器根据 lockfile/Playwright 版本缓存。不得使用付费 larger runner；并行度依据标准 runner 的实际计量调整。
+依赖和 Playwright 浏览器根据 lockfile/Playwright 版本进行缓存：
+
+- **方案 A（Fast/PR Gate 推荐与默认实现）**：
+  使用 `actions/cache@v4` 缓存 `~/.cache/ms-playwright`。缓存 Key 显式写入 Node 脚本解析的 Playwright 版本、Runner OS/架构以及 `package-lock.json` hash。命中时补充运行 `npx playwright install-deps` 以补齐 Linux 系统依赖库，提升 CI 速度。
+- **方案 B（Nightly / Visual / Memory 物理环境容器化备选）**：
+  在需要强一致 WebGL 渲染或原生 Linux 依赖环境的 Nightly 任务中，可使用 Playwright 官方 Container 镜像（`mcr.microsoft.com/playwright:v1.61.1-jammy`），避免系统库差异。
+
+不得使用付费 larger runner；并行度依据标准 runner 的实际计量调整。
 
 ## 9. 证据与日志策略
 

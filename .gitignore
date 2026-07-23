@@ -11,7 +11,6 @@ coverage/
 # Local browser/test artifacts
 .playwright-cli/
 output/
-docs/
 public/models/*-uncompressed.glb
 
 # One-off asset/UI verification scripts
