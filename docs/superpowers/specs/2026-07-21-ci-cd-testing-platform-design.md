@@ -308,12 +308,11 @@ concurrency:
   cancel-in-progress: true
 ```
 
-依赖和 Playwright 浏览器根据 lockfile/Playwright 版本进行缓存：
+CI 执行统一采用 Playwright 官方 Container 镜像（`mcr.microsoft.com/playwright:v1.61.1-jammy`，配置 `--ipc=host`）：
 
-- **方案 A（Fast/PR Gate 推荐与默认实现）**：
-  使用 `actions/cache@v4` 缓存 `~/.cache/ms-playwright`。缓存 Key 显式写入 Node 脚本解析的 Playwright 版本、Runner OS/架构以及 `package-lock.json` hash。命中时补充运行 `npx playwright install-deps` 以补齐 Linux 系统依赖库，提升 CI 速度。
-- **方案 B（Nightly / Visual / Memory 物理环境容器化备选）**：
-  在需要强一致 WebGL 渲染或原生 Linux 依赖环境的 Nightly 任务中，可使用 Playwright 官方 Container 镜像（`mcr.microsoft.com/playwright:v1.61.1-jammy`），避免系统库差异。
+- 镜像预装对应版本的 Chromium、WebKit 浏览器二进制及 Linux 系统原生依赖库，工作流无需再进行浏览器二次下载或路径缓存。
+- `package.json` 中的 `playwright` 依赖版本严格锁定为 `"1.61.1"`，保证 Node 驱动端与容器预装浏览器版本 100% 契约匹配。
+- 项目 `npm` 依赖依然配置 `actions/setup-node@v4` 的 `cache: npm` 缓存 `~/.npm`，并配合 `npm ci` 安装。
 
 不得使用付费 larger runner；并行度依据标准 runner 的实际计量调整。
 

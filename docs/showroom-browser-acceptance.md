@@ -44,36 +44,34 @@ Playwright 配置 (`playwright.config.ts`) 包含 4 个验收 Project：
 
 `output/` 已在 `.gitignore` 中，不提交截图与视频大文件；CI 将其作为 GitHub Actions artifact 上传供 review。
 
-## CI/CD 与缓存方案
+## CI/CD 容器环境与依赖缓存
 
-### 1. 触发与影响范围检测 (`ci-browser`)
-showroom / F1 / 依赖项修改时触发浏览器验收，普通文档修改跳过浏览器矩阵。
-
-### 2. 缓存方案 A（当前 GitHub Actions 默认方案）
-使用 `actions/cache@v4` 缓存 `~/.cache/ms-playwright` 浏览器二进制：
+### 1. 官方 Docker Container（默认落地方案）
+GitHub Actions 物理任务直接运行于 Playwright 官方镜像 `mcr.microsoft.com/playwright:v1.61.1-jammy` 中：
 
 ```yaml
-- name: Get Playwright version
-  id: playwright-version
-  run: |
-    echo "version=$(node -p "require('./node_modules/playwright/package.json').version")" \
-      >> "$GITHUB_OUTPUT"
-
-- name: Cache Playwright browsers
-  id: playwright-cache
-  uses: actions/cache@v4
-  with:
-    path: ~/.cache/ms-playwright
-    key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}-${{ hashFiles('package-lock.json') }}
-
-- name: Install selected browser
-  if: steps.playwright-cache.outputs.cache-hit != 'true'
-  run: npx playwright install --with-deps "${{ matrix.browser }}"
-
-- name: Install system dependencies
-  if: steps.playwright-cache.outputs.cache-hit == 'true'
-  run: npx playwright install-deps "${{ matrix.browser }}"
+container:
+  image: mcr.microsoft.com/playwright:v1.61.1-jammy
+  options: --ipc=host
 ```
 
-### 3. 缓存方案 B（高度固定环境备选方案）
-对于 Nightly Visual / Memory 任务或需要强一致 WebGL / Linux 原生系统库的环境，可使用 Playwright 官方 Docker 镜像（如 `mcr.microsoft.com/playwright:v1.61.1-jammy`）。在 PR Fast Gate 中保留方案 A 以维持轻量与良好的 Artifact / Permission 调试体验。
+该镜像预装了对应版本的 Chromium、WebKit 浏览器二进制及完整的 Linux 系统原生依赖库，因此工作流中无需再执行 `npx playwright install` 或配置浏览器级别的路径缓存。
+
+### 2. npm 依赖缓存
+容器环境仅包含浏览器与 OS 依赖，不包含项目 `node_modules`。通过 `actions/setup-node@v4` 的 `cache: 'npm'` 缓存 `~/.npm` 全局包下载目录，随后运行 `npm ci` 安装项目依赖：
+
+```yaml
+- name: Setup Node.js
+  uses: actions/setup-node@v4
+  with:
+    node-version: 22
+    cache: npm
+
+- name: Install dependencies
+  run: npm ci
+```
+
+### 3. 版本严格锁定契约
+为防止容器镜像内置浏览器与 Node.js 客户端驱动不匹配：
+- `package.json` 中的 `playwright` 依赖版本严格锁定为固定版本（如 `"playwright": "1.61.1"`）。
+- Docker 镜像标签严格保持 `v1.61.1-jammy` 一致。
