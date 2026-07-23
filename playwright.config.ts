@@ -57,6 +57,14 @@ export default defineConfig({
       },
     },
     {
+      name: 'showroom-arrival-timeline-chromium',
+      testMatch: /showroom-arrival-timeline\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
       name: 'showroom-webkit-smoke',
       testMatch: /showroom-webkit-smoke\.spec\.ts/,
       use: {
