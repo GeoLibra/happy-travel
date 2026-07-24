@@ -11,6 +11,10 @@ import {
   createF1WelcomeSequence,
   type F1WelcomeSequence,
 } from '../lib/f1-welcome-sequence';
+import {
+  advanceIgnitionProgress,
+  IGNITION_PROGRESS_CADENCE_MS,
+} from '../lib/f1-ignition-progress';
 import { ShowroomAssetManager } from './showroom/asset-manager';
 import { useI18n } from '../i18n';
 
@@ -69,7 +73,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const hasManualInteractionRef = React.useRef(false);
   const hasStartedEntryRef = React.useRef(false);
   const ignoreNextEnterClickRef = React.useRef(false);
-  const lastProgressTickRef = React.useRef<number | null>(null);
   const progressRef = React.useRef(0);
 
   const cancelAutomaticShowroomSequence = useCallback(() => {
@@ -228,50 +231,45 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   }, [isTransitioning, progress]);
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const currentProgress = progressRef.current;
 
-    if (isPressing && progress < 100) {
-      // Advance by elapsed time so heavy WebGL frames do not stretch ignition.
-      if (lastProgressTickRef.current === null) {
-        lastProgressTickRef.current = performance.now();
-      }
+    const startProgression = (startProgress: number) => {
+      let lastTickAt = performance.now();
+      let progression = {
+        progress: startProgress,
+        remainderMs: 0,
+      };
       interval = setInterval(() => {
-        setProgress((prev) => {
-          const now = performance.now();
-          const elapsed = Math.min(now - (lastProgressTickRef.current ?? now), 1000);
-          lastProgressTickRef.current = now;
-          const next = prev >= 100 ? 100 : Math.floor(Math.min(100, prev + elapsed / 50));
-          progressRef.current = next;
-          return next;
-        });
-      }, 50);
-    } else if (!isPressing && progress > 0 && progress < 30) {
-      lastProgressTickRef.current = null;
+        const now = performance.now();
+        progression = advanceIgnitionProgress(progression, now - lastTickAt);
+        lastTickAt = now;
+        progressRef.current = progression.progress;
+        setProgress(progression.progress);
+        if (progression.progress >= 100 && interval !== null) {
+          clearInterval(interval);
+          interval = null;
+        }
+      }, IGNITION_PROGRESS_CADENCE_MS);
+    };
+
+    if (isPressing && currentProgress < 100) {
+      startProgression(currentProgress);
+    } else if (!isPressing && currentProgress > 0 && currentProgress < 30) {
+      progressRef.current = 0;
       setProgress(0);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
-    } else if (!isPressing && progress >= 30 && progress < 100) {
-      if (lastProgressTickRef.current === null) {
-        lastProgressTickRef.current = performance.now();
-      }
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          const now = performance.now();
-          const elapsed = Math.min(now - (lastProgressTickRef.current ?? now), 1000);
-          lastProgressTickRef.current = now;
-          const next = prev >= 100 ? 100 : Math.floor(Math.min(100, prev + elapsed / 50));
-          progressRef.current = next;
-          return next;
-        });
-      }, 50);
-    } else {
-      lastProgressTickRef.current = null;
+    } else if (!isPressing && currentProgress >= 30 && currentProgress < 100) {
+      startProgression(currentProgress);
     }
 
-    return () => clearInterval(interval);
-  }, [isPressing, progress]);
+    return () => {
+      if (interval !== null) clearInterval(interval);
+    };
+  }, [isPressing]);
 
 
 
@@ -500,6 +498,11 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
               onKeyDown={(event) => {
                 if (event.repeat || (event.key !== ' ' && event.key !== 'Enter')) return;
                 event.preventDefault();
+                if (progressRef.current >= 100) {
+                  ignoreNextEnterClickRef.current = true;
+                  triggerPreparedEnter();
+                  return;
+                }
                 ignoreNextEnterClickRef.current = true;
                 setIsPressing(true);
                 if (audioRef.current) {

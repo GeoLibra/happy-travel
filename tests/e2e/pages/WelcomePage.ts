@@ -30,23 +30,22 @@ export class WelcomePage {
   }
 
   /**
-   * Hold enter button via real mouse input and wait for observable engine
+   * Hold enter button via real keyboard input and wait for observable engine
    * progress to reach the specified state (or timeout).
    */
   async holdToIgnite(): Promise<void> {
-    const point = await this.enterButtonCenter();
-    await this.page.mouse.move(point.x, point.y);
-    await this.page.mouse.down();
+    await this.enterButton.focus();
+    await this.page.keyboard.down('Space');
     try {
       await this.waitForIgnitionCompleteOrEntered();
     } finally {
-      await this.page.mouse.up();
+      await this.page.keyboard.up('Space');
     }
 
     await this.waitForIgnitionReadyToEnter();
     if (await this.hasEnteredApp()) return;
 
-    await this.enterButton.click({ timeout: 5_000 }).catch(() => {});
+    await this.enterButton.press('Enter');
     await expect.poll(() => this.hasEnteredApp(), {
       intervals: [100],
       timeout: 15_000,
@@ -58,16 +57,18 @@ export class WelcomePage {
    * Uses observable check that progress has started but not completed.
    */
   async holdPartially(): Promise<void> {
-    const point = await this.enterButtonCenter();
-    await this.page.mouse.move(point.x, point.y);
-    await this.page.mouse.down();
-    await expect.poll(async () => {
-      return this.enterButton.textContent();
-    }, {
-      intervals: [100],
-      timeout: 10_000,
-    }).toContain('ENGINE STARTING');
-    await this.page.mouse.up();
+    await this.enterButton.focus();
+    await this.page.keyboard.down('Space');
+    try {
+      await expect.poll(async () => {
+        return this.enterButton.textContent();
+      }, {
+        intervals: [100],
+        timeout: 10_000,
+      }).toContain('ENGINE STARTING');
+    } finally {
+      await this.page.keyboard.up('Space');
+    }
   }
 
   async holdUntilIgnitedWithoutEntering(): Promise<void> {
@@ -113,15 +114,6 @@ export class WelcomePage {
     return this.canvas.isVisible();
   }
 
-  private async enterButtonCenter(): Promise<{ x: number; y: number }> {
-    const box = await this.enterButton.boundingBox();
-    if (!box) throw new Error('Enter button bounding box not available');
-    return {
-      x: box.x + box.width / 2,
-      y: box.y + box.height / 2,
-    };
-  }
-
   private async waitForIgnitionReadyToEnter(): Promise<void> {
     await expect.poll(async () => {
       if (await this.hasEnteredApp()) return 'ENTERED_APP';
@@ -159,11 +151,9 @@ export class WelcomePage {
   private async hasEnteredApp(): Promise<boolean> {
     return this.page.evaluate(() => {
       const returnButton = document.querySelector<HTMLElement>('[data-app-action="return-welcome"]');
-      const welcomeButton = document.querySelector<HTMLElement>('[data-f1-welcome-action="enter"]');
-      if (!returnButton) return false;
-      if (!welcomeButton) return true;
-      const styles = window.getComputedStyle(welcomeButton);
-      return styles.display === 'none' || styles.visibility === 'hidden' || Number(styles.opacity) === 0;
+      const appShell = document.querySelector<HTMLElement>('[data-app-shell="main"]');
+      if (!returnButton || !appShell) return false;
+      return window.getComputedStyle(appShell).pointerEvents !== 'none';
     }).catch(() => false);
   }
 }

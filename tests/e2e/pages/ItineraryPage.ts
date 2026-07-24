@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from 'playwright/test';
+import { WelcomePage } from './WelcomePage';
 
 export class ItineraryPage {
   readonly page: Page;
@@ -17,9 +18,9 @@ export class ItineraryPage {
 
   async goto() {
     await this.page.goto('/', { waitUntil: 'domcontentloaded' });
-    const enterBtn = this.page.locator('[data-f1-welcome-action="enter"]');
-    await enterBtn.waitFor({ state: 'visible', timeout: 30_000 });
-    await enterBtn.click();
+    const welcomePage = new WelcomePage(this.page);
+    await welcomePage.waitUntilReady();
+    await welcomePage.holdToIgnite();
     await this.waitUntilReady();
   }
 
