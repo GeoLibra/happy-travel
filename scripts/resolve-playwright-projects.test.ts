@@ -34,7 +34,42 @@ test('showroom implementation and F1 model changes select the complete safety ma
       'src/components/showroom/ShowroomOverlay.tsx',
       'public/models/2024_redbull_rb20_showroom_v6.glb',
     ]),
-    ALL_PLAYWRIGHT_PROJECTS,
+    [
+      'showroom-desktop-chromium',
+      'showroom-mobile-chromium',
+      'showroom-arrival-timeline-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'showroom-webkit-smoke',
+      'f1-e2e-chromium',
+    ],
+  );
+});
+
+test('F1 interaction changes select F1 browser and lifecycle coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['tests/e2e/f1/f1-interaction-flow.spec.ts']),
+    [
+      'showroom-desktop-chromium',
+      'showroom-mobile-chromium',
+      'showroom-arrival-timeline-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'showroom-webkit-smoke',
+      'f1-e2e-chromium',
+    ],
+  );
+});
+
+test('particle itinerary changes select app and particles E2E only', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['tests/e2e/itinerary-particles/particles.spec.ts']),
+    ['app-desktop-chromium', 'particles-e2e-chromium'],
+  );
+});
+
+test('rose changes select app and rose E2E only', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['tests/e2e/rose/rose-interaction-bloom.spec.ts']),
+    ['app-desktop-chromium', 'rose-e2e-chromium'],
   );
 });
 
@@ -67,4 +102,3 @@ test('matrix output preserves deterministic project order', () => {
     },
   );
 });
-

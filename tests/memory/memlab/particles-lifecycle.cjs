@@ -39,7 +39,17 @@ async function action(page) {
 
   const enterButton = await page.$('button[data-f1-welcome-action="enter"]');
   if (enterButton) {
-    await enterButton.click();
+    const box = await enterButton.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.waitForFunction(() => {
+        const text = document.body.innerText || '';
+        return text.includes('ENTER') || text.includes('REASSEMBLING');
+      }, undefined, { timeout: 10000 });
+      await page.mouse.up();
+    }
+    await enterButton.dispose();
   }
 
   await page.waitForSelector('main canvas', {
@@ -56,6 +66,7 @@ async function back(page) {
   const returnButton = await page.$('button[data-app-action="return-welcome"]');
   if (returnButton) {
     await returnButton.click();
+    await returnButton.dispose();
   }
 
   await page.waitForSelector('button[data-f1-welcome-action="enter"]', {

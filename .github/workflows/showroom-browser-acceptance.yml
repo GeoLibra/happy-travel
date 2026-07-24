@@ -1,4 +1,4 @@
-name: Showroom Browser Acceptance
+name: Affected Browser Acceptance
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: showroom-browser-${{ github.ref }}
+  group: affected-browser-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
@@ -87,7 +87,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
@@ -100,13 +100,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: showroom-browser-${{ matrix.project }}
+          name: affected-browser-${{ matrix.project }}
           path: output/playwright/
           if-no-files-found: ignore
           retention-days: 7
 
   showroom-browser-gate:
-    name: Showroom browser acceptance
+    name: Affected browser acceptance
     needs: [detect-projects, browser-acceptance]
     if: always()
     runs-on: ubuntu-latest

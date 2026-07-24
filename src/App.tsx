@@ -70,6 +70,7 @@ export default function App() {
   const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const secretClickRef = useRef(0);
   const secretClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const successAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     isModalOpenRef.current = showRoseModal;
@@ -81,9 +82,21 @@ export default function App() {
   const shiftAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    shiftAudioRef.current = new Audio(f1EngineShiftSound);
-    shiftAudioRef.current.volume = 0.4;
-    shiftAudioRef.current.preload = 'auto';
+    const audio = new Audio(f1EngineShiftSound);
+    audio.volume = 0.4;
+    audio.preload = 'auto';
+    shiftAudioRef.current = audio;
+    const successAudio = new Audio(successSound);
+    successAudio.preload = 'auto';
+    successAudioRef.current = successAudio;
+    return () => {
+      audio.pause();
+      audio.src = '';
+      shiftAudioRef.current = null;
+      successAudio.pause();
+      successAudio.src = '';
+      successAudioRef.current = null;
+    };
   }, []);
 
   const playShiftSound = () => {
@@ -111,8 +124,10 @@ export default function App() {
       console.log('[App] Secret click trigger: Opening Rose Modal');
       setShowRoseModal(true);
       secretClickRef.current = 0;
-      const successAudio = new Audio(successSound);
-      successAudio.play().catch(() => {});
+      if (successAudioRef.current) {
+        successAudioRef.current.currentTime = 0;
+        successAudioRef.current.play().catch(() => {});
+      }
     } else {
       secretClickTimeoutRef.current = setTimeout(() => {
         secretClickRef.current = 0;
@@ -145,9 +160,6 @@ export default function App() {
   useEffect(() => {
     if (!motionPermissionGranted) return;
 
-    const successAudio = new Audio(successSound);
-    successAudio.preload = 'auto';
-
     const handleMotion = (event: DeviceMotionEvent) => {
       const acceleration = event.acceleration ?? event.accelerationIncludingGravity;
       const result = stepShakeDetection(
@@ -164,8 +176,10 @@ export default function App() {
 
       if (result.detected) {
         console.log('[App] Shake detected!');
-        successAudio.currentTime = 0;
-        successAudio.play().catch(() => {});
+        if (successAudioRef.current) {
+          successAudioRef.current.currentTime = 0;
+          successAudioRef.current.play().catch(() => {});
+        }
         setShowRoseModal(true);
       }
     };

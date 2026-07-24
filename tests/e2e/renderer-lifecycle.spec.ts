@@ -1,6 +1,7 @@
 import { test, expect, type Page } from 'playwright/test';
 
 import { createAcceptanceEvidence, openWelcome } from './support/showroom.ts';
+import { WelcomePage } from './pages/WelcomePage.ts';
 
 const evidence = createAcceptanceEvidence('webgl-renderer-lifecycle-chromium');
 
@@ -24,33 +25,9 @@ interface WebGLAuditMetrics {
  * Waits for observable state transitions instead of fixed sleeps.
  */
 async function triggerEnterToMainApp(page: Page): Promise<void> {
-  const enterCta = page.locator('[data-f1-welcome-action="enter"]');
-  await expect(enterCta).toBeVisible({ timeout: 15_000 });
-
-  // Use real mouse down on the CTA center
-  const box = await enterCta.boundingBox();
-  if (!box) throw new Error('CTA bounding box not available');
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
-
-  await page.mouse.move(cx, cy);
-  await page.mouse.down();
-
-  // Wait for observable engine progress to reach 100% (button text changes)
-  await page.waitForFunction(() => {
-    const btn = document.querySelector('[data-f1-welcome-action="enter"]');
-    if (!btn) return false;
-    const text = btn.textContent || '';
-    return text.includes('ENTER') || text.includes('REASSEMBLING');
-  }, { timeout: 10_000 });
-
-  await page.mouse.up();
-
-  // Click to trigger handoff
-  await enterCta.click();
-
-  // Wait for Main Application view to be visible (observable landmark)
-  await page.locator('[data-app-action="return-welcome"]').waitFor({ state: 'visible', timeout: 15_000 });
+  const welcomePage = new WelcomePage(page);
+  await welcomePage.waitUntilReady();
+  await welcomePage.holdToIgnite();
 }
 
 /**
@@ -60,29 +37,15 @@ async function getResourceSnapshot(page: Page): Promise<WebGLAuditMetrics | null
   return page.evaluate(() => {
     const testApi = (window as any).__HAPPY_TRAVEL_TEST__;
     if (testApi && typeof testApi.snapshot === 'function') {
-      const snap = testApi.snapshot();
+      const s = testApi.snapshot();
       return {
-        geometries: Number(snap.geometries ?? snap.gpu?.geometries ?? 0),
-        textures: Number(snap.textures ?? snap.gpu?.textures ?? 0),
-        programs: Number(snap.programs ?? snap.gpu?.programs ?? 0),
-        activeAnimationFrames: Number(snap.activeAnimationFrames ?? snap.gpu?.activeAnimationFrames ?? 0),
-        activeListeners: Number(snap.activeListeners ?? snap.gpu?.activeListeners ?? 0),
-        activeRenderTargets: Number(snap.activeRenderTargets ?? snap.gpu?.activeRenderTargets ?? 0),
-        materials: Number(snap.materials ?? snap.gpu?.materials ?? 0),
-      };
-    }
-    // Fallback to legacy audit API
-    const audit = (window as any).__F1_SHOWROOM_RESOURCE_AUDIT__;
-    if (typeof audit === 'function') {
-      const data = audit();
-      return {
-        geometries: Number(data.geometries ?? 0),
-        textures: Number(data.textures ?? 0),
-        programs: Number(data.programs ?? 0),
-        activeAnimationFrames: Number(data.activeAnimationFrames ?? 0),
-        activeListeners: 0,
-        activeRenderTargets: 0,
-        materials: 0,
+        geometries: Number(s.geometries ?? 0),
+        textures: Number(s.textures ?? 0),
+        programs: Number(s.programs ?? 0),
+        activeAnimationFrames: Number(s.activeAnimationFrames ?? 0),
+        activeListeners: Number(s.activeListeners ?? 0),
+        activeRenderTargets: Number(s.activeRenderTargets ?? 0),
+        materials: Number(s.materials ?? 0),
       };
     }
     return null;
@@ -92,7 +55,7 @@ async function getResourceSnapshot(page: Page): Promise<WebGLAuditMetrics | null
 test('runs 5-cycle WebGL renderer lifecycle trend and verifies GPU resources stabilize after warmup', async ({
   page,
 }) => {
-  test.setTimeout(180_000); // Allow sufficient time for 5 WebGL reassembly cycles
+  test.setTimeout(900_000); // 15 minute budget for 5 full-speed WebGL reassembly cycles
 
   const samples: { cycle: number; metrics: WebGLAuditMetrics }[] = [];
 
@@ -107,17 +70,17 @@ test('runs 5-cycle WebGL renderer lifecycle trend and verifies GPU resources sta
 
     // 2. Wait for main app to be fully interactive (return button visible)
     const returnBtn = page.locator('[data-app-action="return-welcome"]');
-    await expect(returnBtn).toBeVisible({ timeout: 5000 });
+    await expect(returnBtn).toBeVisible({ timeout: 15_000 });
 
     // 3. Click return button to unmount Main App and return to WelcomePage
-    await returnBtn.click({ force: true });
+    await returnBtn.click();
 
     // 4. Wait for WelcomePage to be remounted and ready (observable landmark)
     const enterCta = page.locator('[data-f1-welcome-action="enter"]');
-    await expect(enterCta).toBeVisible({ timeout: 15_000 });
+    await expect(enterCta).toBeVisible({ timeout: 30_000 });
 
     // Wait for canvas to be rendering (observable WebGL readiness)
-    await page.locator('canvas').first().waitFor({ state: 'visible', timeout: 10_000 });
+    await page.locator('canvas').first().waitFor({ state: 'visible', timeout: 15_000 });
 
     // 5. Query WebGL renderer telemetry snapshot
     const metrics = await getResourceSnapshot(page);

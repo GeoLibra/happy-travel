@@ -55,7 +55,7 @@ test.describe('Rose Easter Egg, Modal & Bloom Interaction', () => {
       if (!roseAudit) return true; // Rose scene not registered = skip
       // If phase is available, wait for 'presented' or similar end state
       return !roseAudit.phase || roseAudit.phase === 'presented' || roseAudit.phase === 'bloom-complete';
-    }, { timeout: 15_000 });
+    }, undefined, { timeout: 15_000 });
 
     // Check GPU metrics / observability if present
     const snapshot = await page.evaluate(() => {

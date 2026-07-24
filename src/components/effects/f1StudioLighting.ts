@@ -41,6 +41,10 @@ export const createF1StudioLighting = (scene: THREE.Scene): F1StudioLighting => 
       if (disposed) return;
       disposed = true;
       scene.remove(group);
+      key.dispose();
+      leftRim.dispose();
+      rightRim.dispose();
+      frontFill.dispose();
     },
   };
 };

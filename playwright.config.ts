@@ -80,6 +80,30 @@ export default defineConfig({
         viewport: { width: 1280, height: 800 },
       },
     },
+    {
+      name: 'f1-e2e-chromium',
+      testMatch: /f1\/.*\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
+      name: 'particles-e2e-chromium',
+      testMatch: /itinerary-particles\/.*\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
+      name: 'rose-e2e-chromium',
+      testMatch: /rose\/.*\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+      },
+    },
   ],
 });
 

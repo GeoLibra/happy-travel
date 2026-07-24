@@ -318,9 +318,33 @@ export class GPUParticleSystem {
     if (this.particles) {
       scene.remove(this.particles);
       this.particles.geometry.dispose();
-      (this.particles.material as THREE.Material).dispose();
+      if (this.particles.material) {
+        const mat = this.particles.material as THREE.ShaderMaterial;
+        if (mat.uniforms?.texturePosition) {
+          mat.uniforms.texturePosition.value = null;
+        }
+        mat.dispose();
+      }
       this.particles = null;
     }
-    this.compute = null;
+    if (this.compute) {
+      if (this.posVar) {
+        this.posVar.initialValueTexture?.dispose?.();
+        if (Array.isArray(this.posVar.renderTargets)) {
+          this.posVar.renderTargets.forEach((rt: any) => rt?.dispose?.());
+        }
+        if (this.posVar.material) this.posVar.material.dispose?.();
+      }
+      if (this.velVar) {
+        this.velVar.initialValueTexture?.dispose?.();
+        if (Array.isArray(this.velVar.renderTargets)) {
+          this.velVar.renderTargets.forEach((rt: any) => rt?.dispose?.());
+        }
+        if (this.velVar.material) this.velVar.material.dispose?.();
+      }
+      this.compute = null;
+    }
+    this.posVar = null;
+    this.velVar = null;
   }
 }

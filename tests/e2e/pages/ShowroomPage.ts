@@ -19,8 +19,12 @@ export class ShowroomPage {
 
   async triggerWebGLContextLoss() {
     await this.page.evaluate(() => {
-      const canvas = document.querySelector('canvas');
+      const canvas = document.querySelector('canvas') as any;
       if (!canvas) throw new Error('Canvas element not found');
+      if (canvas.__f1RendererAudit?.loseContext) {
+        canvas.__f1RendererAudit.loseContext();
+        return;
+      }
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
       if (!gl) throw new Error('WebGL context not found on canvas');
       const ext = gl.getExtension('WEBGL_lose_context');
@@ -31,8 +35,12 @@ export class ShowroomPage {
 
   async restoreWebGLContext() {
     await this.page.evaluate(() => {
-      const canvas = document.querySelector('canvas');
+      const canvas = document.querySelector('canvas') as any;
       if (!canvas) throw new Error('Canvas element not found');
+      if (canvas.__f1RendererAudit?.restoreContext) {
+        canvas.__f1RendererAudit.restoreContext();
+        return;
+      }
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
       if (!gl) throw new Error('WebGL context not found on canvas');
       const ext = gl.getExtension('WEBGL_lose_context');

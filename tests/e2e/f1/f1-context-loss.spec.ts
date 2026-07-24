@@ -22,7 +22,7 @@ test.describe('F1 WebGL Context Loss & Restore', () => {
     await page.waitForFunction(() => {
       const canvas = document.querySelector('canvas');
       return canvas !== null;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Filter out expected context loss messages, verify no fatal crash
     const fatalErrors = pageErrors.filter(
@@ -44,7 +44,7 @@ test.describe('F1 WebGL Context Loss & Restore', () => {
     await page.waitForFunction(() => {
       const canvas = document.querySelector('canvas');
       return canvas !== null;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     await showroomPage.restoreWebGLContext();
 

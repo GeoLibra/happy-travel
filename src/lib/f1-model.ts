@@ -7,6 +7,74 @@ export const F1_WHEEL_NODE_NAMES = [
   'WheelSpin_RR',
 ] as const;
 
+export interface F1WheelAudit {
+  wheelNodeNames: string[];
+  missingWheelNodes: string[];
+  wheelSpinAngles: Record<string, number>;
+  hasAllRuntimeWheelNodes: boolean;
+}
+
+export interface F1FloorClearanceAudit {
+  floorY: number;
+  clearance: number;
+  minPartWorldY: number | null;
+  partCount: number;
+  allPartsAboveFloor: boolean;
+}
+
+export const getF1WheelAudit = (wheels: THREE.Object3D[]): F1WheelAudit => {
+  const wheelNodeNames = wheels.map((wheel) => wheel.name);
+  const missingWheelNodes = F1_WHEEL_NODE_NAMES.filter(
+    (name) => !wheelNodeNames.includes(name),
+  );
+  const wheelSpinAngles = Object.fromEntries(
+    wheels.map((wheel) => [wheel.name, wheel.rotation.x]),
+  );
+
+  return {
+    wheelNodeNames,
+    missingWheelNodes: [...missingWheelNodes],
+    wheelSpinAngles,
+    hasAllRuntimeWheelNodes: missingWheelNodes.length === 0,
+  };
+};
+
+export const getF1ExplodedPartsFloorAudit = (
+  parts: F1ExplodedPart[],
+  floorY: number,
+  clearance: number,
+): F1FloorClearanceAudit => {
+  if (parts.length === 0) {
+    return {
+      floorY,
+      clearance,
+      minPartWorldY: null,
+      partCount: 0,
+      allPartsAboveFloor: false,
+    };
+  }
+
+  let minPartWorldY = Infinity;
+  for (const part of parts) {
+    part.object.updateMatrixWorld(true);
+    for (const corner of part.localCorners) {
+      minPartWorldY = Math.min(
+        minPartWorldY,
+        part.scratch.worldCorner.copy(corner).applyMatrix4(part.object.matrixWorld).y,
+      );
+    }
+  }
+
+  const threshold = floorY + clearance - 1e-4;
+  return {
+    floorY,
+    clearance,
+    minPartWorldY: Number.isFinite(minPartWorldY) ? minPartWorldY : null,
+    partCount: parts.length,
+    allPartsAboveFloor: Number.isFinite(minPartWorldY) && minPartWorldY >= threshold,
+  };
+};
+
 export const resolveF1WheelNodes = (
   root: THREE.Object3D,
   warn: (message: string) => void = console.warn,

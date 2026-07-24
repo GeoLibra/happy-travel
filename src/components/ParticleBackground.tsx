@@ -16,7 +16,15 @@ import {
   getF1ScreenStableOrbitTarget,
   stepF1ArrivalState,
 } from '../lib/f1-arrival-motion';
-import { createF1ExplodedParts, getF1LocalBounds, resolveF1WheelNodes, updateF1ExplodedParts, type F1ExplodedPart } from '../lib/f1-model';
+import {
+  createF1ExplodedParts,
+  getF1ExplodedPartsFloorAudit,
+  getF1LocalBounds,
+  getF1WheelAudit,
+  resolveF1WheelNodes,
+  updateF1ExplodedParts,
+  type F1ExplodedPart,
+} from '../lib/f1-model';
 import { applyF1WheelAngle, createF1WheelMotionState, getF1WheelRenderAngle, stepF1WheelMotion } from '../lib/f1-wheel-motion';
 import {
   CAR_DRAG_TOLERANCE_PX,
@@ -220,20 +228,30 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       firstPulseProgramDeltas: [...rendererAudit.firstPulseProgramDeltas],
     });
 
-    (window as any).__F1_SHOWROOM_RESOURCE_AUDIT__ = getResourceAudit;
 
-    const unregisterF1Scene = registerScene('f1-welcome', () => ({
-      sceneId: 'f1-welcome',
-      phase: progress >= 100 ? (exploded ? 'exploded' : 'settled') : 'arriving',
-      geometries: renderer.info.memory.geometries,
-      textures: renderer.info.memory.textures,
-      programs: renderer.info.programs ? renderer.info.programs.length : 0,
-      activeAnimationFrames: frameId !== null ? 1 : 0,
-      activeListeners: 5,
-      activeRenderTargets: (renderer.info.memory as any).renderTargets ?? 0,
-      materials: (renderer.info.memory as any).materials ?? 0,
-      details: getResourceAudit(),
-    }));
+    const unregisterF1Scene = registerScene('f1-welcome', () => {
+      const floorY = reflection.floor.position.y;
+      const clearance = 0.03;
+      const settled = stateRef.current.progress >= 100;
+      const isExploded = stateRef.current.exploded;
+      return {
+        sceneId: 'f1-welcome',
+        phase: settled ? (isExploded ? 'exploded' : 'settled') : 'arriving',
+        geometries: renderer.info.memory.geometries,
+        textures: renderer.info.memory.textures,
+        programs: renderer.info.programs ? renderer.info.programs.length : 0,
+        activeAnimationFrames: frameId !== null ? 1 : 0,
+        activeListeners: 5,
+        activeRenderTargets: (renderer.info.memory as any).renderTargets ?? 0,
+        materials: (renderer.info.memory as any).materials ?? 0,
+        details: {
+          ...getResourceAudit(),
+          ...getF1WheelAudit(f1Wheels),
+          explodeAmount,
+          ...getF1ExplodedPartsFloorAudit(f1ExplodedParts, floorY, clearance),
+        },
+      };
+    });
 
     const unregisterParticlesScene = registerScene('particles', () => ({
       sceneId: 'particles',
@@ -1144,8 +1162,19 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
       if (glitchPostProcess) glitchPostProcess.dispose();
       unregisterF1Scene();
       unregisterParticlesScene();
-      delete (window as any).__F1_SHOWROOM_RESOURCE_AUDIT__;
-      delete auditCanvas.__f1RendererAudit;
+      if (f1CarGroup) {
+        revertHologramMaterial(f1CarGroup);
+      }
+
+      scene.clear();
+      bgScene.clear();
+
+      if ((auditCanvas as any).__f1RendererAudit) {
+        (auditCanvas as any).__f1RendererAudit.snapshot = null;
+        (auditCanvas as any).__f1RendererAudit.restoreContext = null;
+        delete (auditCanvas as any).__f1RendererAudit;
+      }
+
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);

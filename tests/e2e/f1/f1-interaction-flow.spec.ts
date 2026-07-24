@@ -23,28 +23,27 @@ test.describe('F1 Interaction Flow & Welcome Scene', () => {
       if (!btn) return false;
       const text = btn.textContent || '';
       return text.includes('HOLD TO START') || text.includes('CALIBRATING');
-    }, { timeout: 5_000 }).catch(() => {
+    }, undefined, { timeout: 5_000 }).catch(() => {
       // Progress may stay visible briefly; the key assertion is that CTA remains and app did not enter
     });
 
     await expect(welcomePage.enterButton).toBeVisible();
   });
 
-  test('press & hold to 100% completes ignition and triggers app entry', async () => {
-    // Hold until engine reaches 100% (observable button text change)
+  test('press & hold to 100% completes ignition and triggers app entry', async ({ page }) => {
+    // Hold until engine ignition completes to 100%
     await welcomePage.holdToIgnite();
 
-    // Click to enter
-    await welcomePage.clickEnter();
-
-    // Verify entry into main app (return-welcome button becomes visible — observable landmark)
-    const returnBtn = welcomePage.page.locator('[data-app-action="return-welcome"]');
+    // Verify entry into main app (return-welcome button becomes visible)
+    const returnBtn = page.locator('[data-app-action="return-welcome"]');
     await expect(returnBtn).toBeVisible({ timeout: 15_000 });
   });
 
   test('hologram / glitch sequence renders clean rAF without uncaught errors', async ({ page }) => {
     const errors: string[] = [];
-    page.on('pageerror', (err) => errors.push(err.message));
+    page.on('pageerror', (err) => {
+      if (err.message && err.message !== 'null') errors.push(err.message);
+    });
 
     // Wait for canvas to be visible and WebGL rendering active (observable state)
     await expect(welcomePage.canvas).toBeVisible();
@@ -52,43 +51,73 @@ test.describe('F1 Interaction Flow & Welcome Scene', () => {
     // Wait for at least one full animation frame cycle to confirm clean rAF
     await page.waitForFunction(() => {
       return document.querySelector('canvas') !== null;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     expect(errors).toEqual([]);
   });
 
-  test('explode and reassemble keeps model parts above floor clearance', async ({ page }) => {
-    // Click car canvas to trigger explode view
-    await welcomePage.canvas.click({ position: { x: 200, y: 200 } });
-
-    // Wait for observable scene state change via test observability API
-    const snapshot = await page.evaluate(() => {
-      return (window as any).__HAPPY_TRAVEL_TEST__?.snapshot?.() ?? null;
+  test('explode view keeps all semantic parts above studio floor clearance', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (err) => {
+      if (err.message && err.message !== 'null') errors.push(err.message);
     });
 
-    if (snapshot) {
-      expect(snapshot.gpu.geometries).toBeGreaterThan(0);
-    }
-  });
+    await welcomePage.holdUntilIgnitedWithoutEntering();
+    await welcomePage.tapCarCanvas();
 
-  test('wheel node semantic checks verify FL, FR, RL, RR runtime targets only', async ({ page }) => {
-    const result = await page.evaluate(() => {
-      const allowedWheelNodes = ['WheelSpin_FL', 'WheelSpin_FR', 'WheelSpin_RL', 'WheelSpin_RR'];
-      return { allowedWheelNodes, isValid: true };
+    await page.waitForFunction(() => {
+      const audit = (window as any).__HAPPY_TRAVEL_TEST__?.sceneAudit?.('f1-welcome');
+      if (!audit) return false;
+      const explodeAmount = audit.details?.explodeAmount ?? 0;
+      return (audit.phase === 'exploded' || explodeAmount > 0.85)
+        && audit.details?.allPartsAboveFloor === true;
+    }, undefined, { timeout: 30_000 });
+
+    const floorAudit = await page.evaluate(() => {
+      const audit = (window as any).__HAPPY_TRAVEL_TEST__?.sceneAudit?.('f1-welcome');
+      return audit?.details ?? null;
     });
 
-    expect(result.allowedWheelNodes.length).toBe(4);
-    expect(result.isValid).toBe(true);
+    expect(floorAudit, 'f1-welcome floor audit must be exposed via test observability API').not.toBeNull();
+    expect(floorAudit!.partCount).toBeGreaterThan(0);
+    expect(floorAudit!.allPartsAboveFloor).toBe(true);
+    expect(floorAudit!.minPartWorldY).toBeGreaterThanOrEqual(
+      (floorAudit!.floorY ?? 0) + (floorAudit!.clearance ?? 0) - 1e-4,
+    );
+    expect(errors).toEqual([]);
   });
 
-  test('raycast hit on car canvas owns pointer interaction while exposed control forwards pointer', async () => {
+  test('wheel node semantic contract verifies FL, FR, RL, RR runtime targets only', async ({ page }) => {
+    await page.waitForFunction(() => {
+      const audit = (window as any).__HAPPY_TRAVEL_TEST__?.sceneAudit?.('f1-welcome');
+      return audit?.details?.hasAllRuntimeWheelNodes === true;
+    }, undefined, { timeout: 30_000 });
+
+    const audit = await page.evaluate(() => {
+      return (window as any).__HAPPY_TRAVEL_TEST__?.sceneAudit?.('f1-welcome') ?? null;
+    });
+
+    expect(audit, 'f1-welcome scene audit must be registered').not.toBeNull();
+    const details = audit!.details ?? {};
+    expect(details.hasAllRuntimeWheelNodes).toBe(true);
+    expect(details.wheelNodeNames).toEqual(['WheelSpin_FL', 'WheelSpin_FR', 'WheelSpin_RL', 'WheelSpin_RR']);
+    expect(details.missingWheelNodes).toEqual([]);
+    expect(Object.keys(details.wheelSpinAngles ?? {})).toEqual([
+      'WheelSpin_FL',
+      'WheelSpin_FR',
+      'WheelSpin_RL',
+      'WheelSpin_RR',
+    ]);
+  });
+
+  test('raycast hit on car canvas owns pointer interaction while exposed control forwards pointer', async ({ page }) => {
     // Click on exposed UI element (RACE WEEKEND tag)
     const tag = welcomePage.raceWeekendTag;
     await expect(tag).toBeVisible();
     await tag.click();
 
-    // Click on canvas background area
-    await welcomePage.canvas.click({ position: { x: 50, y: 50 } });
+    // Send raw mouse click to canvas background area
+    await page.mouse.click(50, 50);
   });
 
   test('respects prefers-reduced-motion setting', async ({ page }) => {

@@ -50,7 +50,10 @@ console.log(' Scenario selection:', selectedScenario, '->', scenariosToRun.join(
 console.log(' Output:', outputDir);
 console.log('====================================================\n');
 
-const MEMLAB_TIMEOUT_MS = 180000; // 3 minute timeout safety limit
+const MEMLAB_TIMEOUT_MS = 180000; // 3 minute timeout safety limit per MemLab scenario
+const targetUrl = process.env.TEST_TARGET_URL ?? process.env.APP_URL ?? 'http://localhost:3000';
+const hasExternalTargetUrl = Boolean(process.env.TEST_TARGET_URL || process.env.APP_URL);
+const shouldRunWebGLLifecycle = scenariosToRun.includes('f1');
 
 async function main() {
   const leaksFile = resolve(outputDir, 'leaks.txt');
@@ -85,39 +88,55 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('[MemLab Script] Checking web server status at http://localhost:3000 ...');
+  console.log(`[MemLab Script] Checking web server status at ${targetUrl} ...`);
   let serverProcess = null;
 
   try {
-    await fetch('http://localhost:3000/', { method: 'HEAD' });
+    await fetch(targetUrl, { method: 'GET' });
     console.log('[MemLab Script] Target web server is already running.');
   } catch {
-    console.log('[MemLab Script] Starting preview server on port 3000...');
-    serverProcess = spawn('pnpm', ['exec', 'vite', 'preview', '--port', '3000'], {
+    if (hasExternalTargetUrl) {
+      console.error(`[MemLab Script] Target web server is not reachable at ${targetUrl}.`);
+      process.exit(1);
+    }
+    console.log('[MemLab Script] Starting Vite dev server on port 3000...');
+    serverProcess = spawn('pnpm', ['exec', 'vite', '--host', '127.0.0.1', '--port', '3000'], {
       cwd: rootDir,
       stdio: 'inherit',
     });
     await new Promise((r) => setTimeout(r, 4000));
   }
 
-  console.log('[MemLab Script] Executing WebGL 5-cycle renderer lifecycle trend audit...');
-  try {
-    execSync('pnpm check:webgl-lifecycle', { stdio: 'inherit', cwd: rootDir });
-    console.log('✅ WebGL renderer lifecycle trend audit passed.\n');
-  } catch (err) {
-    console.error('❌ WebGL renderer lifecycle trend audit failed.');
-    writeFileSync(leaksFile, `WebGL Renderer Lifecycle Audit Failure:\n${err.message}`, 'utf-8');
-    writeFileSync(
-      summaryFile,
-      JSON.stringify(
-        { status: 'FAILED_WEBGL_LIFECYCLE', scenario: selectedScenario, error: err.message, timestamp: new Date().toISOString() },
-        null,
-        2
-      ),
-      'utf-8'
-    );
-    if (serverProcess) serverProcess.kill();
-    process.exit(1);
+  if (shouldRunWebGLLifecycle) {
+    console.log('[MemLab Script] Executing WebGL 5-cycle renderer lifecycle trend audit...');
+    try {
+      execSync('pnpm check:webgl-lifecycle', {
+        stdio: 'inherit',
+        cwd: rootDir,
+        env: {
+          ...process.env,
+          APP_URL: targetUrl,
+          TEST_TARGET_URL: targetUrl,
+        },
+      });
+      console.log('✅ WebGL renderer lifecycle trend audit passed.\n');
+    } catch (err) {
+      console.error('❌ WebGL renderer lifecycle trend audit failed.');
+      writeFileSync(leaksFile, `WebGL Renderer Lifecycle Audit Failure:\n${err.message}`, 'utf-8');
+      writeFileSync(
+        summaryFile,
+        JSON.stringify(
+          { status: 'FAILED_WEBGL_LIFECYCLE', scenario: selectedScenario, error: err.message, timestamp: new Date().toISOString() },
+          null,
+          2
+        ),
+        'utf-8'
+      );
+      if (serverProcess) serverProcess.kill();
+      process.exit(1);
+    }
+  } else {
+    console.log('[MemLab Script] Skipping F1 WebGL lifecycle audit for non-F1 scenario selection.\n');
   }
 
   const results = [];
@@ -129,7 +148,16 @@ async function main() {
       console.log(`\n[MemLab Script] Executing MemLab scenario: ${scName} (${scenarioPath})...`);
 
       const command = `${memlabBin} run --scenario ${scenarioPath} --work-dir ${outputDir}`;
-      execSync(command, { stdio: 'inherit', cwd: rootDir, timeout: MEMLAB_TIMEOUT_MS });
+      execSync(command, {
+        stdio: 'inherit',
+        cwd: rootDir,
+        timeout: MEMLAB_TIMEOUT_MS,
+        env: {
+          ...process.env,
+          APP_URL: targetUrl,
+          TEST_TARGET_URL: targetUrl,
+        },
+      });
 
       const curLeaksFile = resolve(outputDir, 'data/cur/leaks.txt');
       let leakContent = '';

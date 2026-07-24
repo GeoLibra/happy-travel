@@ -294,6 +294,15 @@ export const createStudioReflection = ({
   const disposeReflectiveResources = (): void => {
     if (reflectiveResourcesDisposed) return;
     reflectiveResourcesDisposed = true;
+    if (floorMaterial?.uniforms?.uReflection) {
+      floorMaterial.uniforms.uReflection.value = null;
+    }
+    if (horizontalBlurMaterial?.uniforms?.uInput) {
+      horizontalBlurMaterial.uniforms.uInput.value = null;
+    }
+    if (verticalBlurMaterial?.uniforms?.uInput) {
+      verticalBlurMaterial.uniforms.uInput.value = null;
+    }
     disposeSafely(fullscreenGeometry);
     disposeSafely(verticalBlurMaterial);
     disposeSafely(horizontalBlurMaterial);

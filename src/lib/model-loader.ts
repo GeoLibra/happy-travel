@@ -15,6 +15,23 @@ const createGLTFLoader = () => {
   return loader;
 };
 
+const parseGLTFBuffer = (buffer: ArrayBuffer): Promise<GLTF> => {
+  return new Promise<GLTF>((resolve, reject) => {
+    const loader = createGLTFLoader();
+    loader.parse(
+      buffer,
+      '',
+      (result) => {
+        resolve(result);
+      },
+      (error) => {
+        console.error('[ModelLoader] Error parsing GLTF buffer:', error);
+        reject(error);
+      }
+    );
+  });
+};
+
 export const loadModelWithCache = async (
   url: string,
   onProgress?: (progress: number) => void
@@ -24,15 +41,7 @@ export const loadModelWithCache = async (
   if (cachedModel) {
     console.log(`[ModelLoader] Loading ${url} from cache`);
     onProgress?.(100);
-    return new Promise((resolve, reject) => {
-      const loader = createGLTFLoader();
-      loader.parse(cachedModel, '', (gltf) => {
-        resolve(gltf);
-      }, (error) => {
-        console.error(`[ModelLoader] Error parsing cached model ${url}:`, error);
-        reject(error);
-      });
-    });
+    return parseGLTFBuffer(cachedModel);
   }
 
   console.log(`[ModelLoader] Fetching ${url} from server`);
@@ -71,13 +80,5 @@ export const loadModelWithCache = async (
   // Cache for next time
   await localforage.setItem(url, arrayBuffer);
 
-  return new Promise((resolve, reject) => {
-    const loader = createGLTFLoader();
-    loader.parse(arrayBuffer, '', (gltf) => {
-      resolve(gltf);
-    }, (error) => {
-      console.error(`[ModelLoader] Error parsing fetched model ${url}:`, error);
-      reject(error);
-    });
-  });
+  return parseGLTFBuffer(arrayBuffer);
 };

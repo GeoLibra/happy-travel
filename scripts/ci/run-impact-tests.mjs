@@ -21,10 +21,10 @@ function getGitDiffFiles(base, head) {
 
 // Map e2e suite names to Playwright project names or test directories
 const e2eSuiteToPlaywright = {
-  f1: ['--grep', '@f1', '--project', 'showroom-desktop-chromium'],
+  f1: ['--project', 'f1-e2e-chromium'],
   smoke: ['--project', 'app-desktop-chromium', '--project', 'showroom-desktop-chromium'],
-  'itinerary-particles': ['tests/e2e/itinerary-particles/'],
-  rose: ['tests/e2e/rose/'],
+  'itinerary-particles': ['--project', 'particles-e2e-chromium'],
+  rose: ['--project', 'rose-e2e-chromium'],
 };
 
 // Map memory suite names to memlab scenarios
@@ -99,7 +99,8 @@ export function runImpactTests() {
         continue;
       }
       console.log(`  Running e2e suite: ${suite}`);
-      const proc = spawnSync('npx', ['playwright', 'test', ...playwrightArgs], {
+      const playwrightCliPath = path.join(rootDir, 'node_modules/playwright/cli.js');
+      const proc = spawnSync('node', [playwrightCliPath, 'test', ...playwrightArgs], {
         cwd: rootDir,
         stdio: 'inherit',
         shell: false,

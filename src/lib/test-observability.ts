@@ -172,4 +172,3 @@ if (
   };
   window.__HAPPY_TRAVEL_TEST__ = testAPI;
 }
-

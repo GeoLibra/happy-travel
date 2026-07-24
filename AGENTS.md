@@ -10,10 +10,14 @@
 - Every F1 model or visual change requires the focused asset, motion, wheel, airflow, studio, reflection, interaction, and model checks plus desktop and mobile browser evidence.
 - Browser evidence must include the complete arrival timeline, not only the final stopped frame, so car pose, camera framing, floor placement, and floor reveal jumps remain visible to reviewers.
 - Explode and reassemble verification must prove every part stays above the floor for the entire motion and that wheel-adjacent bodywork follows its semantic body group.
+- Do not change user-visible ignition timing, showroom lighting, camera framing, model/material ownership, audio behavior, or other F1 product experience details merely to satisfy CI, Playwright, or MemLab. If a test exposes a timing or memory issue, fix the ownership/lifecycle bug or the test harness instead of weakening the product behavior.
+- Test and memory scenarios must not hide leaks or failures by clearing console output, deleting application globals, mutating DOM outside the user path, forcing WebGL context loss in normal runtime cleanup, or adding test-only imperative triggers. Any test-only escape hatch must be explicitly documented, isolated from production runtime, and reviewed before use.
+- Keep the welcome ignition contract stable unless a product change is explicitly requested: holding advances the original progress cadence, releasing below the threshold resets, releasing after the threshold auto-completes, and completion/handoff must use real pointer/keyboard/browser interactions in acceptance tests.
 
 ## Testing and CI workflow
 
 - The project uses `pnpm` (with `pnpm-lock.yaml`), Vitest for unit tests, and Playwright Test (running in the official `mcr.microsoft.com/playwright:v1.61.1-jammy` container in CI).
+- Node.js 24 is the intended local and CI runtime for this project; do not downgrade it to satisfy tooling assumptions without explicit user approval.
 - Standard testing commands:
   - `pnpm test:fast`: Runs fast quality gate (lint, unit tests, assets check, build).
   - `pnpm test:assets`: Runs specialized asset validation checks.
@@ -22,6 +26,7 @@
   - `pnpm test:e2e`: Runs full Playwright end-to-end tests across configured browser projects.
   - `pnpm test:full`: Runs `pnpm test:fast` followed by `pnpm test:e2e`.
   - `pnpm test:memory`: Runs WebGL lifecycle and memory audit checks.
+- Package-level scripts should stay as grouped, user-facing quality gates. Do not add a new `package.json` alias for every `scripts/check-*.ts` file; add focused diagnostics as direct `node --import tsx scripts/...` commands in docs or fold them into grouped gates such as `pnpm check:showroom`, `pnpm check:f1`, or `pnpm check:rose`.
 - Run `pnpm test:fast` or `pnpm check:showroom-acceptance` for code changes that affect the showroom or F1 handoff flow, including `src/App.tsx`, `src/components/WelcomePage.tsx`, `src/components/ParticleBackground.tsx`, files under `src/components/showroom/**`, files under `src/lib/showroom-*.ts`, or any change to ignition, skip, enter-app handoff, overlay visibility, scroll lock, or keyboard/pointer showroom controls. Treat `output/playwright/showroom-acceptance-summary.json` or the GitHub Actions artifact as the reviewable evidence.
 - Chromium mobile coverage in CI is viewport and touch emulation only; it does not replace real-device Safari/Chrome checks when shipping materially new mobile WebGL behavior.
 - Prefer `node --import tsx <script>` in pnpm scripts over bare `tsx` CLI so local sandbox runs and GitHub Actions behave consistently.

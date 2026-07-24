@@ -68,6 +68,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const automaticSequenceRef = React.useRef<F1WelcomeSequence | null>(null);
   const hasManualInteractionRef = React.useRef(false);
   const hasStartedEntryRef = React.useRef(false);
+  const ignoreNextEnterClickRef = React.useRef(false);
 
   const cancelAutomaticShowroomSequence = useCallback(() => {
     if (autoExplodeTimerRef.current) {
@@ -128,6 +129,10 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   }, [enterAfterReassembly, onPrepareEnter]);
 
   const handleEnter = useCallback(() => {
+    if (ignoreNextEnterClickRef.current) {
+      ignoreNextEnterClickRef.current = false;
+      return;
+    }
     if (progress < 100 || hasStartedEntryRef.current) return;
     triggerPreparedEnter();
   }, [progress, triggerPreparedEnter]);
@@ -142,7 +147,6 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   useEffect(() => {
     setMounted(true);
     const assetManager = new ShowroomAssetManager();
-
     assetManager.loadModel<{ scene: THREE.Group }>(F1_SHOWROOM_MODEL_URL, (p) => {
       setModelProgress(p);
     }).then((result) => {
@@ -159,6 +163,7 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
     });
 
     return () => {
+      setLoadedModel(null);
       assetManager.dispose();
     };
   }, []);
@@ -425,16 +430,35 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
             >
             <button
               data-f1-welcome-action="enter"
-              onPointerDown={() => {
+              onPointerDown={(event) => {
+                ignoreNextEnterClickRef.current = false;
+                event.currentTarget.setPointerCapture?.(event.pointerId);
                 setIsPressing(true);
                 if (audioRef.current) {
                   audioRef.current.currentTime = 0;
                   audioRef.current.play().catch(() => {});
                 }
               }}
-              onPointerUp={() => setIsPressing(false)}
-              onPointerLeave={() => setIsPressing(false)}
-              onPointerCancel={() => setIsPressing(false)}
+              onPointerMove={(event) => {
+                if (!event.currentTarget.hasPointerCapture?.(event.pointerId)) return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                const isInsideButton = event.clientX >= rect.left
+                  && event.clientX <= rect.right
+                  && event.clientY >= rect.top
+                  && event.clientY <= rect.bottom;
+                if (!isInsideButton) ignoreNextEnterClickRef.current = true;
+              }}
+              onPointerUp={(event) => {
+                if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+                setIsPressing(false);
+              }}
+              onPointerCancel={(event) => {
+                if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+              }}
               onClick={handleEnter}
               className="group relative z-[90] inline-flex items-center justify-center gap-2 px-10 py-4 w-[280px] sm:w-[360px] bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl uppercase tracking-wider transform -skew-x-12 pointer-events-auto cursor-pointer select-none"
             >

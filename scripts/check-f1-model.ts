@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   createF1ExplodedParts,
+  getF1ExplodedPartsFloorAudit,
   getF1LocalBounds,
+  getF1WheelAudit,
+  resolveF1WheelNodes,
   updateF1ExplodedParts,
 } from '../src/lib/f1-model';
 
@@ -208,3 +211,34 @@ parts.forEach((part, index) => {
     'animation must reuse the same per-part scratch objects',
   );
 });
+
+const wheelRoot = new THREE.Group();
+const wheelNodes = ['WheelSpin_FL', 'WheelSpin_FR', 'WheelSpin_RL', 'WheelSpin_RR'].map((name) => {
+  const wheel = new THREE.Group();
+  wheel.name = name;
+  wheel.rotation.x = name.endsWith('_FL') ? 0.25 : 0.5;
+  wheelRoot.add(wheel);
+  return wheel;
+});
+const wheelAudit = getF1WheelAudit(wheelNodes);
+assert.deepEqual(wheelAudit.wheelNodeNames, [
+  'WheelSpin_FL',
+  'WheelSpin_FR',
+  'WheelSpin_RL',
+  'WheelSpin_RR',
+]);
+assert.equal(wheelAudit.hasAllRuntimeWheelNodes, true);
+assert.equal(wheelAudit.missingWheelNodes.length, 0);
+assert.equal(wheelAudit.wheelSpinAngles.WheelSpin_FL, 0.25);
+assert.equal(wheelAudit.wheelSpinAngles.WheelSpin_RR, 0.5);
+
+const missingWheelAudit = getF1WheelAudit([wheelNodes[0], wheelNodes[2]]);
+assert.equal(missingWheelAudit.hasAllRuntimeWheelNodes, false);
+assert.deepEqual(missingWheelAudit.missingWheelNodes, ['WheelSpin_FR', 'WheelSpin_RR']);
+
+const floorAuditParts = createF1ExplodedParts(root);
+updateF1ExplodedParts(floorAuditParts, 1, 1 / 60, { floorY, clearance });
+const floorAudit = getF1ExplodedPartsFloorAudit(floorAuditParts, floorY, clearance);
+assert.equal(floorAudit.partCount, floorAuditParts.length);
+assert.equal(floorAudit.allPartsAboveFloor, true);
+assert(floorAudit.minPartWorldY !== null && floorAudit.minPartWorldY >= floorY + clearance - 1e-4);

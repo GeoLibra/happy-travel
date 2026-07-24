@@ -16,7 +16,7 @@ on:
           - visual
           - memory
       domain:
-        description: 'Domain to run (f1, particles, rose, all)'
+        description: 'Domain filter (f1=showroom acceptance, particles=itinerary particles E2E, rose=rose modal E2E, all=run every visual domain)'
         required: false
         default: 'all'
         type: choice
@@ -53,7 +53,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: Install dependencies
@@ -62,12 +62,22 @@ jobs:
       - name: Build Web Application
         run: pnpm build
 
-      - name: Run Visual Audit (Playwright lifecycle & arrival timeline)
+      - name: Run Visual Audit (Playwright acceptance per domain)
         if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'visual'
-        run: pnpm check:showroom-acceptance
+        run: |
+          if [ "${{ env.AUDIT_DOMAIN }}" = "f1" ]; then
+            pnpm check:showroom-acceptance
+          elif [ "${{ env.AUDIT_DOMAIN }}" = "particles" ]; then
+            npx playwright test --project=particles-e2e-chromium
+          elif [ "${{ env.AUDIT_DOMAIN }}" = "rose" ]; then
+            npx playwright test --project=rose-e2e-chromium
+          else
+            pnpm check:showroom-acceptance
+            npx playwright test --project=particles-e2e-chromium --project=rose-e2e-chromium
+          fi
 
       - name: Run WebGL Lifecycle Audit
-        if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'memory'
+        if: (env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'memory') && (env.AUDIT_DOMAIN == 'all' || env.AUDIT_DOMAIN == 'f1')
         run: pnpm check:webgl-lifecycle
 
       - name: Run MemLab Memory Leak Audit
