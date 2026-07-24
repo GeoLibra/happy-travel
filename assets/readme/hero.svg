@@ -1,0 +1,84 @@
+<svg width="1200" height="520" viewBox="0 0 1200 520" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Happy Travel F1 Shanghai README hero</title>
+  <desc id="desc">A racing cockpit style hero for a Shanghai F1 travel planner with a 3D RB20 showroom, itinerary map, rose easter egg, and CI verification lanes.</desc>
+  <defs>
+    <linearGradient id="track" x1="86" y1="478" x2="1114" y2="70" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#09111F"/>
+      <stop offset="0.44" stop-color="#122A44"/>
+      <stop offset="1" stop-color="#04070D"/>
+    </linearGradient>
+    <linearGradient id="redline" x1="83" y1="100" x2="1108" y2="422" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E10600"/>
+      <stop offset="0.5" stop-color="#FFB800"/>
+      <stop offset="1" stop-color="#E10600"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="112" y1="100" x2="1110" y2="439" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.04"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0.882 0 1 0 0 0.024 0 0 1 0 0 0 0 0 0.6 0"/>
+      <feBlend in2="SourceGraphic" mode="screen"/>
+    </filter>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+    <pattern id="checker" width="32" height="32" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#F8FAFC"/>
+      <rect x="16" y="16" width="16" height="16" fill="#F8FAFC"/>
+      <rect x="16" width="16" height="16" fill="#111827"/>
+      <rect y="16" width="16" height="16" fill="#111827"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="520" rx="28" fill="#050914"/>
+  <rect width="1200" height="520" rx="28" fill="url(#grid)"/>
+  <path d="M0 0H1200V70H0V0Z" fill="url(#checker)" opacity="0.14"/>
+  <path d="M72 454C204 360 254 270 374 250C506 228 579 335 723 290C838 254 895 144 1128 78" stroke="url(#track)" stroke-width="72" stroke-linecap="round"/>
+  <path d="M72 454C204 360 254 270 374 250C506 228 579 335 723 290C838 254 895 144 1128 78" stroke="url(#redline)" stroke-width="6" stroke-linecap="round" filter="url(#glow)"/>
+
+  <rect x="72" y="82" width="1056" height="356" rx="22" fill="url(#panel)" stroke="#FFFFFF" stroke-opacity="0.16"/>
+  <path d="M72 135H1128" stroke="#FFFFFF" stroke-opacity="0.12"/>
+  <text x="110" y="122" fill="#FFB800" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="4">SHANGHAI RACE WEEKEND</text>
+  <text x="110" y="194" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="900">Happy Travel</text>
+  <text x="110" y="240" fill="#E2E8F0" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">F1 showroom entrance for a 2026 Shanghai itinerary</text>
+  <text x="110" y="285" fill="#A8B3C7" font-family="Inter, Arial, sans-serif" font-size="18">Hold to ignite, watch the RB20 arrive, then plan the weekend by list, map, language, and day.</text>
+
+  <g transform="translate(110 326)">
+    <rect width="160" height="52" rx="10" fill="#E10600"/>
+    <text x="80" y="33" text-anchor="middle" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="900">3D F1 START</text>
+    <rect x="178" width="156" height="52" rx="10" fill="#111827" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <text x="256" y="33" text-anchor="middle" fill="#FFB800" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="900">MAP + LIST</text>
+    <rect x="352" width="160" height="52" rx="10" fill="#111827" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <text x="432" y="33" text-anchor="middle" fill="#E2E8F0" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="900">ROSE MODAL</text>
+  </g>
+
+  <g transform="translate(760 156)">
+    <path d="M34 153C82 95 166 73 278 86C340 93 389 116 425 155" stroke="#FFB800" stroke-opacity="0.65" stroke-width="4" stroke-dasharray="10 10"/>
+    <path d="M42 158L132 96H305L410 158H42Z" fill="#E10600"/>
+    <path d="M132 96L176 54H259L305 96H132Z" fill="#0B1220" stroke="#FFB800" stroke-width="4"/>
+    <path d="M85 144H365L415 177H35L85 144Z" fill="#101827"/>
+    <path d="M194 75H248L275 102H166L194 75Z" fill="#F8FAFC" fill-opacity="0.9"/>
+    <circle cx="125" cy="180" r="42" fill="#050914" stroke="#F8FAFC" stroke-width="8"/>
+    <circle cx="125" cy="180" r="18" fill="#FFB800"/>
+    <circle cx="322" cy="180" r="42" fill="#050914" stroke="#F8FAFC" stroke-width="8"/>
+    <circle cx="322" cy="180" r="18" fill="#FFB800"/>
+    <path d="M54 158H417" stroke="#FFFFFF" stroke-opacity="0.32" stroke-width="3"/>
+    <text x="224" y="239" text-anchor="middle" fill="#A8B3C7" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="700">RB20 showroom asset</text>
+  </g>
+
+  <g transform="translate(802 94)">
+    <circle cx="15" cy="15" r="15" fill="#1A2537" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <circle cx="53" cy="15" r="15" fill="#1A2537" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <circle cx="91" cy="15" r="15" fill="#E10600" filter="url(#glow)"/>
+    <circle cx="129" cy="15" r="15" fill="#E10600" filter="url(#glow)"/>
+    <circle cx="167" cy="15" r="15" fill="#FFB800" filter="url(#glow)"/>
+  </g>
+
+  <g transform="translate(728 324)">
+    <rect width="352" height="68" rx="14" fill="#FFFFFF" fill-opacity="0.08" stroke="#FFFFFF" stroke-opacity="0.14"/>
+    <text x="24" y="27" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="900">VERIFICATION LANES</text>
+    <text x="24" y="50" fill="#A8B3C7" font-family="Inter, Arial, sans-serif" font-size="13">Vitest | Playwright | GLB asset checks | Vercel</text>
+  </g>
+</svg>
