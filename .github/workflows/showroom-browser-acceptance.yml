@@ -98,7 +98,7 @@ jobs:
 
       - name: Upload Playwright evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: affected-browser-${{ matrix.project }}
           path: output/playwright/
