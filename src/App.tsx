@@ -241,6 +241,7 @@ export default function App() {
       </AnimatePresence>
 
       <motion.div
+        data-app-shell="main"
         className="min-h-screen bg-[#F0F2F5] text-slate-900 font-sans selection:bg-[#E10600]/20"
         initial={{ opacity: 0 }}
         animate={{ opacity: showWelcome ? 0 : 1 }}

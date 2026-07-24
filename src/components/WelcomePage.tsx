@@ -69,6 +69,8 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const hasManualInteractionRef = React.useRef(false);
   const hasStartedEntryRef = React.useRef(false);
   const ignoreNextEnterClickRef = React.useRef(false);
+  const lastProgressTickRef = React.useRef<number | null>(null);
+  const progressRef = React.useRef(0);
 
   const cancelAutomaticShowroomSequence = useCallback(() => {
     if (autoExplodeTimerRef.current) {
@@ -128,7 +130,15 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
     enterAfterReassembly();
   }, [enterAfterReassembly, onPrepareEnter]);
 
-  const handleEnter = useCallback(() => {
+  const handleEnter = useCallback((event?: React.MouseEvent<HTMLButtonElement>) => {
+    if (event) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const isInsideButton = event.clientX >= rect.left
+        && event.clientX <= rect.right
+        && event.clientY >= rect.top
+        && event.clientY <= rect.bottom;
+      if (!isInsideButton) return;
+    }
     if (ignoreNextEnterClickRef.current) {
       ignoreNextEnterClickRef.current = false;
       return;
@@ -174,6 +184,10 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   }, [cancelAutomaticShowroomSequence]);
 
   useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
+
+  useEffect(() => {
     if (
       progress < 100
       || isTransitioning
@@ -217,28 +231,43 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
     let interval: ReturnType<typeof setInterval>;
 
     if (isPressing && progress < 100) {
-      // 按住时增加进度
+      // Advance by elapsed time so heavy WebGL frames do not stretch ignition.
+      if (lastProgressTickRef.current === null) {
+        lastProgressTickRef.current = performance.now();
+      }
       interval = setInterval(() => {
         setProgress((prev) => {
-          const next = prev >= 100 ? 100 : prev + 1;
+          const now = performance.now();
+          const elapsed = Math.min(now - (lastProgressTickRef.current ?? now), 1000);
+          lastProgressTickRef.current = now;
+          const next = prev >= 100 ? 100 : Math.floor(Math.min(100, prev + elapsed / 50));
+          progressRef.current = next;
           return next;
         });
       }, 50);
     } else if (!isPressing && progress > 0 && progress < 30) {
-      // 松手且进度<30%：重置进度
+      lastProgressTickRef.current = null;
       setProgress(0);
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
     } else if (!isPressing && progress >= 30 && progress < 100) {
-      // 松手但进度>=30%：自动继续增长
+      if (lastProgressTickRef.current === null) {
+        lastProgressTickRef.current = performance.now();
+      }
       interval = setInterval(() => {
         setProgress((prev) => {
-          const next = prev >= 100 ? 100 : prev + 1;
+          const now = performance.now();
+          const elapsed = Math.min(now - (lastProgressTickRef.current ?? now), 1000);
+          lastProgressTickRef.current = now;
+          const next = prev >= 100 ? 100 : Math.floor(Math.min(100, prev + elapsed / 50));
+          progressRef.current = next;
           return next;
         });
       }, 50);
+    } else {
+      lastProgressTickRef.current = null;
     }
 
     return () => clearInterval(interval);
@@ -452,12 +481,39 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
                 if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
                   event.currentTarget.releasePointerCapture(event.pointerId);
                 }
+                const rect = event.currentTarget.getBoundingClientRect();
+                const isInsideButton = event.clientX >= rect.left
+                  && event.clientX <= rect.right
+                  && event.clientY >= rect.top
+                  && event.clientY <= rect.bottom;
+                if (!isInsideButton) ignoreNextEnterClickRef.current = true;
+                setProgress((value) => (
+                  value >= 30 || progressRef.current >= 30 ? Math.max(value, 30) : value
+                ));
                 setIsPressing(false);
               }}
               onPointerCancel={(event) => {
                 if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
                   event.currentTarget.releasePointerCapture(event.pointerId);
                 }
+              }}
+              onKeyDown={(event) => {
+                if (event.repeat || (event.key !== ' ' && event.key !== 'Enter')) return;
+                event.preventDefault();
+                ignoreNextEnterClickRef.current = true;
+                setIsPressing(true);
+                if (audioRef.current) {
+                  audioRef.current.currentTime = 0;
+                  audioRef.current.play().catch(() => {});
+                }
+              }}
+              onKeyUp={(event) => {
+                if (event.key !== ' ' && event.key !== 'Enter') return;
+                event.preventDefault();
+                setProgress((value) => (
+                  value >= 30 || progressRef.current >= 30 ? Math.max(value, 30) : value
+                ));
+                setIsPressing(false);
               }}
               onClick={handleEnter}
               className="group relative z-[90] inline-flex items-center justify-center gap-2 px-10 py-4 w-[280px] sm:w-[360px] bg-[#FFB800] text-[#001A30] font-black text-lg sm:text-2xl uppercase tracking-wider transform -skew-x-12 pointer-events-auto cursor-pointer select-none"
