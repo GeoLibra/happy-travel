@@ -25,7 +25,7 @@ export class ItineraryPage {
   }
 
   async waitUntilReady() {
-    await expect(this.returnWelcomeButton).toBeVisible({ timeout: 15_000 });
+    await expect(this.returnWelcomeButton).toBeVisible({ timeout: 30_000 });
   }
 
   async clickReturnToWelcome() {

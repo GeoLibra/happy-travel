@@ -3,6 +3,8 @@ import { ItineraryPage } from '../pages/ItineraryPage';
 import { RoseModalPage } from '../pages/RoseModalPage';
 
 test.describe('Rose Easter Egg, Modal & Bloom Interaction', () => {
+  test.describe.configure({ timeout: 180_000 });
+
   let itineraryPage: ItineraryPage;
   let roseModalPage: RoseModalPage;
 

@@ -247,6 +247,10 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         details: {
           ...getResourceAudit(),
           ...getF1WheelAudit(f1Wheels),
+          arrivalReady: arrivalState.ready,
+          arrivalSettledFrames: arrivalState.settledFrames,
+          arrivalHoldSeconds: arrivalState.holdSeconds,
+          studioReveal,
           explodeAmount,
           ...getF1ExplodedPartsFloorAudit(f1ExplodedParts, floorY, clearance),
         },

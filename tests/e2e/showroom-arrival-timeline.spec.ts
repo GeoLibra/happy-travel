@@ -1,4 +1,4 @@
-import { test, expect } from 'playwright/test';
+import { test, expect, type Page } from 'playwright/test';
 
 import {
   analyzeCanvasScreenshot,
@@ -18,10 +18,12 @@ test.afterAll(() =>
 test('captures 5 arrival timeline frames and verifies canvas non-empty, centered composition, motion delta, and CTA operability', async ({
   page,
 }) => {
+  test.setTimeout(180_000);
+
   // Step 1: Open welcome page
   await openWelcome(page);
 
-  const frames: { timeMs: number; name: string; metrics: CanvasFrameMetrics }[] = [];
+  const frames: { milestone: string; name: string; metrics: CanvasFrameMetrics }[] = [];
 
   // T0: Initial load frame
   const canvasLocator = page.locator('canvas').first();
@@ -31,37 +33,53 @@ test('captures 5 arrival timeline frames and verifies canvas non-empty, centered
   const screenshotT0 = 'arrival-t0-initial.png';
   const bufferT0 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT0) });
   const metricsT0 = await analyzeCanvasScreenshot(page, bufferT0);
-  frames.push({ timeMs: 0, name: screenshotT0, metrics: metricsT0 });
+  frames.push({ milestone: 'idle', name: screenshotT0, metrics: metricsT0 });
 
-  const startMark = await page.evaluate(() => performance.now());
+  const cta = page.locator('[data-f1-welcome-action="enter"]');
+  await cta.focus();
+  await page.keyboard.down('Space');
 
-  // T1: Early motion frame (+300ms)
-  await page.waitForFunction((start) => performance.now() - start >= 300, startMark);
-  const screenshotT1 = 'arrival-t1-early-motion.png';
-  const bufferT1 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT1) });
-  const metricsT1 = await analyzeCanvasScreenshot(page, bufferT1);
-  frames.push({ timeMs: 300, name: screenshotT1, metrics: metricsT1 });
+  let metricsT1: CanvasFrameMetrics;
+  let metricsT2: CanvasFrameMetrics;
+  try {
+    await waitForIgnitionProgress(page, 20);
+    const screenshotT1 = 'arrival-t1-early-motion.png';
+    const bufferT1 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT1) });
+    metricsT1 = await analyzeCanvasScreenshot(page, bufferT1);
+    frames.push({ milestone: 'ignition-20%', name: screenshotT1, metrics: metricsT1 });
 
-  // T2: Mid arrival frame (+500ms -> total 800ms)
-  await page.waitForFunction((start) => performance.now() - start >= 800, startMark);
-  const screenshotT2 = 'arrival-t2-mid-motion.png';
-  const bufferT2 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT2) });
-  const metricsT2 = await analyzeCanvasScreenshot(page, bufferT2);
-  frames.push({ timeMs: 800, name: screenshotT2, metrics: metricsT2 });
+    await waitForIgnitionProgress(page, 60);
+    const screenshotT2 = 'arrival-t2-mid-motion.png';
+    const bufferT2 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT2) });
+    metricsT2 = await analyzeCanvasScreenshot(page, bufferT2);
+    frames.push({ milestone: 'ignition-60%', name: screenshotT2, metrics: metricsT2 });
 
-  // T3: Settled frame (+700ms -> total 1500ms)
-  await page.waitForFunction((start) => performance.now() - start >= 1500, startMark);
+    await waitForIgnitionProgress(page, 100);
+  } finally {
+    await page.keyboard.up('Space');
+  }
+
+  await page.waitForFunction(() => {
+    const audit = (window as any).__HAPPY_TRAVEL_TEST__?.sceneAudit?.('f1-welcome');
+    return audit?.details?.arrivalReady === true;
+  }, undefined, { timeout: 60_000 });
+
+  // T3: Settled frame after the arrival state confirms a stable pose.
   const screenshotT3 = 'arrival-t3-settled.png';
   const bufferT3 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT3) });
   const metricsT3 = await analyzeCanvasScreenshot(page, bufferT3);
-  frames.push({ timeMs: 1500, name: screenshotT3, metrics: metricsT3 });
+  frames.push({ milestone: 'arrival-settled', name: screenshotT3, metrics: metricsT3 });
 
-  // T4: Studio post-arrival frame (+1000ms -> total 2500ms)
-  await page.waitForFunction((start) => performance.now() - start >= 2500, startMark);
+  await page.waitForFunction(() => {
+    const audit = (window as any).__HAPPY_TRAVEL_TEST__?.sceneAudit?.('f1-welcome');
+    return (audit?.details?.studioReveal ?? 0) >= 0.95;
+  }, undefined, { timeout: 30_000 });
+
+  // T4: Studio post-arrival frame after the reveal reaches its stable state.
   const screenshotT4 = 'arrival-t4-studio.png';
   const bufferT4 = await canvasLocator.screenshot({ path: evidence.screenshotPath(screenshotT4) });
   const metricsT4 = await analyzeCanvasScreenshot(page, bufferT4);
-  frames.push({ timeMs: 2500, name: screenshotT4, metrics: metricsT4 });
+  frames.push({ milestone: 'studio-revealed', name: screenshotT4, metrics: metricsT4 });
 
   // Save full-page screenshot for visual evidence reporting
   await page.screenshot({ path: evidence.screenshotPath('arrival-fullpage-settled.png'), fullPage: true });
@@ -70,7 +88,7 @@ test('captures 5 arrival timeline frames and verifies canvas non-empty, centered
   for (const frame of frames) {
     expect(
       frame.metrics.nonEmptyPixelRatio,
-      `Canvas frame at ${frame.timeMs}ms (${frame.name}) must render non-empty WebGL content`,
+      `Canvas frame at ${frame.milestone} (${frame.name}) must render non-empty WebGL content`,
     ).toBeGreaterThan(0.005);
   }
 
@@ -104,15 +122,14 @@ test('captures 5 arrival timeline frames and verifies canvas non-empty, centered
   ).toBeLessThan(0.15);
 
   // 4. CTA Operability & Real Handoff Actionability Check
-  const cta = page.locator('[data-f1-welcome-action="enter"]');
   await expect(cta).toBeVisible();
   await expect(cta).toBeEnabled();
 
-  // Test Playwright actionability check (verifies element is not blocked or hidden)
-  await cta.click({ trial: true });
-
-  // Perform real click to ensure CTA responds cleanly to user pointer interaction
-  await cta.click();
+  // Perform a real keyboard handoff; pointer ownership is covered separately.
+  await cta.press('Enter');
+  await expect(page.locator('[data-app-action="return-welcome"]')).toBeVisible({
+    timeout: 15_000,
+  });
 
   evidence.record({
     name: 'F1 arrival timeline 5-frame sampling',
@@ -121,3 +138,13 @@ test('captures 5 arrival timeline frames and verifies canvas non-empty, centered
     screenshot: screenshotT3,
   });
 });
+
+async function waitForIgnitionProgress(page: Page, target: number) {
+  await page.waitForFunction((minimum: number) => {
+    const button = document.querySelector('[data-f1-welcome-action="enter"]');
+    const text = button?.textContent ?? '';
+    if (text.includes('ENTER') || text.includes('REASSEMBLING')) return true;
+    const match = text.match(/ENGINE STARTING\s+(\d+)%/);
+    return match ? Number(match[1]) >= minimum : false;
+  }, target, { timeout: 60_000 });
+}

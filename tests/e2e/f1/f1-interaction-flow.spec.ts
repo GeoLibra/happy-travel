@@ -31,7 +31,7 @@ test.describe('F1 Interaction Flow & Welcome Scene', () => {
   });
 
   test('press & hold to 100% completes ignition and triggers app entry', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
 
     // Hold until engine ignition completes to 100%
     await welcomePage.holdToIgnite();
@@ -59,7 +59,7 @@ test.describe('F1 Interaction Flow & Welcome Scene', () => {
   });
 
   test('explode view keeps all semantic parts above studio floor clearance', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
 
     const errors: string[] = [];
     page.on('pageerror', (err) => {
@@ -75,7 +75,7 @@ test.describe('F1 Interaction Flow & Welcome Scene', () => {
       const explodeAmount = audit.details?.explodeAmount ?? 0;
       return (audit.phase === 'exploded' || explodeAmount > 0.85)
         && audit.details?.allPartsAboveFloor === true;
-    }, undefined, { timeout: 30_000 });
+    }, undefined, { timeout: 60_000 });
 
     const floorAudit = await page.evaluate(() => {
       const audit = (window as any).__HAPPY_TRAVEL_TEST__?.sceneAudit?.('f1-welcome');

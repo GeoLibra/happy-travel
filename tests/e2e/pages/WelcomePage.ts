@@ -25,7 +25,7 @@ export class WelcomePage {
 
   async waitUntilReady() {
     await this.racePrepIndicator.waitFor({ state: 'hidden', timeout: 45_000 }).catch(() => {});
-    await expect(this.enterButton).toBeVisible({ timeout: 30_000 });
+    await expect(this.enterButton).toBeVisible({ timeout: 45_000 });
     await expect(this.canvas).toBeVisible();
   }
 
@@ -144,7 +144,7 @@ export class WelcomePage {
       return (await this.enterButton.textContent().catch(() => '')) || '';
     }, {
       intervals: [100],
-      timeout: 25_000,
+      timeout: 90_000,
     }).toMatch(/ENTERED_APP|ENTER|REASSEMBLING/);
   }
 

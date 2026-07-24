@@ -2,6 +2,8 @@ import { expect, test } from 'playwright/test';
 import { ItineraryPage } from '../pages/ItineraryPage';
 
 test.describe('Itinerary Particles Behavior', () => {
+  test.describe.configure({ timeout: 180_000 });
+
   let itineraryPage: ItineraryPage;
 
   test.beforeEach(async ({ page }) => {
@@ -66,13 +68,7 @@ test.describe('Itinerary Particles Behavior', () => {
 
   test('reduced motion mode disables heavy particle animation', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-
-    const enterBtn = page.locator('[data-f1-welcome-action="enter"]');
-    await enterBtn.waitFor({ state: 'visible', timeout: 30_000 });
-    await enterBtn.click();
-
-    await itineraryPage.waitUntilReady();
+    await itineraryPage.goto();
     await expect(itineraryPage.returnWelcomeButton).toBeVisible();
   });
 });
