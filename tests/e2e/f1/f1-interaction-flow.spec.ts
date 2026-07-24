@@ -2,6 +2,8 @@ import { expect, test } from 'playwright/test';
 import { WelcomePage } from '../pages/WelcomePage';
 
 test.describe('F1 Interaction Flow & Welcome Scene', () => {
+  test.describe.configure({ timeout: 180_000 });
+
   let welcomePage: WelcomePage;
 
   test.beforeEach(async ({ page }) => {

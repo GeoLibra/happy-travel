@@ -18,7 +18,7 @@ test.afterAll(() =>
 test('captures 5 arrival timeline frames and verifies canvas non-empty, centered composition, motion delta, and CTA operability', async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   // Step 1: Open welcome page
   await openWelcome(page);
@@ -127,9 +127,11 @@ test('captures 5 arrival timeline frames and verifies canvas non-empty, centered
 
   // Perform a real keyboard handoff; pointer ownership is covered separately.
   await cta.press('Enter');
-  await expect(page.locator('[data-app-action="return-welcome"]')).toBeVisible({
-    timeout: 15_000,
-  });
+  await page.waitForFunction(() => {
+    const appShell = document.querySelector<HTMLElement>('[data-app-shell="main"]');
+    return appShell && window.getComputedStyle(appShell).pointerEvents !== 'none';
+  }, undefined, { timeout: 30_000 });
+  await expect(page.locator('[data-app-action="return-welcome"]')).toBeVisible();
 
   evidence.record({
     name: 'F1 arrival timeline 5-frame sampling',

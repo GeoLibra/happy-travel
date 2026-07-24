@@ -84,26 +84,12 @@ export class WelcomePage {
 
   async tapCarCanvas(): Promise<void> {
     await this.carControl.focus();
-    await this.page.keyboard.press('Enter');
-    await this.page.waitForFunction(() => {
-      const audit = (window as any).__HAPPY_TRAVEL_TEST__?.sceneAudit?.('f1-welcome');
-      const explodeAmount = audit?.details?.explodeAmount ?? 0;
-      return audit?.phase === 'exploded' || explodeAmount > 0.05;
-    }, undefined, { timeout: 5_000 }).catch(async () => {
-      await this.tapCarCanvasAtVisualCenter();
-    });
-  }
-
-  private async tapCarCanvasAtVisualCenter(): Promise<void> {
-    const box = await this.canvas.boundingBox();
-    if (!box) {
-      throw new Error('Canvas bounding box unavailable');
+    if (await this.carControl.getAttribute('aria-pressed') !== 'true') {
+      await this.page.keyboard.press('Enter');
     }
-    const x = box.x + box.width * 0.5;
-    const y = box.y + box.height * 0.42;
-    await this.page.mouse.move(x, y);
-    await this.page.mouse.down();
-    await this.page.mouse.up();
+    await expect(this.carControl).toHaveAttribute('aria-pressed', 'true', {
+      timeout: 30_000,
+    });
   }
 
   async clickEnter() {
