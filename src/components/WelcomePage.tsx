@@ -51,6 +51,7 @@ interface WelcomeProps {
 }
 
 const REASSEMBLY_BEFORE_ENTER_MS = 1600;
+type IgnitionCtaState = 'loading' | 'idle' | 'charging' | 'ready' | 'entering';
 
 const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const { t } = useI18n();
@@ -73,7 +74,17 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
   const hasManualInteractionRef = React.useRef(false);
   const hasStartedEntryRef = React.useRef(false);
   const ignoreNextEnterClickRef = React.useRef(false);
+  const pointerStartedReadyRef = React.useRef(false);
   const progressRef = React.useRef(0);
+  const ignitionCtaState: IgnitionCtaState = isTransitioning
+    ? 'entering'
+    : progress >= 100
+      ? 'ready'
+      : isPressing || progress > 0
+        ? 'charging'
+        : modelLoading
+          ? 'loading'
+          : 'idle';
 
   const cancelAutomaticShowroomSequence = useCallback(() => {
     if (autoExplodeTimerRef.current) {
@@ -146,9 +157,10 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
       ignoreNextEnterClickRef.current = false;
       return;
     }
+    if (ignitionCtaState !== 'ready') return;
     if (progress < 100 || hasStartedEntryRef.current) return;
     triggerPreparedEnter();
-  }, [progress, triggerPreparedEnter]);
+  }, [ignitionCtaState, progress, triggerPreparedEnter]);
 
   const handleTagClick = () => {
     setSimplyLovely(true);
@@ -459,7 +471,9 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
               data-f1-welcome-action="enter"
               onPointerDown={(event) => {
                 ignoreNextEnterClickRef.current = false;
+                pointerStartedReadyRef.current = progressRef.current >= 100;
                 event.currentTarget.setPointerCapture?.(event.pointerId);
+                if (pointerStartedReadyRef.current) return;
                 setIsPressing(true);
                 if (audioRef.current) {
                   audioRef.current.currentTime = 0;
@@ -489,11 +503,16 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
                   value >= 30 || progressRef.current >= 30 ? Math.max(value, 30) : value
                 ));
                 setIsPressing(false);
+                if (!pointerStartedReadyRef.current) {
+                  ignoreNextEnterClickRef.current = true;
+                }
+                pointerStartedReadyRef.current = false;
               }}
               onPointerCancel={(event) => {
                 if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
                   event.currentTarget.releasePointerCapture(event.pointerId);
                 }
+                pointerStartedReadyRef.current = false;
               }}
               onKeyDown={(event) => {
                 if (event.repeat || (event.key !== ' ' && event.key !== 'Enter')) return;
@@ -530,11 +549,15 @@ const WelcomePage: React.FC<WelcomeProps> = ({ onEnter, onPrepareEnter }) => {
 <span className="relative z-10 flex items-center gap-2 skew-x-12 w-[240px] justify-center text-base sm:text-lg whitespace-nowrap">
   <Zap size={18} className="flex-shrink-0"/>
   <span className="flex-shrink-0">
-    {progress >= 100
-      ? (isTransitioning ? "REASSEMBLING..." : "ENTER")
-      : (isPressing || progress > 0)
-      ? `ENGINE STARTING ${progress}%`
-      : (modelLoading ? "CALIBRATING..." : "HOLD TO START")}
+    {ignitionCtaState === 'entering'
+      ? "REASSEMBLING..."
+      : ignitionCtaState === 'ready'
+        ? "ENTER"
+        : ignitionCtaState === 'charging'
+          ? `ENGINE STARTING ${progress}%`
+          : ignitionCtaState === 'loading'
+            ? "CALIBRATING..."
+            : "HOLD TO START"}
   </span>
   <ArrowRight size={20} className="flex-shrink-0"/>
 </span>

@@ -503,7 +503,20 @@ const ParticleBackground: React.FC<ParticleBackgroundProps> = ({
         interactiveUiHit: interactiveUi !== undefined,
       });
       if (owner !== 'ui' || !interactiveUi) return false;
-      interactiveUi.click();
+      interactiveUi.dispatchEvent(new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        screenX: event.screenX,
+        screenY: event.screenY,
+        button: event.button,
+        buttons: event.buttons,
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        metaKey: event.metaKey,
+      }));
       return true;
     };
 
