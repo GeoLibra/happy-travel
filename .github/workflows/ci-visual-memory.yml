@@ -42,6 +42,7 @@ jobs:
     env:
       AUDIT_SUITE: ${{ inputs.suite || 'all' }}
       AUDIT_DOMAIN: ${{ inputs.domain || 'all' }}
+      PUPPETEER_CACHE_DIR: ${{ github.workspace }}/.cache/puppeteer
 
     steps:
       - name: Checkout repository
@@ -58,6 +59,19 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Restore Puppeteer browser cache
+        if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'memory'
+        uses: actions/cache@v4
+        with:
+          path: .cache/puppeteer
+          key: ${{ runner.os }}-puppeteer-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-puppeteer-
+
+      - name: Install Puppeteer Chrome for MemLab
+        if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'memory'
+        run: node node_modules/.pnpm/puppeteer@*/node_modules/puppeteer/install.mjs
 
       - name: Build Web Application
         run: pnpm build
