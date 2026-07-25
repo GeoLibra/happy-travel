@@ -42,7 +42,7 @@ jobs:
     env:
       AUDIT_SUITE: ${{ inputs.suite || 'all' }}
       AUDIT_DOMAIN: ${{ inputs.domain || 'all' }}
-      PUPPETEER_CACHE_DIR: ${{ github.workspace }}/.cache/puppeteer
+      PUPPETEER_CACHE_DIR: /github/home/.cache/puppeteer
 
     steps:
       - name: Checkout repository
@@ -64,7 +64,7 @@ jobs:
         if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'memory'
         uses: actions/cache@v4
         with:
-          path: .cache/puppeteer
+          path: /github/home/.cache/puppeteer
           key: ${{ runner.os }}-puppeteer-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-puppeteer-
