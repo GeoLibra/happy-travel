@@ -71,7 +71,9 @@ jobs:
 
       - name: Install Puppeteer Chrome for MemLab
         if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'memory'
-        run: node node_modules/.pnpm/puppeteer@*/node_modules/puppeteer/install.mjs
+        run: |
+          echo "PUPPETEER_CACHE_DIR=${PUPPETEER_CACHE_DIR}"
+          node node_modules/.pnpm/puppeteer@*/node_modules/puppeteer/install.mjs
 
       - name: Build Web Application
         run: pnpm build
