@@ -1,9 +1,18 @@
-name: Visual & Memory Audit (Nightly / Manual)
+name: Visual & Memory Audit
 
 on:
-  schedule:
-    # Run nightly at 03:00 CST (19:00 UTC)
-    - cron: '0 19 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ci-visual-memory.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'playwright.config.ts'
+      - 'src/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'tests/e2e/**'
+      - 'tests/memory/**'
   workflow_dispatch:
     inputs:
       suite:
@@ -32,7 +41,7 @@ concurrency:
 
 jobs:
   visual-memory-audit:
-    name: Visual & Memory Audit (${{ inputs.suite || 'all' }} / ${{ inputs.domain || 'all' }})
+    name: Visual & Memory Audit (${{ github.event_name == 'workflow_dispatch' && inputs.suite || 'memory' }} / ${{ github.event_name == 'workflow_dispatch' && inputs.domain || 'f1' }})
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-jammy
@@ -40,8 +49,8 @@ jobs:
     timeout-minutes: 30
 
     env:
-      AUDIT_SUITE: ${{ inputs.suite || 'all' }}
-      AUDIT_DOMAIN: ${{ inputs.domain || 'all' }}
+      AUDIT_SUITE: ${{ github.event_name == 'workflow_dispatch' && inputs.suite || 'memory' }}
+      AUDIT_DOMAIN: ${{ github.event_name == 'workflow_dispatch' && inputs.domain || 'f1' }}
       PUPPETEER_CACHE_DIR: /github/home/.cache/puppeteer
 
     steps:
@@ -108,4 +117,5 @@ jobs:
           path: |
             output/playwright/
             output/test-results/memory/
+            !output/test-results/memory/data/profile/**
           retention-days: 14
