@@ -71,7 +71,7 @@ jobs:
 
       - name: Restore Puppeteer browser cache
         if: env.AUDIT_SUITE == 'all' || env.AUDIT_SUITE == 'memory'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /github/home/.cache/puppeteer
           key: ${{ runner.os }}-puppeteer-${{ hashFiles('pnpm-lock.yaml') }}
