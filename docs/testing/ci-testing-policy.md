@@ -23,7 +23,7 @@ This document outlines the testing strategy, commands, directory layout, browser
 | `pnpm test:impact` | Dynamically resolves and runs affected Playwright browser projects | Pre-push, PR CI |
 | `pnpm test:unit` | Executes Vitest unit & contract suites | Core logic changes |
 | `pnpm test:e2e` | Executes Playwright E2E suites across browser projects | Full browser validation |
-| `pnpm test:full` | Runs `test:fast` followed by `test:e2e` | Pre-release sanity check |
+| `pnpm test:full` | Runs `test:fast` followed by the impacted Playwright suites | Pre-release sanity check |
 | `pnpm test:memory` | Runs WebGL lifecycle & heap leak audit checks | Nightly / Memory debugging |
 | `pnpm check:showroom` | Runs showroom static/runtime contract checks | Showroom implementation changes |
 | `pnpm check:showroom-acceptance` | Generates browser acceptance evidence & screenshots | Showroom / F1 changes |

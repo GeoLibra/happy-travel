@@ -1,33 +1,20 @@
-# Project Agent Guidance
+# Happy Travel agent guidance
 
-## F1 welcome-scene invariants
+Happy Travel is a React, TypeScript, and Three.js trip planner for the 2026 Shanghai race weekend, with an F1 showroom welcome experience and a map/list itinerary.
 
-- The car canvas stays above ordinary welcome UI. Welcome copy, stats, start lights, and the CTA must remain below the transparent car canvas; only the blocking loader and intentional modal/easter-egg overlays may render above it.
-- A visible car ray hit owns pointer interaction. When the car does not cover an interactive control, the exposed control must remain operable through the foreground-canvas pointer forwarding path.
-- `WheelSpin_FL`, `WheelSpin_FR`, `WheelSpin_RL`, and `WheelSpin_RR` are the only runtime wheel-spin nodes. Do not rotate fuzzy name matches, adjacent aero panels, suspension, or brake calipers.
-- Treat wheel geometry ownership and `RearHardRockAeroPanel` parentage as an asset contract. Validate them in Blender and in the shipped GLB before changing the loader URL.
-- Every replacement car asset must use a versioned GLB filename and preserve the previous accepted model until the new asset passes validation.
-- Every F1 model or visual change requires the focused asset, motion, wheel, airflow, studio, reflection, interaction, and model checks plus desktop and mobile browser evidence.
-- Browser evidence must include the complete arrival timeline, not only the final stopped frame, so car pose, camera framing, floor placement, and floor reveal jumps remain visible to reviewers.
-- Explode and reassemble verification must prove every part stays above the floor for the entire motion and that wheel-adjacent bodywork follows its semantic body group.
-- Do not change user-visible ignition timing, showroom lighting, camera framing, model/material ownership, audio behavior, or other F1 product experience details merely to satisfy CI, Playwright, or MemLab. If a test exposes a timing or memory issue, fix the ownership/lifecycle bug or the test harness instead of weakening the product behavior.
-- Test and memory scenarios must not hide leaks or failures by clearing console output, deleting application globals, mutating DOM outside the user path, forcing WebGL context loss in normal runtime cleanup, or adding test-only imperative triggers. Any test-only escape hatch must be explicitly documented, isolated from production runtime, and reviewed before use.
-- Keep the welcome ignition contract stable unless a product change is explicitly requested: holding advances the original progress cadence, releasing below the threshold resets, releasing after the threshold auto-completes, and completion/handoff must use real pointer/keyboard/browser interactions in acceptance tests.
+## Toolchain
 
-## Testing and CI workflow
+- Use `pnpm`; the repository pins it in `package.json` and commits `pnpm-lock.yaml`.
+- Use Node.js 24 locally and in CI. Do not downgrade it to work around tooling issues without explicit approval.
+- Run `pnpm test:fast` for the main local quality gate (typecheck, unit tests, project resolver, asset validation, and build).
+- Use the more focused or browser-heavy gates described in [docs/testing/ci-testing-policy.md](docs/testing/ci-testing-policy.md) when the changed area requires them.
 
-- The project uses `pnpm` (with `pnpm-lock.yaml`), Vitest for unit tests, and Playwright Test (running in the official `mcr.microsoft.com/playwright:v1.61.1-jammy` container in CI).
-- Node.js 24 is the intended local and CI runtime for this project; do not downgrade it to satisfy tooling assumptions without explicit user approval.
-- Standard testing commands:
-  - `pnpm test:fast`: Runs fast quality gate (lint, unit tests, assets check, build).
-  - `pnpm test:assets`: Runs specialized asset validation checks.
-  - `pnpm test:impact`: Resolves changed files and runs impacted Playwright browser suites.
-  - `pnpm test:unit`: Runs Vitest unit and contract tests.
-  - `pnpm test:e2e`: Runs full Playwright end-to-end tests across configured browser projects.
-  - `pnpm test:full`: Runs `pnpm test:fast` followed by `pnpm test:e2e`.
-  - `pnpm test:memory`: Runs WebGL lifecycle and memory audit checks.
-- Package-level scripts should stay as grouped, user-facing quality gates. Do not add a new `package.json` alias for every `scripts/check-*.ts` file; add focused diagnostics as direct `node --import tsx scripts/...` commands in docs or fold them into grouped gates such as `pnpm check:showroom`, `pnpm check:f1`, or `pnpm check:rose`.
-- Run `pnpm test:fast` or `pnpm check:showroom-acceptance` for code changes that affect the showroom or F1 handoff flow, including `src/App.tsx`, `src/components/WelcomePage.tsx`, `src/components/ParticleBackground.tsx`, files under `src/components/showroom/**`, files under `src/lib/showroom-*.ts`, or any change to ignition, skip, enter-app handoff, overlay visibility, scroll lock, or keyboard/pointer showroom controls. Treat `output/playwright/showroom-acceptance-summary.json` or the GitHub Actions artifact as the reviewable evidence.
-- Chromium mobile coverage in CI is viewport and touch emulation only; it does not replace real-device Safari/Chrome checks when shipping materially new mobile WebGL behavior.
-- Prefer `node --import tsx <script>` in pnpm scripts over bare `tsx` CLI so local sandbox runs and GitHub Actions behave consistently.
-- Canonical implementation plans and design specs must live in the main checkout under `docs/superpowers/**`; `.worktrees/**` and `output/**` are disposable execution artifacts, not the long-term source of truth.
+## Task-specific guidance
+
+Load detailed guidance only when it applies to the task:
+
+- For the F1 welcome scene, showroom behavior, car assets, WebGL lifecycle, or related browser evidence, follow [docs/agent-guides/f1-showroom.md](docs/agent-guides/f1-showroom.md).
+- For test selection, Playwright, CI, memory checks, and artifact conventions, follow [docs/testing/ci-testing-policy.md](docs/testing/ci-testing-policy.md).
+- For showroom browser evidence and its output, follow [docs/showroom-browser-acceptance.md](docs/showroom-browser-acceptance.md).
+
+Canonical implementation plans and design specs belong under `docs/superpowers/**` in the main checkout. Treat `.worktrees/**` and `output/**` as disposable execution artifacts, not long-term sources of truth.
