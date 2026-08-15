@@ -10,6 +10,7 @@ interface MapProps {
   onMarkerClick?: (location: Location) => void;
   onHoverType?: (type: Location['type'] | null) => void;
   hoveredType?: Location['type'] | null;
+  active?: boolean;
 }
 
 const getLabelContent = (loc: Location, state: 'normal' | 'hovered' | 'selected') => {
@@ -124,7 +125,8 @@ const MapComponent: React.FC<MapProps> = ({
   selectedLocationId,
   onMarkerClick,
   onHoverType,
-  hoveredType
+  hoveredType,
+  active = true,
 }) => {
   const { t } = useI18n();
   const mapRef = useRef<HTMLDivElement>(null);
@@ -134,9 +136,17 @@ const MapComponent: React.FC<MapProps> = ({
   const markersRef = useRef<{ [key: string]: any }>({});
   const [isMapReady, setIsMapReady] = useState(false);
   const [showPOI, setShowPOI] = useState(false);
+  const [rendererState, setRendererState] = useState(active ? 'initializing' : 'suspended');
 
   useEffect(() => {
+    if (!active) {
+      setRendererState('suspended');
+      return;
+    }
+
     if (!mapRef.current) return;
+    let disposed = false;
+    setRendererState('initializing');
 
     // Use ResizeObserver to ensure container has size before initializing map
     const observer = new ResizeObserver((entries) => {
@@ -159,7 +169,7 @@ const MapComponent: React.FC<MapProps> = ({
         version: '2.0',
         plugins: ['AMap.Scale', 'AMap.ToolBar'],
       }).then((AMap) => {
-        if (!mapRef.current) return;
+        if (disposed || !mapRef.current) return;
 
         amapConstructor.current = AMap;
 
@@ -173,6 +183,7 @@ const MapComponent: React.FC<MapProps> = ({
 
         // Add controls only after map is initialized
         map.on('complete', () => {
+          if (disposed) return;
           map.addControl(new AMap.Scale());
           map.addControl(new AMap.ToolBar());
         });
@@ -236,12 +247,15 @@ const MapComponent: React.FC<MapProps> = ({
 
         map.setFitView();
         setIsMapReady(true);
+        setRendererState('ready');
       }).catch(e => {
+        if (disposed) return;
         console.error('AMap Loader Error:', e);
       });
     };
 
     return () => {
+      disposed = true;
       observer.disconnect();
       if (labelsLayer.current) {
         try {
@@ -261,6 +275,8 @@ const MapComponent: React.FC<MapProps> = ({
         } catch {}
         amapInstance.current = null;
       }
+      setIsMapReady(false);
+      setRendererState('suspended');
       amapConstructor.current = null;
       if (typeof window !== 'undefined' && (window as any).AMap) {
         try {
@@ -277,7 +293,7 @@ const MapComponent: React.FC<MapProps> = ({
         } catch {}
       }
     };
-  }, []);
+  }, [active]);
 
   // Update selection and hover state
   useEffect(() => {
@@ -344,7 +360,10 @@ const MapComponent: React.FC<MapProps> = ({
   }, [showPOI, isMapReady]);
 
   return (
-    <div className="w-full h-full rounded-2xl overflow-hidden shadow-inner bg-slate-100 relative touch-none">
+    <div
+      className="w-full h-full rounded-2xl overflow-hidden shadow-inner bg-slate-100 relative touch-none"
+      data-amap-renderer-state={rendererState}
+    >
       <div ref={mapRef} className="w-full h-full" />
       <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-slate-200 text-xs z-10 min-w-[110px]">
         <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">

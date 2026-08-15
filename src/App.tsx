@@ -356,7 +356,7 @@ function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: Happ
             </div>
             {/* Firework anchor placed exactly at the top right bounding corner */}
             <div className="absolute top-0 right-0 w-0 h-0 z-50 pointer-events-none">
-              {!showWelcome && <MiniFirework />}
+              {!showWelcome && !inactive && <MiniFirework />}
             </div>
       </div>
 
@@ -581,6 +581,7 @@ function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: Happ
           viewMode === 'list' && "hidden md:block"
         )}>
           <MapComponent
+            active={!inactive}
             locations={allLocations}
             selectedLocationId={selectedLocationId}
             onMarkerClick={(loc) => setSelectedLocationId(loc.id)}

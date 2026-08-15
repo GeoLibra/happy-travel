@@ -39,15 +39,21 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   test.setTimeout(180_000);
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);
+  const mapRenderer = page.locator('[data-amap-renderer-state]');
+  const fireworkPortal = page.locator('[data-mini-firework-portal]');
 
   await itinerary.completeWelcomeIgnition();
   await itinerary.selectDayTab(1);
+  await expect(mapRenderer).not.toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(fireworkPortal).toHaveCount(1);
   await itinerary.fullCountdownButton.focus();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/countdown$/);
   await expect(countdown.backButton).toBeFocused();
   await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true');
   await expect(itinerary.surface).toHaveCSS('display', 'none');
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(fireworkPortal).toHaveCount(0);
   await expect(page.getByRole('main')).toHaveCount(1);
 
   await countdown.backButton.press('Enter');
@@ -56,11 +62,15 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   await expect(page.locator('button:has-text("DAY 2") > div')).toBeVisible();
   await expect(itinerary.fullCountdownButton).toBeFocused();
   await expect(page.locator('[data-f1-welcome-action="enter"]')).toHaveCount(0);
+  await expect(mapRenderer).not.toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(fireworkPortal).toHaveCount(1);
 
   await page.goForward();
   await expect(page).toHaveURL(/\/countdown$/);
   await expect(countdown.backButton).toBeFocused();
   await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true');
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(fireworkPortal).toHaveCount(0);
   await expect(page.getByRole('main')).toHaveCount(1);
 });
 

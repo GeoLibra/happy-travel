@@ -45,3 +45,17 @@ Implemented and committed. The compact itinerary countdown is now a native, keyb
 - `pnpm run lint` — passed (`tsc --noEmit`).
 - `pnpm exec playwright test tests/e2e/race-countdown/race-countdown-flow.spec.ts --project=app-desktop-chromium` — passed: 7 tests, including the new app-owned keyboard Back/Forward flow.
 - `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` was launched; after the parent interruption, the latest `output/playwright/test-results/.last-run.json` reports `status: "passed"` and `failedTests: []` (the terminal had reported 4 tests running).
+
+## Fix round 2 — suspend retained map and firework work
+
+- `MapComponent` now receives an `active` lifecycle input. Transitioning to the countdown destroys its AMap instance, label layer, and markers while cancelling an in-flight loader result; returning reinitializes the map renderer without unmounting or resetting React itinerary state. Its `data-amap-renderer-state` exposes `initializing`, `ready`, and `suspended` runtime state.
+- `MiniFirework` is now unmounted while the itinerary is inactive. This removes its `document.body` portal and runs both effect cleanups, stopping its 30 ms positioning interval and 60 ms emitter. Its active portal carries `data-mini-firework-portal` for observable browser coverage.
+- The app-owned keyboard Back/Forward acceptance flow now establishes the map/firework work is present before opening, suspended/removed while the countdown owns the screen, restored after the app-owned return, and suspended/removed again after browser Forward. It continues to verify DAY 2 retention, focus transfer, and no welcome replay.
+
+### Fix-round verification
+
+- `pnpm run lint` — passed (`tsc --noEmit`).
+- Focused app-owned lifecycle acceptance test — passed.
+- `pnpm exec playwright test tests/e2e/race-countdown/race-countdown-flow.spec.ts --project=app-desktop-chromium` — passed: 7 tests.
+- `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` — passed: 4 tests (`.last-run.json` reports passed with no failures).
+- `pnpm check:webgl-lifecycle` — passed: the five-cycle WebGL renderer lifecycle trend.
