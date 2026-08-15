@@ -214,7 +214,7 @@ describe('createTimeVizScene lifecycle', () => {
     expect(tracker.cancelAnimationFrame).toHaveBeenCalledTimes(1);
   });
 
-  it('forwards the selected pixel-ratio cap to renderer and composer before sizing', async () => {
+  it('normalizes the isolated reference renderer to the source pixel density', async () => {
     const tracker = createFakeTimeVizDependencies();
     const scene = await createTimeVizScene({
       canvas: tracker.canvas,
@@ -224,8 +224,8 @@ describe('createTimeVizScene lifecycle', () => {
 
     scene.resize(640, 360, 3);
 
-    expect(tracker.rendererSetPixelRatio).toHaveBeenCalledWith(2);
-    expect(tracker.composerSetPixelRatio).toHaveBeenCalledWith(2);
+    expect(tracker.rendererSetPixelRatio).toHaveBeenCalledWith(1);
+    expect(tracker.composerSetPixelRatio).toHaveBeenCalledWith(1);
     expect(tracker.composerSetPixelRatio.mock.invocationCallOrder[0])
       .toBeLessThan(tracker.composerSetSize.mock.invocationCallOrder[0]);
     scene.dispose();
@@ -278,6 +278,8 @@ describe('default composite factory ownership', () => {
     expect(shader?.fragmentShader).toContain('for (int x = -4; x <= 4; x += 1)');
     expect(shader?.fragmentShader).toContain('float foreground');
     expect(shader?.fragmentShader).toContain('radiusX');
+    expect(shader?.fragmentShader).toContain('180.0');
+    expect(shader?.fragmentShader).toContain('ax < 0.5 ? 0.06');
     expect(shader?.fragmentShader).toContain('/ resolution.x');
     expect(resolutionUniform.value.toArray()).toEqual([448, 251]);
     floor.dispose();

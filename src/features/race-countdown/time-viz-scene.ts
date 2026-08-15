@@ -134,21 +134,21 @@ const floorShader = {
         + 0.003 * cos(p.y * 1.60 + p.x * 0.08 - time * 0.13);
 
       float foreground = smoothstep(1.0, 16.0, -p.y);
-      uv.y = mix(uv.y, 0.5 + (uv.y - 0.5) * 0.35, foreground);
-      float radiusX = mix(10.0, 70.0, foreground) / resolution.x;
-      float radiusY = mix(1.5, 4.0, foreground) / resolution.y;
+      uv.y = mix(uv.y, 0.5 + (uv.y - 0.5) * 0.24, foreground);
+      float radiusX = mix(24.0, 180.0, foreground) / resolution.x;
+      float radiusY = mix(2.0, 6.0, foreground) / resolution.y;
       vec3 blurred = vec3(0.0);
 
       for (int x = -4; x <= 4; x += 1) {
         float ax = float(abs(x));
-        float weightX = ax < 0.5 ? 0.227027
-          : ax < 1.5 ? 0.194595
-          : ax < 2.5 ? 0.121622
-          : ax < 3.5 ? 0.054054
-          : 0.016216;
+        float weightX = ax < 0.5 ? 0.06
+          : ax < 1.5 ? 0.13
+          : ax < 2.5 ? 0.14
+          : ax < 3.5 ? 0.11
+          : 0.09;
         for (int y = -1; y <= 1; y += 1) {
           float weightY = y == 0 ? 0.5 : 0.25;
-          vec2 offset = vec2(float(x) * radiusX * 0.25, float(y) * radiusY);
+          vec2 offset = vec2(float(x) * radiusX * 0.5, float(y) * radiusY);
           blurred += texture2D(tDiffuse, uv + offset).rgb * weightX * weightY;
         }
       }
@@ -458,7 +458,10 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const updateCameraFraming = () => {
     const mobile = viewport === 'mobile';
     const countdown = options.mode === 'countdown';
-    camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 19.2));
+    // Round-2 evidence measured the desktop row at roughly 1.86x the target
+    // normalized bounds. Scale camera distance by that ratio while preserving
+    // the established aim point and reflector horizon relationship.
+    camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 35.7));
     camera.lookAt(0, mobile && countdown ? 0.2 : -1.2, 0);
     digitGroup.position.y = mobile ? -1.15 : -0.65;
     if (floor) {
@@ -621,7 +624,12 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
       resize: (width, height, pixelRatio) => {
         if (disposed || width <= 0 || height <= 0 || !renderer || !composer || !floor) return;
         const nextViewport = viewportForWidth(width);
-        const cappedPixelRatio = Math.max(0.5, Math.min(pixelRatio, quality.maxPixelRatio));
+        // The source reference renders at one backing pixel per CSS pixel. Keep
+        // this isolated comparison route at the same density so its measured
+        // world bounds map to the same normalized viewport margins.
+        const cappedPixelRatio = options.mode === 'reference'
+          ? 1
+          : Math.max(0.5, Math.min(pixelRatio, quality.maxPixelRatio));
         renderer.setPixelRatio(cappedPixelRatio);
         renderer.setSize(width, height, false);
         composer.setPixelRatio(cappedPixelRatio);

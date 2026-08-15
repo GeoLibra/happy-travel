@@ -71,4 +71,13 @@
 - Console: zero errors in the final local capture. The only warning was Three.js's existing `RGBELoader` deprecation notice; Vite/analytics development diagnostics were informational.
 - Focused units: 21 passed. Responsive Playwright: 3 passed. `pnpm test:fast`: passed with 64 unit tests, 10 resolver tests, 6/6 asset validators, and a successful production build.
 
+### Iteration 6 — bounded fix round 3, blocked
+
+- Matched desktop: `output/reference/round-3/source-desktop-1280x720.jpg` and `output/reference/round-3/local-desktop-1280x720.jpg`, digits `195342`, paired source-left/local-right in `output/reference/comparisons/desktop-final.png` (2560 x 720).
+- Matched mobile: `output/reference/round-3/source-mobile-390x844.png` and `output/reference/round-3/local-mobile-390x844.png`, digits `012346`, paired source-left/local-right in `output/reference/comparisons/mobile-final.png` (780 x 844).
+- The local reference renderer is normalized to the source's measured one backing pixel per CSS pixel. The desktop camera distance was adjusted by the 1.86x oversize ratio measured in round 2, with the lattice and group origins unchanged.
+- The reflector now spreads foreground samples across a 180-pixel UV radius, halves each horizontal step across nine taps, reduces the center weight to 0.06, compresses depth more strongly, and increases vertical blur. Mobile now produces broad broken horizontal streaks with no readable mirrored third-row glyph, clearing that round-2 P1.
+- [P1] Desktop remains unacceptable: after the bounded distance correction, only the first three digits are visible in the lower-right portion of the local comparison. It does not reproduce the source's centered, fully visible six-digit row and balanced horizon. No further exploratory tuning was performed.
+- Console: zero errors; only the existing `RGBELoader` deprecation warning. Focused units 21/21, responsive Playwright 3/3, and `pnpm test:fast` all passed.
+
 final result: blocked
