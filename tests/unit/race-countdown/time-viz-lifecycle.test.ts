@@ -233,6 +233,56 @@ describe('createTimeVizScene lifecycle', () => {
 });
 
 describe('default composite factory ownership', () => {
+  it('keeps static liquid distortion and uses foreground-growing horizontal Gaussian blur', () => {
+    let shader: {
+      vertexShader: string;
+      fragmentShader: string;
+      uniforms: Record<string, { value: unknown }>;
+    } | undefined;
+    const timeUniform = { value: 0 };
+    const displacementUniform = { value: 0.075 };
+    const resolutionUniform = { value: new THREE.Vector2() };
+    const renderTarget = {
+      dispose: vi.fn(),
+      setSize: vi.fn(),
+      texture: new THREE.Texture(),
+    };
+    const reflector = {
+      dispose: vi.fn(),
+      getRenderTarget: () => renderTarget,
+      material: new THREE.ShaderMaterial({
+        uniforms: {
+          displacementStrength: displacementUniform,
+          resolution: resolutionUniform,
+          time: timeUniform,
+        },
+      }),
+      position: new THREE.Vector3(),
+      receiveShadow: false,
+      rotation: new THREE.Euler(),
+    };
+
+    const floor = createDefaultFloor({} as TimeVizRenderer, 1280, 720, false, {
+      createGeometry: () => new THREE.PlaneGeometry(),
+      createReflector: (_geometry, options) => {
+        shader = options.shader as typeof shader;
+        return reflector as never;
+      },
+    });
+
+    floor.update(12);
+
+    expect(displacementUniform.value).toBeGreaterThan(0);
+    expect(timeUniform.value).toBe(0);
+    expect(shader?.vertexShader).toContain('depthWave');
+    expect(shader?.fragmentShader).toContain('for (int x = -4; x <= 4; x += 1)');
+    expect(shader?.fragmentShader).toContain('float foreground');
+    expect(shader?.fragmentShader).toContain('radiusX');
+    expect(shader?.fragmentShader).toContain('/ resolution.x');
+    expect(resolutionUniform.value.toArray()).toEqual([448, 251]);
+    floor.dispose();
+  });
+
   it('disposes the loaded HDR source when PMREM construction fails', async () => {
     const source = new THREE.Texture();
     const sourceDispose = vi.fn();

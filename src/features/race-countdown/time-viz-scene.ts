@@ -13,7 +13,12 @@ import {
   type ShowroomQualityOptions,
 } from '@/src/lib/showroom-quality';
 
-import { buildDigitInstances, getTimeVizLayout, type ViewportKind } from './digit-layout';
+import {
+  buildDigitInstances,
+  CELLS_PER_DIGIT,
+  getTimeVizLayout,
+  type ViewportKind,
+} from './digit-layout';
 import type {
   TimeVizComposer,
   TimeVizDependencies,
@@ -25,7 +30,6 @@ import type {
 } from './time-viz-types';
 
 const ENVIRONMENT_URL = '/environments/lythwood_room_1k.hdr';
-const CELLS_PER_DIGIT = 70;
 const MOBILE_BREAKPOINT = 768;
 const INITIAL_WIDTH = 1280;
 const INITIAL_HEIGHT = 720;
@@ -78,29 +82,29 @@ const floorShader = {
     tDiffuse: { value: null },
     textureMatrix: { value: null },
     time: { value: 0 },
-    displacementStrength: { value: 0.11 },
-    blurAmount: { value: 0.016 },
+    displacementStrength: { value: 0.075 },
+    resolution: { value: new THREE.Vector2(
+      reflectionSize(INITIAL_WIDTH, 1),
+      reflectionSize(INITIAL_HEIGHT, 1),
+    ) },
   },
   vertexShader: /* glsl */ `
     uniform mat4 textureMatrix;
     uniform float time;
     uniform float displacementStrength;
     varying vec4 vUv;
-    varying vec2 vWaveNormal;
+    varying vec2 vPlaneCoord;
 
     #include <common>
     #include <logdepthbuf_pars_vertex>
 
     void main() {
       vec3 displaced = position;
-      float xPhase = position.x * 0.32 + time * 0.22;
-      float yPhase = position.y * 0.44 - time * 0.18;
-      float wave = sin(xPhase) * cos(yPhase);
-      displaced.z += wave * displacementStrength;
+      float depthWave = sin(position.y * 0.34 + time * 0.16)
+        + sin(position.y * 0.83 - position.x * 0.035 - time * 0.11) * 0.35;
+      displaced.z += depthWave * displacementStrength;
 
-      float dx = cos(xPhase) * cos(yPhase) * 0.32;
-      float dy = -sin(xPhase) * sin(yPhase) * 0.44;
-      vWaveNormal = vec2(dx, dy) * displacementStrength;
+      vPlaneCoord = position.xy;
       vUv = textureMatrix * vec4(displaced, 1.0);
       gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
 
@@ -110,43 +114,56 @@ const floorShader = {
   fragmentShader: /* glsl */ `
     uniform vec3 color;
     uniform sampler2D tDiffuse;
-    uniform float blurAmount;
+    uniform float time;
+    uniform vec2 resolution;
     varying vec4 vUv;
-    varying vec2 vWaveNormal;
+    varying vec2 vPlaneCoord;
 
     #include <logdepthbuf_pars_fragment>
-
-    float blendOverlay(float base, float blend) {
-      return base < 0.5
-        ? 2.0 * base * blend
-        : 1.0 - 2.0 * (1.0 - base) * (1.0 - blend);
-    }
-
-    vec3 blendOverlay(vec3 base, vec3 blend) {
-      return vec3(
-        blendOverlay(base.r, blend.r),
-        blendOverlay(base.g, blend.g),
-        blendOverlay(base.b, blend.b)
-      );
-    }
 
     void main() {
       #include <logdepthbuf_fragment>
 
-      vec4 projectedUv = vUv;
-      projectedUv.xy += vWaveNormal * projectedUv.w * 0.18;
-      vec2 blur = vec2(blurAmount, blurAmount * 1.7) * projectedUv.w;
-      vec4 reflected = vec4(0.0);
-      for (float x = -2.0; x <= 2.0; x += 1.0) {
-        for (float y = -2.0; y <= 2.0; y += 1.0) {
-          reflected += texture2DProj(
-            tDiffuse,
-            projectedUv + vec4(blur * vec2(x, y), 0.0, 0.0)
-          ) * 0.045;
+      vec2 p = vPlaneCoord;
+      vec2 uv = vUv.xy / max(vUv.w, 0.0001);
+      float band0 = sin(p.y * 0.55 + time * 0.22);
+      float band1 = sin(p.y * 1.15 + p.x * 0.10 - time * 0.17);
+      float band2 = sin(p.y * 2.10 - p.x * 0.04 + time * 0.11);
+      uv.x += 0.032 * band0 + 0.012 * band1 + 0.004 * band2;
+      uv.y += 0.006 * cos(p.y * 0.72 + time * 0.16)
+        + 0.003 * cos(p.y * 1.60 + p.x * 0.08 - time * 0.13);
+
+      float foreground = smoothstep(1.0, 16.0, -p.y);
+      uv.y = mix(uv.y, 0.5 + (uv.y - 0.5) * 0.35, foreground);
+      float radiusX = mix(10.0, 70.0, foreground) / resolution.x;
+      float radiusY = mix(1.5, 4.0, foreground) / resolution.y;
+      vec3 blurred = vec3(0.0);
+
+      for (int x = -4; x <= 4; x += 1) {
+        float ax = float(abs(x));
+        float weightX = ax < 0.5 ? 0.227027
+          : ax < 1.5 ? 0.194595
+          : ax < 2.5 ? 0.121622
+          : ax < 3.5 ? 0.054054
+          : 0.016216;
+        for (int y = -1; y <= 1; y += 1) {
+          float weightY = y == 0 ? 0.5 : 0.25;
+          vec2 offset = vec2(float(x) * radiusX * 0.25, float(y) * radiusY);
+          blurred += texture2D(tDiffuse, uv + offset).rgb * weightX * weightY;
         }
       }
 
-      gl_FragColor = vec4(blendOverlay(reflected.rgb, color), 0.92);
+      float energy = max(blurred.r, max(blurred.g, blurred.b));
+      float mask = smoothstep(0.002, 0.08, energy);
+      float gain = mix(0.78, 0.48, foreground);
+      float lowFrequencyNoise = 0.5 + 0.5 * sin(p.y * 0.23 + sin(p.x * 0.10));
+      float depthBand = 0.5 + 0.5 * sin(
+        p.y * 1.1 + sin(p.x * 0.22) * 1.5 + sin(p.y * 0.31 - p.x * 0.11) * 0.6
+      );
+      float poolMask = smoothstep(0.28, 0.70, depthBand);
+      vec3 floorBase = vec3(0.004, 0.006, 0.010) + lowFrequencyNoise * 0.003;
+      vec3 liquidColor = mix(floorBase, blurred, mask * gain * mix(0.05, 1.0, poolMask));
+      gl_FragColor = vec4(liquidColor, 1.0);
 
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
@@ -239,7 +256,7 @@ function reflectionSize(value: number, pixelRatio: number): number {
 }
 
 const defaultFloorResourceFactories: TimeVizFloorResourceFactories = {
-  createGeometry: () => new THREE.PlaneGeometry(34, 24, 96, 64),
+  createGeometry: () => new THREE.PlaneGeometry(42, 52, 112, 128),
   createReflector: (geometry, options) => new Reflector(geometry, options),
 };
 
@@ -269,6 +286,7 @@ export function createDefaultFloor(
     reflector.position.y = -2.45;
     reflector.position.z = -1.25;
     reflector.receiveShadow = true;
+    reflector.renderOrder = -1;
 
     const renderTarget = reflector.getRenderTarget();
     renderTarget.texture.generateMipmaps = true;
@@ -276,18 +294,22 @@ export function createDefaultFloor(
     renderTarget.texture.minFilter = THREE.LinearMipmapLinearFilter;
 
     const material = reflector.material as THREE.ShaderMaterial;
+    material.depthWrite = false;
     const timeUniform = material.uniforms.time;
-    const displacementUniform = material.uniforms.displacementStrength;
-    if (!animated) displacementUniform.value = 0;
+    const resolutionUniform = material.uniforms.resolution;
+    resolutionUniform.value.set(
+      reflectionSize(width, 1),
+      reflectionSize(height, 1),
+    );
     const dispose = createIdempotentDisposer([...resources].reverse());
 
     return {
       object: reflector,
       resize: (nextWidth, nextHeight, pixelRatio) => {
-        renderTarget.setSize(
-          reflectionSize(nextWidth, pixelRatio),
-          reflectionSize(nextHeight, pixelRatio),
-        );
+        const targetWidth = reflectionSize(nextWidth, pixelRatio);
+        const targetHeight = reflectionSize(nextHeight, pixelRatio);
+        renderTarget.setSize(targetWidth, targetHeight);
+        resolutionUniform.value.set(targetWidth, targetHeight);
       },
       update: (elapsedSeconds) => {
         if (animated) timeUniform.value = elapsedSeconds;
@@ -345,7 +367,7 @@ const defaultDependencies: TimeVizDependencies = {
   cancelAnimationFrame: (frameId) => window.cancelAnimationFrame(frameId),
   createComposer: createDefaultComposer,
   createFloor: createDefaultFloor,
-  createGeometry: () => new RoundedBoxGeometry(0.34, 0.34, 0.72, 3, 0.045),
+  createGeometry: () => new RoundedBoxGeometry(0.16, 0.16, 0.36, 3, 0.022),
   createMaterial: () => new THREE.MeshPhysicalMaterial({
     clearcoat: 0.52,
     clearcoatRoughness: 0.16,
@@ -417,6 +439,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const quaternion = new THREE.Quaternion();
   const scale = new THREE.Vector3();
   const instanceColor = new THREE.Color();
+  quaternion.setFromEuler(new THREE.Euler(0, 0.28, 0));
 
   const cleanupAfterFailure = (error: unknown): never => {
     const dispose = createIdempotentDisposer([...ownedResources].reverse());
@@ -435,11 +458,12 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const updateCameraFraming = () => {
     const mobile = viewport === 'mobile';
     const countdown = options.mode === 'countdown';
-    camera.position.set(2.2, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 19.2));
+    camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 19.2));
     camera.lookAt(0, mobile && countdown ? 0.2 : -1.2, 0);
-    digitGroup.position.y = mobile ? -0.9 : -1;
+    digitGroup.position.y = mobile ? -1.15 : -0.65;
     if (floor) {
-      floor.object.position.y = mobile ? (countdown ? -11.2 : -7.4) : -2.25;
+      floor.object.position.y = mobile ? (countdown ? -11.2 : -6.9) : -1.85;
+      floor.object.position.z = -1.25;
     }
   };
 
@@ -464,7 +488,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
         const instanceIndex = firstCell + cellOffset;
         const instance = instances[instanceIndex];
         position.set(instance.position[0], instance.position[1], instance.position[2]);
-        scale.setScalar(instance.visible ? (viewport === 'mobile' ? 0.91 : 0.94) : 0.0001);
+        scale.setScalar(instance.visible ? 0.95 : 0.0001);
         matrix.compose(position, quaternion, scale);
         cellMesh.setMatrixAt(instanceIndex, matrix);
       }

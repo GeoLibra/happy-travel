@@ -28,20 +28,23 @@ export interface LayoutMetrics {
   rowSpacing: number;
 }
 
-const DIGIT_ROWS = 10;
-const DIGIT_COLUMNS = 7;
+const LOGICAL_DIGIT_ROWS = 10;
+const LOGICAL_DIGIT_COLUMNS = 7;
+export const DIGIT_LATTICE_ROWS = LOGICAL_DIGIT_ROWS * 2;
+export const DIGIT_LATTICE_COLUMNS = LOGICAL_DIGIT_COLUMNS * 2;
+export const CELLS_PER_DIGIT = DIGIT_LATTICE_ROWS * DIGIT_LATTICE_COLUMNS;
 const REFERENCE_DIGIT_CAPACITY = 6;
 const COUNTDOWN_DIGIT_CAPACITY = 9;
 const DEFAULT_SEED = 26;
 
 const LAYOUTS: Record<ViewportKind, Omit<LayoutMetrics, 'columns' | 'rows' | 'digitCapacity'>> = {
   desktop: {
-    cubeSpacing: 0.33,
+    cubeSpacing: 0.17,
     digitSpacing: 2.4,
     rowSpacing: 4.1,
   },
   mobile: {
-    cubeSpacing: 0.33,
+    cubeSpacing: 0.17,
     digitSpacing: 2.3,
     rowSpacing: 4.95,
   },
@@ -80,9 +83,12 @@ function pastelColor(
 function isGlyphCellVisible(glyph: number[][] | undefined, row: number, column: number): boolean {
   if (!glyph) return false;
 
-  for (let rowOffset = -1; rowOffset <= 0; rowOffset += 1) {
-    for (let columnOffset = -1; columnOffset <= 0; columnOffset += 1) {
-      if (glyph[row + rowOffset]?.[column + columnOffset] === 1) return true;
+  for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
+    for (let columnOffset = -1; columnOffset <= 1; columnOffset += 1) {
+      const microRow = row + rowOffset;
+      const microColumn = column + columnOffset;
+      if (microRow < 0 || microColumn < 0) continue;
+      if (glyph[Math.floor(microRow / 2)]?.[Math.floor(microColumn / 2)] === 1) return true;
     }
   }
 
@@ -119,17 +125,17 @@ export function buildDigitInstances({
       ? (Math.floor(digitIndex / 2) - 1) * 6.1 + ((digitIndex % 2) - 0.5) * layout.digitSpacing
       : (groupColumn - (layout.columns - 1) / 2) * layout.digitSpacing;
     const originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
-    const verticalCubeSpacing = viewport === 'mobile' ? 0.4 : 0.43;
+    const verticalCubeSpacing = viewport === 'mobile' ? 0.212 : 0.176;
 
-    for (let row = 0; row < DIGIT_ROWS; row += 1) {
-      for (let column = 0; column < DIGIT_COLUMNS; column += 1) {
+    for (let row = 0; row < DIGIT_LATTICE_ROWS; row += 1) {
+      for (let column = 0; column < DIGIT_LATTICE_COLUMNS; column += 1) {
         instances.push({
           key: `${digitIndex}:${row}:${column}`,
           digitIndex,
           groupRow,
           position: [
-            originX + (column - (DIGIT_COLUMNS - 1) / 2) * layout.cubeSpacing,
-            originY + ((DIGIT_ROWS - 1) / 2 - row) * verticalCubeSpacing,
+            originX + (column - (DIGIT_LATTICE_COLUMNS - 1) / 2) * layout.cubeSpacing,
+            originY + ((DIGIT_LATTICE_ROWS - 1) / 2 - row) * verticalCubeSpacing,
             0,
           ],
           color: pastelColor(random, digitIndex, row, column),

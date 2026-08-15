@@ -74,6 +74,9 @@ function DevelopmentTools({ digits }: { digits: string[] }) {
 
 export function ReferenceTimeVizPage() {
   const digits = useClockDigits();
+  const captureViewport = import.meta.env.DEV
+    ? new URLSearchParams(window.location.search).get('captureViewport')
+    : null;
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [snapshot, setSnapshot] = useState<TimeVizSceneSnapshot | null>(null);
   const layout = snapshot?.viewport === 'mobile'
@@ -82,7 +85,7 @@ export function ReferenceTimeVizPage() {
 
   return (
     <main
-      className="time-viz-page"
+      className={`time-viz-page${captureViewport === 'mobile' ? ' time-viz-page--mobile-capture' : ''}`}
       data-time-viz-digits={digits.join('')}
       data-time-viz-frame-count={snapshot?.frameCount ?? 0}
       data-time-viz-layout={layout}

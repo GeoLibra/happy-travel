@@ -13,6 +13,20 @@
   position: absolute;
 }
 
+.time-viz-page--mobile-capture {
+  height: 844px;
+  inset: auto;
+  min-height: 844px;
+  position: relative;
+  width: 390px;
+}
+
+.time-viz-page--mobile-capture .time-viz-debug {
+  left: 126px;
+  min-width: 0;
+  right: 8px;
+}
+
 .time-viz-dev-tools {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10px;

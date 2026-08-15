@@ -55,4 +55,20 @@
 - Console: zero browser console errors in the round-1 local desktop state. The only observed non-error diagnostic was Three.js's `RGBELoader` deprecation warning.
 - Renderer readiness and responsive observability findings are fixed and tested, but the P1 reflector mismatch remains.
 
+### Iteration 5 — structural fix round 2, blocked
+
+- Fresh matched desktop evidence: `output/reference/round-2/source-desktop-1280x720.jpg` and `output/reference/round-2/local-desktop-1280x720.jpg`, both 1280 x 720 with digits `195342`; paired source-left/local-right in `output/reference/comparisons/desktop-final.png` at 2560 x 720.
+- Fresh matched mobile evidence: `output/reference/round-2/source-mobile-390x844.png` and `output/reference/round-2/local-mobile-390x844.png`, both 390 x 844 with digits `012346`; paired source-left/local-right in `output/reference/comparisons/mobile-final.png` at 780 x 844. The source image is the previously captured exact in-app-browser baseline; the local image is a fresh exact 390 x 844 renderer-applied mobile capture.
+- Structural changes: replaced the 10 x 7 visual grid with a fixed-capacity 20 x 14 (280-slot) supersampled lattice, switched to smaller near-square microcubes, removed the prior coarse one-sided weighting, exposed more cube side depth, and replaced the checkerboard-like reflector with depth-dominant multi-octave distortion, normalized horizontal Gaussian sampling, foreground blur growth, and reflection gain falloff. Reduced motion retains static liquid distortion while freezing time animation.
+- Readiness remains tied to at least one successful composed frame, and the renderer snapshot—not React `innerWidth`—drives the exposed responsive layout.
+- [P1] Desktop framing regressed during the structural geometry pass: the local row is substantially oversized and cropped at the right and bottom, while the source contains all six digits with generous horizontal bounds. This is an immediately visible composition failure.
+- [P1] The mobile reflection remains a compact mirrored glow beneath the third row rather than the source's wide, horizontally broken liquid bands. Cube edges are also more uniformly frontal than the source's stronger side-face depth.
+- The round was stopped after the required bounded structural pass. These are actionable P1 differences, so no visual pass is claimed.
+
+## Round-2 runtime checks
+
+- In-app-browser state: desktop reported `desktop-row`, `desktop`, `ready`, and `frameCount=1`; the exact mobile stage reported `mobile-three-row`, `mobile`, `ready`, and `frameCount=1` after the renderer resize.
+- Console: zero errors in the final local capture. The only warning was Three.js's existing `RGBELoader` deprecation notice; Vite/analytics development diagnostics were informational.
+- Focused units: 21 passed. Responsive Playwright: 3 passed. `pnpm test:fast`: passed with 64 unit tests, 10 resolver tests, 6/6 asset validators, and a successful production build.
+
 final result: blocked
