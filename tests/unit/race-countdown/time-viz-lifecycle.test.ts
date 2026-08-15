@@ -5,6 +5,7 @@ import {
   createDefaultComposer,
   createDefaultFloor,
   createTimeVizScene,
+  loadDefaultEnvironment,
   parseDigitInstanceColor,
 } from '@/src/features/race-countdown/time-viz-scene';
 import type {
@@ -188,6 +189,20 @@ describe('createTimeVizScene lifecycle', () => {
 });
 
 describe('default composite factory ownership', () => {
+  it('disposes the loaded HDR source when PMREM construction fails', async () => {
+    const source = new THREE.Texture();
+    const sourceDispose = vi.fn();
+    source.dispose = sourceDispose;
+
+    await expect(loadDefaultEnvironment({} as TimeVizRenderer, '/environment.hdr', {
+      createPmremGenerator: () => {
+        throw new Error('pmrem failed');
+      },
+      loadSource: vi.fn().mockResolvedValue(source),
+    })).rejects.toThrow('pmrem failed');
+    expect(sourceDispose).toHaveBeenCalledTimes(1);
+  });
+
   it('disposes floor geometry when reflector construction fails', () => {
     const geometry = new THREE.PlaneGeometry();
     const geometryDispose = vi.fn();

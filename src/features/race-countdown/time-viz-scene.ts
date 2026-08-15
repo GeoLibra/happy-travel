@@ -57,6 +57,20 @@ export interface TimeVizFloorResourceFactories {
   ): Reflector;
 }
 
+interface TimeVizPmremRenderTarget extends DisposableResource {
+  texture: THREE.Texture;
+}
+
+interface TimeVizPmremGenerator extends DisposableResource {
+  compileEquirectangularShader(): void;
+  fromEquirectangular(source: THREE.Texture): TimeVizPmremRenderTarget;
+}
+
+export interface TimeVizEnvironmentResourceFactories {
+  loadSource(url: string): Promise<THREE.Texture>;
+  createPmremGenerator(renderer: THREE.WebGLRenderer): TimeVizPmremGenerator;
+}
+
 const floorShader = {
   name: 'TimeVizLiquidReflector',
   uniforms: {
@@ -281,15 +295,22 @@ export function createDefaultFloor(
   }
 }
 
-async function loadDefaultEnvironment(
+const defaultEnvironmentResourceFactories: TimeVizEnvironmentResourceFactories = {
+  createPmremGenerator: (renderer) => new THREE.PMREMGenerator(renderer),
+  loadSource: (url) => new RGBELoader().loadAsync(url),
+};
+
+export async function loadDefaultEnvironment(
   rendererLike: TimeVizRenderer,
   url: string,
+  factories: TimeVizEnvironmentResourceFactories = defaultEnvironmentResourceFactories,
 ): Promise<TimeVizEnvironment> {
   const renderer = rendererLike as THREE.WebGLRenderer;
-  const source = await new RGBELoader().loadAsync(url);
-  const pmrem = new THREE.PMREMGenerator(renderer);
+  const source = await factories.loadSource(url);
+  let pmrem: TimeVizPmremGenerator | null = null;
 
   try {
+    pmrem = factories.createPmremGenerator(renderer);
     pmrem.compileEquirectangularShader();
     const renderTarget = pmrem.fromEquirectangular(source);
     return {
@@ -298,7 +319,7 @@ async function loadDefaultEnvironment(
     };
   } finally {
     source.dispose();
-    pmrem.dispose();
+    pmrem?.dispose();
   }
 }
 
