@@ -58,4 +58,17 @@ Implemented and committed. The compact itinerary countdown is now a native, keyb
 - Focused app-owned lifecycle acceptance test — passed.
 - `pnpm exec playwright test tests/e2e/race-countdown/race-countdown-flow.spec.ts --project=app-desktop-chromium` — passed: 7 tests.
 - `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` — passed: 4 tests (`.last-run.json` reports passed with no failures).
-- `pnpm check:webgl-lifecycle` — passed: the five-cycle WebGL renderer lifecycle trend.
+- `pnpm check:webgl-lifecycle` — passed: the five-cycle F1 welcome renderer lifecycle trend. This is not AMap lifecycle evidence.
+
+## Fix round 3 — deterministic AMap recreation evidence
+
+- `MapComponent` now exposes app-owned resource counters for its AMap instance, labels layer, and marker collection alongside its lifecycle status. `ready` is set only after the map, one labels layer, and every itinerary marker have been recreated; cleanup resets all counts to zero before reporting `suspended`.
+- The component accepts a legitimately preloaded `window.AMap` SDK before falling back to the package loader. The browser acceptance test preloads a small vendor-boundary fixture, so it executes the production map/layer/marker setup deterministically without treating an unavailable external AMap key as a successful renderer.
+- The strengthened test requires `ready`, one map, one layer, and a nonzero marker count before opening; requires `suspended` with all-zero counts throughout the countdown (including after an animation frame); and requires the exact prior marker count plus `ready` again after keyboard return. Browser Forward must suspend all counts again.
+
+### Fix-round verification
+
+- `pnpm run lint` — passed (`tsc --noEmit`).
+- Deterministic app-owned AMap resource lifecycle acceptance test — passed.
+- `pnpm exec playwright test tests/e2e/race-countdown/race-countdown-flow.spec.ts --project=app-desktop-chromium` — passed: 7 tests.
+- `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` — passed: 4 tests (`.last-run.json` reports passed with no failures).

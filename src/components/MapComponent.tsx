@@ -13,6 +13,14 @@ interface MapProps {
   active?: boolean;
 }
 
+interface AMapResourceCounts {
+  instance: number;
+  layer: number;
+  marker: number;
+}
+
+const SUSPENDED_AMAP_RESOURCES: AMapResourceCounts = { instance: 0, layer: 0, marker: 0 };
+
 const getLabelContent = (loc: Location, state: 'normal' | 'hovered' | 'selected') => {
   const isF1Circuit = loc.id === '2-1' || loc.name.includes('F1');
   const isImagineDragons = loc.description?.includes('Imagine Dragons');
@@ -137,6 +145,7 @@ const MapComponent: React.FC<MapProps> = ({
   const [isMapReady, setIsMapReady] = useState(false);
   const [showPOI, setShowPOI] = useState(false);
   const [rendererState, setRendererState] = useState(active ? 'initializing' : 'suspended');
+  const [resourceCounts, setResourceCounts] = useState<AMapResourceCounts>(SUSPENDED_AMAP_RESOURCES);
 
   useEffect(() => {
     if (!active) {
@@ -164,11 +173,16 @@ const MapComponent: React.FC<MapProps> = ({
         securityJsCode: import.meta.env.VITE_AMAP_SECURITY_CODE,
       };
 
-      AMapLoader.load({
+      const preloadedAMap = (window as any).AMap;
+      const amapPromise = preloadedAMap
+        ? Promise.resolve(preloadedAMap)
+        : AMapLoader.load({
         key: import.meta.env.VITE_AMAP_KEY,
         version: '2.0',
         plugins: ['AMap.Scale', 'AMap.ToolBar'],
-      }).then((AMap) => {
+      });
+
+      amapPromise.then((AMap) => {
         if (disposed || !mapRef.current) return;
 
         amapConstructor.current = AMap;
@@ -247,6 +261,7 @@ const MapComponent: React.FC<MapProps> = ({
 
         map.setFitView();
         setIsMapReady(true);
+        setResourceCounts({ instance: 1, layer: 1, marker: locations.length });
         setRendererState('ready');
       }).catch(e => {
         if (disposed) return;
@@ -276,6 +291,7 @@ const MapComponent: React.FC<MapProps> = ({
         amapInstance.current = null;
       }
       setIsMapReady(false);
+      setResourceCounts(SUSPENDED_AMAP_RESOURCES);
       setRendererState('suspended');
       amapConstructor.current = null;
       if (typeof window !== 'undefined' && (window as any).AMap) {
@@ -363,6 +379,9 @@ const MapComponent: React.FC<MapProps> = ({
     <div
       className="w-full h-full rounded-2xl overflow-hidden shadow-inner bg-slate-100 relative touch-none"
       data-amap-renderer-state={rendererState}
+      data-amap-instance-count={resourceCounts.instance}
+      data-amap-layer-count={resourceCounts.layer}
+      data-amap-marker-count={resourceCounts.marker}
     >
       <div ref={mapRef} className="w-full h-full" />
       <div className="absolute top-4 right-4 bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-slate-200 text-xs z-10 min-w-[110px]">

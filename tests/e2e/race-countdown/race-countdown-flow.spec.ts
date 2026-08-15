@@ -16,6 +16,38 @@ const officialShanghaiFixture = {
   },
 };
 
+const amapBrowserFixture = `
+  window.AMap = {
+    Map: class {
+      on(_event, callback) { callback(); }
+      add() {}
+      addControl() {}
+      destroy() {}
+      setCenter() {}
+      setFeatures() {}
+      setFitView() {}
+    },
+    Scale: class {},
+    ToolBar: class {},
+    LabelsLayer: class { add() {} clear() {} },
+    Marker: class {
+      on() {}
+      remove() {}
+      setContent() {}
+      setMap() {}
+      setzIndex() {}
+    },
+    LabelMarker: class {
+      on() {}
+      remove() {}
+      setText() {}
+      setzIndex() {}
+    },
+    LngLat: class { constructor(_lng, _lat) {} },
+  };
+  window.___onAPILoaded?.();
+`;
+
 function raceFixture(date: string, time: string, season = date.slice(0, 4)) {
   return {
     MRData: {
@@ -42,9 +74,14 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   const mapRenderer = page.locator('[data-amap-renderer-state]');
   const fireworkPortal = page.locator('[data-mini-firework-portal]');
 
+  await page.addInitScript(amapBrowserFixture);
   await itinerary.completeWelcomeIgnition();
   await itinerary.selectDayTab(1);
-  await expect(mapRenderer).not.toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'ready');
+  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '1');
+  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '1');
+  const markerCount = await mapRenderer.getAttribute('data-amap-marker-count');
+  expect(Number(markerCount)).toBeGreaterThan(0);
   await expect(fireworkPortal).toHaveCount(1);
   await itinerary.fullCountdownButton.focus();
   await page.keyboard.press('Enter');
@@ -53,7 +90,13 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true');
   await expect(itinerary.surface).toHaveCSS('display', 'none');
   await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '0');
+  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '0');
+  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', '0');
   await expect(fireworkPortal).toHaveCount(0);
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', '0');
   await expect(page.getByRole('main')).toHaveCount(1);
 
   await countdown.backButton.press('Enter');
@@ -62,7 +105,10 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   await expect(page.locator('button:has-text("DAY 2") > div')).toBeVisible();
   await expect(itinerary.fullCountdownButton).toBeFocused();
   await expect(page.locator('[data-f1-welcome-action="enter"]')).toHaveCount(0);
-  await expect(mapRenderer).not.toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'ready');
+  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '1');
+  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '1');
+  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', markerCount ?? '');
   await expect(fireworkPortal).toHaveCount(1);
 
   await page.goForward();
@@ -70,6 +116,9 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   await expect(countdown.backButton).toBeFocused();
   await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true');
   await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '0');
+  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '0');
+  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', '0');
   await expect(fireworkPortal).toHaveCount(0);
   await expect(page.getByRole('main')).toHaveCount(1);
 });
