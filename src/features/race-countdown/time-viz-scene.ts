@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
@@ -35,9 +36,25 @@ interface DisposableResource {
   dispose(): void;
 }
 
-interface TimeVizComposerWithPasses extends TimeVizComposer {
-  composer: EffectComposer;
-  bloomPass: UnrealBloomPass | null;
+interface TimeVizPostPass extends DisposableResource {}
+
+interface TimeVizComposerCore extends TimeVizComposer {
+  addPass(pass: TimeVizPostPass): void;
+}
+
+export interface TimeVizComposerResourceFactories {
+  createComposer(renderer: THREE.WebGLRenderer): TimeVizComposerCore;
+  createRenderPass(scene: THREE.Scene, camera: THREE.Camera): TimeVizPostPass;
+  createBloomPass(): TimeVizPostPass;
+  createOutputPass(): TimeVizPostPass;
+}
+
+export interface TimeVizFloorResourceFactories {
+  createGeometry(): THREE.PlaneGeometry;
+  createReflector(
+    geometry: THREE.PlaneGeometry,
+    options: ConstructorParameters<typeof Reflector>[1],
+  ): Reflector;
 }
 
 const floorShader = {
@@ -137,86 +154,131 @@ function createDefaultRenderer(
   return renderer;
 }
 
-function createDefaultComposer(
+const defaultComposerResourceFactories: TimeVizComposerResourceFactories = {
+  createBloomPass: () => new UnrealBloomPass(
+    new THREE.Vector2(INITIAL_WIDTH, INITIAL_HEIGHT),
+    1.1,
+    0.72,
+    0.16,
+  ),
+  createComposer: (renderer) => new EffectComposer(renderer) as unknown as TimeVizComposerCore,
+  createOutputPass: () => new OutputPass(),
+  createRenderPass: (scene, camera) => new RenderPass(scene, camera),
+};
+
+function disposeConstructionFailure(
+  error: unknown,
+  resources: ReadonlyArray<DisposableResource>,
+): never {
+  try {
+    createIdempotentDisposer([...resources].reverse())();
+  } catch {
+    // Preserve the construction error after attempting every acquired cleanup.
+  }
+  throw error;
+}
+
+export function createDefaultComposer(
   rendererLike: TimeVizRenderer,
   scene: THREE.Scene,
   camera: THREE.Camera,
   bloomEnabled: boolean,
-): TimeVizComposerWithPasses {
-  const renderer = rendererLike as THREE.WebGLRenderer;
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene, camera));
+  factories: TimeVizComposerResourceFactories = defaultComposerResourceFactories,
+): TimeVizComposer {
+  const resources: DisposableResource[] = [];
 
-  const bloomPass = bloomEnabled
-    ? new UnrealBloomPass(new THREE.Vector2(INITIAL_WIDTH, INITIAL_HEIGHT), 1.1, 0.72, 0.16)
-    : null;
-  if (bloomPass) composer.addPass(bloomPass);
+  try {
+    const composer = factories.createComposer(rendererLike as THREE.WebGLRenderer);
+    resources.push(composer);
+    const renderPass = factories.createRenderPass(scene, camera);
+    resources.push(renderPass);
+    composer.addPass(renderPass);
 
-  return {
-    composer,
-    bloomPass,
-    dispose: () => {
-      bloomPass?.dispose();
-      composer.dispose();
-    },
-    render: (deltaTime) => composer.render(deltaTime),
-    setSize: (width, height) => composer.setSize(width, height),
-  };
+    if (bloomEnabled) {
+      const bloomPass = factories.createBloomPass();
+      resources.push(bloomPass);
+      composer.addPass(bloomPass);
+    }
+
+    const outputPass = factories.createOutputPass();
+    resources.push(outputPass);
+    composer.addPass(outputPass);
+    const dispose = createIdempotentDisposer([...resources].reverse());
+
+    return {
+      dispose,
+      render: (deltaTime) => composer.render(deltaTime),
+      setPixelRatio: (pixelRatio) => composer.setPixelRatio(pixelRatio),
+      setSize: (width, height) => composer.setSize(width, height),
+    };
+  } catch (error) {
+    return disposeConstructionFailure(error, resources);
+  }
 }
 
 function reflectionSize(value: number, pixelRatio: number): number {
   return Math.max(MIN_REFLECTION_SIZE, Math.floor(value * pixelRatio * REFLECTION_RESOLUTION_SCALE));
 }
 
-function createDefaultFloor(
+const defaultFloorResourceFactories: TimeVizFloorResourceFactories = {
+  createGeometry: () => new THREE.PlaneGeometry(34, 24, 96, 64),
+  createReflector: (geometry, options) => new Reflector(geometry, options),
+};
+
+export function createDefaultFloor(
   rendererLike: TimeVizRenderer,
   width: number,
   height: number,
   animated: boolean,
+  factories: TimeVizFloorResourceFactories = defaultFloorResourceFactories,
 ): TimeVizFloor {
   void rendererLike;
-  const geometry = new THREE.PlaneGeometry(34, 24, 96, 64);
-  const reflector = new Reflector(geometry, {
-    clipBias: 0.002,
-    color: 0x171b2a,
-    multisample: 0,
-    shader: floorShader,
-    textureHeight: reflectionSize(height, 1),
-    textureWidth: reflectionSize(width, 1),
-  });
-  reflector.rotation.x = -Math.PI / 2;
-  reflector.position.y = -2.45;
-  reflector.position.z = -1.25;
-  reflector.receiveShadow = true;
+  const resources: DisposableResource[] = [];
 
-  const renderTarget = reflector.getRenderTarget();
-  renderTarget.texture.generateMipmaps = true;
-  renderTarget.texture.magFilter = THREE.LinearFilter;
-  renderTarget.texture.minFilter = THREE.LinearMipmapLinearFilter;
+  try {
+    const geometry = factories.createGeometry();
+    resources.push(geometry);
+    const reflector = factories.createReflector(geometry, {
+      clipBias: 0.002,
+      color: 0x171b2a,
+      multisample: 0,
+      shader: floorShader,
+      textureHeight: reflectionSize(height, 1),
+      textureWidth: reflectionSize(width, 1),
+    });
+    resources.push(reflector);
+    reflector.rotation.x = -Math.PI / 2;
+    reflector.position.y = -2.45;
+    reflector.position.z = -1.25;
+    reflector.receiveShadow = true;
 
-  const material = reflector.material as THREE.ShaderMaterial;
-  const timeUniform = material.uniforms.time;
-  const displacementUniform = material.uniforms.displacementStrength;
-  if (!animated) displacementUniform.value = 0;
+    const renderTarget = reflector.getRenderTarget();
+    renderTarget.texture.generateMipmaps = true;
+    renderTarget.texture.magFilter = THREE.LinearFilter;
+    renderTarget.texture.minFilter = THREE.LinearMipmapLinearFilter;
 
-  const dispose = createIdempotentDisposer([
-    { dispose: () => reflector.dispose() },
-    { dispose: () => geometry.dispose() },
-  ]);
+    const material = reflector.material as THREE.ShaderMaterial;
+    const timeUniform = material.uniforms.time;
+    const displacementUniform = material.uniforms.displacementStrength;
+    if (!animated) displacementUniform.value = 0;
+    const dispose = createIdempotentDisposer([...resources].reverse());
 
-  return {
-    object: reflector,
-    resize: (nextWidth, nextHeight, pixelRatio) => {
-      renderTarget.setSize(
-        reflectionSize(nextWidth, pixelRatio),
-        reflectionSize(nextHeight, pixelRatio),
-      );
-    },
-    update: (elapsedSeconds) => {
-      if (animated) timeUniform.value = elapsedSeconds;
-    },
-    dispose,
-  };
+    return {
+      object: reflector,
+      resize: (nextWidth, nextHeight, pixelRatio) => {
+        renderTarget.setSize(
+          reflectionSize(nextWidth, pixelRatio),
+          reflectionSize(nextHeight, pixelRatio),
+        );
+      },
+      update: (elapsedSeconds) => {
+        if (animated) timeUniform.value = elapsedSeconds;
+      },
+      dispose,
+    };
+  } catch (error) {
+    return disposeConstructionFailure(error, resources);
+  }
 }
 
 async function loadDefaultEnvironment(
@@ -381,8 +443,9 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     ownedResources.push(renderer);
 
     cellGeometry = dependencies.createGeometry();
+    ownedResources.push(cellGeometry);
     cellMaterial = dependencies.createMaterial();
-    ownedResources.push(cellGeometry, cellMaterial);
+    ownedResources.push(cellMaterial);
 
     const capacity = getTimeVizLayout(options.mode, viewport).digitCapacity;
     const instanceCount = capacity * CELLS_PER_DIGIT;
@@ -489,6 +552,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
         const cappedPixelRatio = Math.max(0.5, Math.min(pixelRatio, quality.maxPixelRatio));
         renderer.setPixelRatio(cappedPixelRatio);
         renderer.setSize(width, height, false);
+        composer.setPixelRatio(cappedPixelRatio);
         composer.setSize(width, height);
         floor.resize(width, height, cappedPixelRatio);
         camera.aspect = width / height;

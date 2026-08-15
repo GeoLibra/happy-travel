@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { createTimeVizScene } from './time-viz-scene';
-import type { CountdownCanvasProps, TimeVizScene } from './time-viz-types';
+import type {
+  CountdownCanvasProps,
+  TimeVizScene,
+  TimeVizSceneOptions,
+} from './time-viz-types';
 
 export type { CountdownCanvasProps } from './time-viz-types';
 
@@ -12,6 +16,51 @@ function initialReducedMotion(): boolean {
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+export interface CountdownCanvasSceneRequest {
+  factory?: (options: TimeVizSceneOptions) => Promise<TimeVizScene>;
+  options: TimeVizSceneOptions;
+  onScene(scene: TimeVizScene): void;
+  onReady?: () => void;
+  onFailure?: (error: Error) => void;
+}
+
+export function startCountdownCanvasSceneRequest({
+  factory = createTimeVizScene,
+  options,
+  onScene,
+  onReady,
+  onFailure,
+}: CountdownCanvasSceneRequest): () => void {
+  let cancelled = false;
+  let activeScene: TimeVizScene | null = null;
+
+  void factory(options).then((scene) => {
+    if (cancelled) {
+      scene.dispose();
+      return;
+    }
+
+    activeScene = scene;
+    try {
+      onScene(scene);
+      onReady?.();
+    } catch (error) {
+      activeScene = null;
+      scene.dispose();
+      onFailure?.(toError(error));
+    }
+  }, (error: unknown) => {
+    if (!cancelled) onFailure?.(toError(error));
+  });
+
+  return () => {
+    if (cancelled) return;
+    cancelled = true;
+    activeScene?.dispose();
+    activeScene = null;
+  };
 }
 
 export function CountdownCanvas({
@@ -46,7 +95,6 @@ export function CountdownCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    let cancelled = false;
     let createdScene: TimeVizScene | null = null;
     let resizeObserver: ResizeObserver | null = null;
 
@@ -54,39 +102,35 @@ export function CountdownCanvas({
       scene.resize(width, height, window.devicePixelRatio || 1);
     };
 
-    void createTimeVizScene({
-      canvas,
-      mode,
+    const cancelRequest = startCountdownCanvasSceneRequest({
+      onFailure: (error) => onWebGLFailureRef.current?.(error),
       onReady: () => onReadyRef.current?.(),
-      reducedMotion,
-    }).then((scene) => {
-      if (cancelled) {
-        scene.dispose();
-        return;
-      }
+      onScene: (scene) => {
+        createdScene = scene;
+        sceneRef.current = scene;
+        scene.setDigits(digitsRef.current);
+        scene.setVehicle(vehicleRef.current);
 
-      createdScene = scene;
-      sceneRef.current = scene;
-      scene.setDigits(digitsRef.current);
-      scene.setVehicle(vehicleRef.current);
+        const rect = canvas.getBoundingClientRect();
+        resize(scene, rect.width || canvas.clientWidth, rect.height || canvas.clientHeight);
 
-      const rect = canvas.getBoundingClientRect();
-      resize(scene, rect.width || canvas.clientWidth, rect.height || canvas.clientHeight);
-
-      resizeObserver = new ResizeObserver((entries) => {
-        const entry = entries[0];
-        if (!entry) return;
-        resize(scene, entry.contentRect.width, entry.contentRect.height);
-      });
-      resizeObserver.observe(canvas);
-    }).catch((error: unknown) => {
-      if (!cancelled) onWebGLFailureRef.current?.(toError(error));
+        resizeObserver = new ResizeObserver((entries) => {
+          const entry = entries[0];
+          if (!entry) return;
+          resize(scene, entry.contentRect.width, entry.contentRect.height);
+        });
+        resizeObserver.observe(canvas);
+      },
+      options: {
+        canvas,
+        mode,
+        reducedMotion,
+      },
     });
 
     return () => {
-      cancelled = true;
       resizeObserver?.disconnect();
-      createdScene?.dispose();
+      cancelRequest();
       if (sceneRef.current === createdScene) sceneRef.current = null;
     };
   }, [mode, reducedMotion]);

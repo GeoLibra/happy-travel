@@ -38,6 +38,7 @@ export interface TimeVizRenderer {
 export interface TimeVizComposer {
   dispose(): void;
   render(deltaTime?: number): void;
+  setPixelRatio(pixelRatio: number): void;
   setSize(width: number, height: number): void;
 }
 
