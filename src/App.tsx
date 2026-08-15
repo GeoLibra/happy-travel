@@ -38,6 +38,7 @@ import successSound from './audio/success.mp3';
 import { localizeItinerary, useI18n } from './i18n';
 import { EMPTY_SHAKE_STATE, stepShakeDetection } from './lib/shake-detection';
 import { ReferenceTimeVizPage } from './features/race-countdown/ReferenceTimeVizPage';
+import { RaceCountdownPage } from './features/race-countdown/RaceCountdownPage';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -599,7 +600,9 @@ function HappyTravelApp() {
 }
 
 export default function App() {
-  return window.location.pathname === '/time-viz-reference'
-    ? <ReferenceTimeVizPage />
-    : <HappyTravelApp />;
+  if (window.location.pathname === '/time-viz-reference') return <ReferenceTimeVizPage />;
+  if (window.location.pathname === '/countdown') {
+    return <RaceCountdownPage onBack={() => window.location.assign('/')} />;
+  }
+  return <HappyTravelApp />;
 }

@@ -28,6 +28,18 @@ describe('i18n Internationalization Contract', () => {
       const locales: Locale[] = ['zh', 'en'];
       expect(locales.map((locale) => translate(locale, 'language.switchLabel'))).toEqual(['English', '中文']);
     });
+
+    it('translates the race countdown status and unit labels in both locales', () => {
+      expect(translate('zh', 'countdown.back')).toBe('返回行程');
+      expect(translate('zh', 'countdown.official')).toBe('官方正赛时间');
+      expect(translate('zh', 'countdown.estimated')).toBe('暂定日期 · 等待官方赛程确认');
+      expect(translate('zh', 'countdown.units.days')).toBe('天');
+
+      expect(translate('en', 'countdown.back')).toBe('Back to itinerary');
+      expect(translate('en', 'countdown.official')).toBe('Official race time');
+      expect(translate('en', 'countdown.estimated')).toBe('Provisional date · Awaiting official confirmation');
+      expect(translate('en', 'countdown.units.days')).toBe('Days');
+    });
   });
 
   describe('Itinerary Data Localization', () => {
