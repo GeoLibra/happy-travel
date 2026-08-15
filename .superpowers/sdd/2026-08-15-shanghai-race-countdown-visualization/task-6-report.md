@@ -87,3 +87,16 @@ Implemented and committed. The compact itinerary countdown is now a native, keyb
 - Focused actual deferred-loader disposal test — passed.
 - `pnpm exec playwright test tests/e2e/race-countdown/race-countdown-flow.spec.ts --project=app-desktop-chromium` — passed: 8 tests.
 - `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` — passed: 4 tests.
+
+## Fix round 5 — prove the app owns the pending loader request
+
+- Removed the manual loader priming call and its independent hard-coded key. The test now injects its fixture key into the Vite-served `MapComponent` module, so production `MapComponent` itself starts the sole deferred `@amap/amap-jsapi-loader` request.
+- The test positively proves the app module was patched, observes exactly one vendor script request carrying that exact key, requires the component to remain `initializing`, and fails on any `AMap Loader Error` console message. This rules out a key-mismatch rejection falsely producing zero resources.
+- After countdown suspension, resolving that app-owned pending request still produces zero vendor resources; returning recreates the first map/layer generation normally. Production source remains unchanged.
+
+### Final fix-round verification
+
+- `pnpm run lint` — passed (`tsc --noEmit`).
+- Focused app-owned deferred-loader test — passed.
+- `pnpm exec playwright test tests/e2e/race-countdown/race-countdown-flow.spec.ts --project=app-desktop-chromium` — passed: 8 tests.
+- `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` — passed: 4 tests.

@@ -266,13 +266,38 @@ test('does not attach a stale AMap loader result after countdown suspension', as
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);
   const mapRenderer = page.locator('[data-amap-renderer-state]');
+  const fixtureAmapKey = 'playwright-deferred-loader-key';
+  const amapLoaderErrors: string[] = [];
+  let appKeyInjected = false;
   let loaderRequested = false;
+  let loaderRequestCount = 0;
+  let requestedAmapKey: string | null = null;
   let releaseLoader = () => {};
   const loaderGate = new Promise<void>((resolve) => { releaseLoader = resolve; });
 
   await installAmapVendorFixture(page, false);
+  page.on('console', (message) => {
+    if (message.type() === 'error' && message.text().includes('AMap Loader Error:')) {
+      amapLoaderErrors.push(message.text());
+    }
+  });
+  await page.route('**/src/components/MapComponent.tsx', async (route) => {
+    const response = await route.fetch();
+    const source = await response.text();
+    const appKeyExpression = 'import.meta.env.VITE_AMAP_KEY';
+    if (!source.includes(appKeyExpression)) {
+      throw new Error('Unable to inject the AMap fixture key into MapComponent');
+    }
+    appKeyInjected = true;
+    await route.fulfill({
+      response,
+      body: source.replace(appKeyExpression, JSON.stringify(fixtureAmapKey)),
+    });
+  });
   await page.route(/https:\/\/webapi\.amap\.com\/maps\?.*/, async (route) => {
     loaderRequested = true;
+    loaderRequestCount += 1;
+    requestedAmapKey = new URL(route.request().url()).searchParams.get('key');
     await loaderGate;
     await route.fulfill({
       contentType: 'application/javascript',
@@ -283,28 +308,13 @@ test('does not attach a stale AMap loader result after countdown suspension', as
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const welcome = new WelcomePage(page);
   await welcome.waitUntilReady();
-  await page.evaluate(() => {
-    void fetch('/src/components/MapComponent.tsx')
-      .then((response) => response.text())
-      .then((source) => {
-        const loaderUrl = source.match(/from\s+"(\/node_modules\/\.vite\/deps\/@amap_amap-jsapi-loader\.js[^\"]*)"/)?.[1];
-        if (!loaderUrl) throw new Error('Unable to resolve the Vite AMap loader module URL');
-        return new Function('url', 'return import(url)')(loaderUrl);
-      })
-      .then((module) => module.default.load({
-        key: 'playwright-deferred-loader-key',
-        version: '2.0',
-        plugins: ['AMap.Scale', 'AMap.ToolBar'],
-      }))
-      .catch((error) => {
-        (window as typeof window & { __AMAP_LOADER_FIXTURE_ERROR__?: string })
-          .__AMAP_LOADER_FIXTURE_ERROR__ = String(error);
-      });
-  });
-  await expect.poll(() => loaderRequested).toBe(true);
+  expect(appKeyInjected).toBe(true);
   await welcome.holdToIgnite();
   await itinerary.waitUntilReady();
   await expect.poll(() => loaderRequested).toBe(true);
+  expect(loaderRequestCount).toBe(1);
+  expect(requestedAmapKey).toBe(fixtureAmapKey);
+  expect(amapLoaderErrors).toEqual([]);
   await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'initializing');
   expect(await readAmapVendorLifecycle(page)).toMatchObject({ mapCreated: 0, layerCreated: 0 });
 
@@ -317,6 +327,7 @@ test('does not attach a stale AMap loader result after countdown suspension', as
     typeof (window as typeof window & { ___onAPILoaded?: unknown }).___onAPILoaded
   ))).toBe('undefined');
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  expect(amapLoaderErrors).toEqual([]);
   expect(await readAmapVendorLifecycle(page)).toMatchObject({
     mapCreated: 0,
     mapDestroyed: 0,
