@@ -35,18 +35,33 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('happy-travel-locale', 'zh'));
 });
 
-test('opens from the compact countdown and restores itinerary with browser back', async ({ page }) => {
+test('returns from the itinerary countdown with keyboard and restores state through history', async ({ page }) => {
   test.setTimeout(180_000);
   const itinerary = new ItineraryPage(page);
+  const countdown = new RaceCountdownPageObject(page);
 
   await itinerary.completeWelcomeIgnition();
   await itinerary.selectDayTab(1);
-  await itinerary.openFullCountdown();
+  await itinerary.fullCountdownButton.focus();
+  await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/countdown$/);
+  await expect(countdown.backButton).toBeFocused();
+  await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true');
+  await expect(itinerary.surface).toHaveCSS('display', 'none');
+  await expect(page.getByRole('main')).toHaveCount(1);
 
-  await page.goBack();
+  await countdown.backButton.press('Enter');
+  await expect(page).toHaveURL(/\/$/);
   await expect(itinerary.daySelector).toBeVisible();
   await expect(page.locator('button:has-text("DAY 2") > div')).toBeVisible();
+  await expect(itinerary.fullCountdownButton).toBeFocused();
+  await expect(page.locator('[data-f1-welcome-action="enter"]')).toHaveCount(0);
+
+  await page.goForward();
+  await expect(page).toHaveURL(/\/countdown$/);
+  await expect(countdown.backButton).toBeFocused();
+  await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.getByRole('main')).toHaveCount(1);
 });
 
 test('shows official status for a future API race', async ({ page }) => {

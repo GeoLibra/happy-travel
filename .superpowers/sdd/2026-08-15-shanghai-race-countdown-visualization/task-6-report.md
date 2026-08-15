@@ -32,3 +32,16 @@ Implemented and committed. The compact itinerary countdown is now a native, keyb
 ## Particle regression outcome
 
 - `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` — passed: 4 tests, no failed tests (`output/playwright/test-results/.last-run.json` reported `status: "passed"`).
+
+## Fix round 1 — inactive itinerary and history focus handoff
+
+- The retained itinerary is now wrapped in `data-itinerary-surface`. When the app-owned countdown is open, it remains mounted for state retention but is `aria-hidden`, `inert`, and `display: none`; this removes the competing itinerary landmark from the accessibility tree and suspends its covered rendering surface.
+- The compact countdown effect is explicitly inactive while that surface is hidden, which cleans up its animation frame, resize listener, and intersection observer. The direct-route mount guard remains unchanged.
+- `RaceCountdownPage` places focus on its visible `返回行程` control on mount. After the app-owned back control (or browser Back) closes the route, focus is restored to the retained compact trigger on the next animation frame.
+- The app-opened acceptance flow now opens the compact trigger with Enter, activates `返回行程` with Enter, verifies DAY 2/state/focus/no welcome replay, then uses browser Forward to reopen and verifies the popstate focus and inactive-view boundary again. Direct-route fallback coverage remains in the WebGL-fallback test.
+
+### Fix-round verification
+
+- `pnpm run lint` — passed (`tsc --noEmit`).
+- `pnpm exec playwright test tests/e2e/race-countdown/race-countdown-flow.spec.ts --project=app-desktop-chromium` — passed: 7 tests, including the new app-owned keyboard Back/Forward flow.
+- `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` was launched; after the parent interruption, the latest `output/playwright/test-results/.last-run.json` reports `status: "passed"` and `failedTests: []` (the terminal had reported 4 tests running).

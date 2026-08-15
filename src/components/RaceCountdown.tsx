@@ -19,9 +19,11 @@ interface Particle {
 
 interface RaceCountdownProps {
   onOpen?: () => void;
+  active?: boolean;
+  triggerRef?: React.Ref<HTMLButtonElement>;
 }
 
-const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen }) => {
+const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, triggerRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Track previous time to detect changes for spawning particles
@@ -46,6 +48,8 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen }) => {
   };
 
   useEffect(() => {
+    if (!active) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -431,11 +435,12 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen }) => {
       observer.disconnect();
       window.removeEventListener('resize', setCanvasSize);
     };
-  }, []);
+  }, [active]);
 
   return (
     <motion.button
       type="button"
+      ref={triggerRef}
       onClick={onOpen}
       disabled={!onOpen}
       aria-label="查看全屏倒计时"

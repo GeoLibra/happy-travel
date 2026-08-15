@@ -67,6 +67,11 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
   const initialResolutionStartedRef = useRef(false);
   const webglUnavailableRef = useRef(false);
   const resolvingElapsedEventRef = useRef(false);
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    backButtonRef.current?.focus();
+  }, []);
 
   const applyResolvedEvent = (event: ResolvedRaceEvent) => {
     if (!mountedRef.current) return;
@@ -155,7 +160,7 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
       ) : null}
 
       <div className="race-countdown-overlay">
-        <button className="race-countdown-back" type="button" onClick={onBack}>
+        <button ref={backButtonRef} className="race-countdown-back" type="button" onClick={onBack}>
           <span aria-hidden="true">←</span>
           <span>{t('countdown.back')}</span>
         </button>

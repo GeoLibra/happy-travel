@@ -58,9 +58,11 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
 
 interface HappyTravelAppProps {
   onOpenCountdown: () => void;
+  countdownTriggerRef: React.Ref<HTMLButtonElement>;
+  inactive: boolean;
 }
 
-function HappyTravelApp({ onOpenCountdown }: HappyTravelAppProps) {
+function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: HappyTravelAppProps) {
   const { locale, t, toggleLocale } = useI18n();
   const [showWelcome, setShowWelcome] = useState(true);
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
@@ -233,7 +235,13 @@ function HappyTravelApp({ onOpenCountdown }: HappyTravelAppProps) {
   };
 
   return (
-    <>
+    <div
+      data-itinerary-surface
+      aria-hidden={inactive || undefined}
+      inert={inactive}
+      style={{ display: inactive ? 'none' : undefined }}
+    >
+      <>
       <AnimatePresence>
         {showWelcome && (
           <WelcomePage
@@ -352,7 +360,13 @@ function HappyTravelApp({ onOpenCountdown }: HappyTravelAppProps) {
             </div>
       </div>
 
-          {!showWelcome && <RaceCountdown onOpen={onOpenCountdown} />}
+          {!showWelcome && (
+            <RaceCountdown
+              onOpen={onOpenCountdown}
+              active={!inactive}
+              triggerRef={countdownTriggerRef}
+            />
+          )}
 
           {/* Day Selector with Swipe Support */}
           {/* Day Selector with Swipe Support */}
@@ -600,21 +614,39 @@ function HappyTravelApp({ onOpenCountdown }: HappyTravelAppProps) {
 
       <RoseModal isOpen={showRoseModal} onClose={() => setShowRoseModal(false)} />
     </motion.div>
-    </>
+      </>
+    </div>
   );
 }
 
 function CountdownNavigationApp() {
   const { countdownOpen, openCountdown, closeCountdown } = useCountdownNavigation();
   const [itineraryMounted, setItineraryMounted] = useState(() => !countdownOpen);
+  const countdownTriggerRef = useRef<HTMLButtonElement>(null);
+  const wasCountdownOpenRef = useRef(countdownOpen);
 
   useEffect(() => {
     if (!countdownOpen) setItineraryMounted(true);
   }, [countdownOpen]);
 
+  useEffect(() => {
+    const shouldRestoreFocus = wasCountdownOpenRef.current && !countdownOpen;
+    wasCountdownOpenRef.current = countdownOpen;
+    if (!shouldRestoreFocus) return;
+
+    const frameId = window.requestAnimationFrame(() => countdownTriggerRef.current?.focus());
+    return () => window.cancelAnimationFrame(frameId);
+  }, [countdownOpen]);
+
   return (
     <>
-      {itineraryMounted && <HappyTravelApp onOpenCountdown={openCountdown} />}
+      {itineraryMounted && (
+        <HappyTravelApp
+          onOpenCountdown={openCountdown}
+          countdownTriggerRef={countdownTriggerRef}
+          inactive={countdownOpen}
+        />
+      )}
       {countdownOpen && (
         <div className="relative z-[100]">
           <RaceCountdownPage onBack={closeCountdown} />

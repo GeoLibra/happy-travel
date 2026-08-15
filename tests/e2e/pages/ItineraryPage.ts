@@ -8,6 +8,7 @@ export class ItineraryPage {
   readonly dayTabs: Locator;
   readonly daySelector: Locator;
   readonly fullCountdownButton: Locator;
+  readonly surface: Locator;
   readonly mapContainer: Locator;
 
   constructor(page: Page) {
@@ -17,6 +18,7 @@ export class ItineraryPage {
     this.dayTabs = page.locator('button:has-text("DAY")');
     this.daySelector = this.dayTabs.first();
     this.fullCountdownButton = page.getByRole('button', { name: '查看全屏倒计时' });
+    this.surface = page.locator('[data-itinerary-surface]');
     this.mapContainer = page.locator('.amap-container, canvas, [data-testid="map-container"]').first();
   }
 
