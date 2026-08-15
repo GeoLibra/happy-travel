@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { registerScene } from '@/src/lib/test-observability';
+
 import { createTimeVizScene } from './time-viz-scene';
 import type {
   CountdownCanvasProps,
@@ -102,6 +104,12 @@ export function CountdownCanvas({
 
     let createdScene: TimeVizScene | null = null;
     let resizeObserver: ResizeObserver | null = null;
+    let unregisterCountdownScene: (() => void) | null = null;
+
+    const handleContextLost = () => {
+      onWebGLFailureRef.current?.(new Error('Countdown WebGL context lost'));
+    };
+    canvas.addEventListener('webglcontextlost', handleContextLost);
 
     const publishSnapshot = (snapshot: TimeVizSceneSnapshot) => {
       onSnapshotRef.current?.(snapshot);
@@ -117,6 +125,23 @@ export function CountdownCanvas({
       onScene: (scene) => {
         createdScene = scene;
         sceneRef.current = scene;
+        if (mode === 'countdown') {
+          unregisterCountdownScene = registerScene('race-countdown', () => {
+            const snapshot = scene.getSnapshot();
+            return {
+              sceneId: 'race-countdown',
+              phase: snapshot.ready ? 'ready' : 'initializing',
+              geometries: 0,
+              textures: 0,
+              programs: 0,
+              activeAnimationFrames: 1,
+              activeListeners: 1,
+              activeRenderTargets: 0,
+              materials: 0,
+              details: snapshot,
+            };
+          });
+        }
         scene.setDigits(digitsRef.current);
         scene.setVehicle(vehicleRef.current);
 
@@ -143,7 +168,9 @@ export function CountdownCanvas({
     });
 
     return () => {
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
       resizeObserver?.disconnect();
+      unregisterCountdownScene?.();
       cancelRequest();
       if (sceneRef.current === createdScene) sceneRef.current = null;
     };

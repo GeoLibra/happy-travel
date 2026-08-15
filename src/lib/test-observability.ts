@@ -39,7 +39,18 @@ export interface HappyTravelTestSnapshot {
   materials: number;
 }
 
+export interface CountdownTestSnapshot {
+  activeAnimationFrames: number;
+  activeScenes: number;
+  frameCount: number;
+  mode: 'countdown' | null;
+  ready: boolean;
+  resourceCount: number;
+  viewport: 'desktop' | 'mobile' | null;
+}
+
 export interface HappyTravelTestAPI {
+  countdown: () => CountdownTestSnapshot;
   snapshot: () => HappyTravelTestSnapshot;
   sceneAudit: (sceneId: string) => SceneAudit | null;
   registerScene: (sceneId: string, auditGetter: () => SceneAudit) => () => void;
@@ -153,6 +164,25 @@ export function snapshot(): HappyTravelTestSnapshot {
   };
 }
 
+export function countdownSnapshot(): CountdownTestSnapshot {
+  const audit = sceneAudit('race-countdown');
+  const details = audit?.details ?? {};
+  const mode = details.mode === 'countdown' ? details.mode : null;
+  const viewport = details.viewport === 'desktop' || details.viewport === 'mobile'
+    ? details.viewport
+    : null;
+
+  return {
+    activeAnimationFrames: audit?.activeAnimationFrames ?? 0,
+    activeScenes: audit ? 1 : 0,
+    frameCount: typeof details.frameCount === 'number' ? details.frameCount : 0,
+    mode,
+    ready: details.ready === true,
+    resourceCount: typeof details.resourceCount === 'number' ? details.resourceCount : 0,
+    viewport,
+  };
+}
+
 // Expose API on window only in dev/test mode. Never in production builds.
 // import.meta.env.PROD is statically replaced by Vite, enabling dead-code elimination.
 // For CI/Playwright running against a production build, set VITE_TEST_OBSERVABILITY=true
@@ -162,6 +192,7 @@ if (
   (!import.meta.env.PROD || import.meta.env.VITE_TEST_OBSERVABILITY === 'true')
 ) {
   const testAPI: HappyTravelTestAPI = {
+    countdown: countdownSnapshot,
     snapshot,
     sceneAudit,
     registerScene,

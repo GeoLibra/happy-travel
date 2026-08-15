@@ -4,6 +4,8 @@ export const ALL_PLAYWRIGHT_PROJECTS = [
   'showroom-mobile-chromium',
   'showroom-arrival-timeline-chromium',
   'webgl-renderer-lifecycle-chromium',
+  'race-countdown-desktop-chromium',
+  'race-countdown-mobile-chromium',
   'showroom-webkit-smoke',
   'f1-e2e-chromium',
   'particles-e2e-chromium',
@@ -48,6 +50,14 @@ const F1_BROWSER_PATHS = [
   /^tests\/e2e\/pages\/(?:WelcomePage|ShowroomPage)\.ts$/,
   /^tests\/memory\/memlab\/f1-welcome\.cjs$/,
   /^scripts\/(?:check-f1|verify-f1|verify-rb20|f1-|run-f1)/,
+];
+
+const COUNTDOWN_BROWSER_PATHS = [
+  /^src\/features\/race-countdown\//,
+  /^src\/components\/RaceCountdown\.tsx$/,
+  /^public\/models\/.*(?:rb20|redbull|showroom).*\.glb$/i,
+  /^tests\/(?:e2e|unit)\/race-countdown\//,
+  /^tests\/e2e\/pages\/RaceCountdownPage\.ts$/,
 ];
 
 const PARTICLES_BROWSER_PATHS = [
@@ -100,6 +110,12 @@ export function resolveAffectedPlaywrightProjects(
     selected.add('showroom-webkit-smoke');
     selected.add('f1-e2e-chromium');
     selected.add('webgl-renderer-lifecycle-chromium');
+  }
+
+  if (relevantPaths.some((path) => matchesAny(path, COUNTDOWN_BROWSER_PATHS))) {
+    selected.add('webgl-renderer-lifecycle-chromium');
+    selected.add('race-countdown-desktop-chromium');
+    selected.add('race-countdown-mobile-chromium');
   }
 
   if (relevantPaths.some((path) => matchesAny(path, PARTICLES_BROWSER_PATHS))) {

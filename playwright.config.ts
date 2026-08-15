@@ -34,7 +34,7 @@ export default defineConfig({
   projects: [
     {
       name: 'app-desktop-chromium',
-      testMatch: /(?:app-desktop\.spec\.ts|race-countdown\/.*\.spec\.ts)/,
+      testMatch: /app-desktop\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 800 },
@@ -70,6 +70,22 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
+      name: 'race-countdown-desktop-chromium',
+      testMatch: 'race-countdown/**/*.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+    {
+      name: 'race-countdown-mobile-chromium',
+      testMatch: 'race-countdown/**/*.spec.ts',
+      use: {
+        ...devices['Pixel 7'],
+        viewport: { width: 390, height: 844 },
       },
     },
     {

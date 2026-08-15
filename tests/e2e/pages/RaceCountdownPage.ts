@@ -1,5 +1,15 @@
 import { expect, type Locator, type Page } from 'playwright/test';
 
+export interface CountdownObservabilitySnapshot {
+  activeAnimationFrames: number;
+  activeScenes: number;
+  frameCount: number;
+  mode: 'countdown' | null;
+  ready: boolean;
+  resourceCount: number;
+  viewport: 'desktop' | 'mobile' | null;
+}
+
 export class RaceCountdownPageObject {
   readonly page: Page;
   readonly scene: Locator;
@@ -41,6 +51,34 @@ export class RaceCountdownPageObject {
 
   async gotoReference() {
     await this.page.goto('/time-viz-reference', { waitUntil: 'domcontentloaded' });
+  }
+
+  async readObservability(): Promise<CountdownObservabilitySnapshot | null> {
+    return this.page.evaluate(() => {
+      const api = (window as typeof window & {
+        __HAPPY_TRAVEL_TEST__?: {
+          countdown?: () => CountdownObservabilitySnapshot;
+        };
+      }).__HAPPY_TRAVEL_TEST__;
+      return api?.countdown?.() ?? null;
+    });
+  }
+
+  async waitForObservabilityReady(): Promise<CountdownObservabilitySnapshot> {
+    await expect.poll(async () => (await this.readObservability())?.ready ?? false).toBe(true);
+    const snapshot = await this.readObservability();
+    if (!snapshot) throw new Error('Countdown observability snapshot is unavailable');
+    return snapshot;
+  }
+
+  async loseWebGLContext(): Promise<void> {
+    await this.canvas.evaluate((canvas) => {
+      const webglCanvas = canvas as HTMLCanvasElement;
+      const context = webglCanvas.getContext('webgl2') ?? webglCanvas.getContext('webgl');
+      const extension = context?.getExtension('WEBGL_lose_context');
+      if (!extension) throw new Error('WEBGL_lose_context extension is unavailable');
+      extension.loseContext();
+    });
   }
 
   async waitForSceneReady() {

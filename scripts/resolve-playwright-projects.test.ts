@@ -39,6 +39,8 @@ test('showroom implementation and F1 model changes select the complete safety ma
       'showroom-mobile-chromium',
       'showroom-arrival-timeline-chromium',
       'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
       'showroom-webkit-smoke',
       'f1-e2e-chromium',
     ],
@@ -55,6 +57,19 @@ test('F1 interaction changes select F1 browser and lifecycle coverage', () => {
       'webgl-renderer-lifecycle-chromium',
       'showroom-webkit-smoke',
       'f1-e2e-chromium',
+    ],
+  );
+});
+
+test('race countdown changes select desktop, mobile, and WebGL lifecycle coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects([
+      'src/features/race-countdown/time-viz-scene.ts',
+    ]),
+    [
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
     ],
   );
 });

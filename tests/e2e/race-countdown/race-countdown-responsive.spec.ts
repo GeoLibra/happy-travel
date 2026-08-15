@@ -1,6 +1,7 @@
 import { expect, test } from 'playwright/test';
 
 import { RaceCountdownPageObject } from '../pages/RaceCountdownPage';
+import { ItineraryPage } from '../pages/ItineraryPage';
 
 const officialShanghaiFixture = {
   MRData: {
@@ -22,16 +23,24 @@ test.beforeEach(async ({ page }) => {
   ));
 });
 
-test('reference route exposes one ready canvas and desktop layout', async ({ page }) => {
+test('reference route matches the dedicated project viewport and layout', async ({ page }, testInfo) => {
+  const mobile = testInfo.project.name === 'race-countdown-mobile-chromium';
+  expect(page.viewportSize()).toEqual(mobile
+    ? { width: 390, height: 844 }
+    : { width: 1280, height: 720 });
   const countdown = new RaceCountdownPageObject(page);
   await countdown.gotoReference();
 
   await countdown.waitForSceneReady();
   await expect(countdown.canvas).toBeVisible();
-  await expect(countdown.layout).toHaveAttribute('data-time-viz-layout', 'desktop-row');
+  await expect(countdown.layout).toHaveAttribute(
+    'data-time-viz-layout',
+    mobile ? 'mobile-three-row' : 'desktop-row',
+  );
 });
 
 test('reference route groups digits into three rows on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
   const countdown = new RaceCountdownPageObject(page);
   await countdown.gotoReference();
   await countdown.waitForSceneReady();
@@ -51,7 +60,8 @@ test('reference clock advances once per second', async ({ page }) => {
   await expect(countdown.scene).not.toHaveAttribute('data-time-viz-digits', initialDigits ?? '');
 });
 
-test('product countdown places the RB20 in the desktop scene', async ({ page }) => {
+test('product countdown places the RB20 in the desktop scene', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'race-countdown-desktop-chromium');
   const countdown = new RaceCountdownPageObject(page);
   await countdown.goto();
 
@@ -65,8 +75,8 @@ test('product countdown places the RB20 in the desktop scene', async ({ page }) 
   await page.screenshot({ path: 'output/reference/countdown-rb20-desktop.png' });
 });
 
-test('product countdown keeps the RB20 framed on mobile', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test('product countdown keeps the RB20 framed on mobile', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'race-countdown-mobile-chromium');
   const countdown = new RaceCountdownPageObject(page);
   await countdown.goto();
 
@@ -77,4 +87,39 @@ test('product countdown keeps the RB20 framed on mobile', async ({ page }) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
   )));
   await page.screenshot({ path: 'output/reference/countdown-rb20-mobile.png' });
+});
+
+test('countdown renderer resources return to baseline after five open and close cycles', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'race-countdown-desktop-chromium');
+  test.setTimeout(300_000);
+
+  const itinerary = new ItineraryPage(page);
+  const countdown = new RaceCountdownPageObject(page);
+  await itinerary.completeWelcomeIgnition();
+
+  const baseline = await countdown.readObservability();
+  expect(baseline).toMatchObject({
+    activeAnimationFrames: 0,
+    activeScenes: 0,
+    frameCount: 0,
+    mode: null,
+    ready: false,
+    resourceCount: 0,
+    viewport: null,
+  });
+
+  for (let cycle = 1; cycle <= 5; cycle += 1) {
+    await itinerary.openFullCountdown();
+    await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready');
+    const active = await countdown.waitForObservabilityReady();
+    expect(active.activeScenes, `cycle ${cycle} must own one countdown scene`).toBe(1);
+    expect(active.activeAnimationFrames, `cycle ${cycle} must own one animation frame`).toBe(1);
+    expect(active.resourceCount, `cycle ${cycle} must report owned resources`).toBeGreaterThan(0);
+
+    await countdown.backButton.click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect.poll(async () => await countdown.readObservability()).toEqual(baseline);
+  }
 });

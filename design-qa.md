@@ -90,4 +90,13 @@
 - The previously accepted exact 390 x 844 mobile comparison remains `output/reference/comparisons/mobile-final.png`; the fix changes only the reference desktop camera branch.
 - Fresh verification: focused units 22/22, responsive Playwright 3/3, and `pnpm test:fast` passed with 65 unit tests, 10 resolver tests, 6/6 asset validators, and a successful production build. The fresh capture emitted no console errors; diagnostics were the existing `RGBELoader` deprecation and headless Chromium readback-performance warnings.
 
+### Iteration 8 — integrated countdown product QA, passed
+
+- Re-inspected the available product captures after the RB20 integration: `output/reference/countdown-rb20-desktop.png` (1280 x 800) and `output/reference/countdown-rb20-mobile.png` (390 x 844), alongside the approved Phase 1 exact comparisons at 1280 x 720 and 390 x 844.
+- Desktop: all four countdown units remain readable; the car occupies the lower central foreground without covering more than the central unit; the broad liquid reflection remains visible around and ahead of the car. The event title/status stay isolated in the upper safe area and the return affordance has independent high-contrast treatment.
+- Mobile: the three-row digit rhythm remains intact, the return control stays inside the top safe area, and the car is isolated to the lower foreground. The committed final mobile pose is smaller and lower than the inspected intermediate capture, so it does not introduce a new digit-legibility regression.
+- The Task 8 changes add observability, context-loss handling, and test configuration only; they do not alter camera, digit, vehicle, reflection, overlay, or CSS composition. Dedicated Playwright projects now lock the requested 1280 x 720 and 390 x 844 viewports, and the responsive assertions validate each project's actual viewport/layout contract.
+- No P1/P2 visual issue was found. Remaining seeded color, liquid-flow phase, and platform bloom differences remain the accepted P3 GPU/stochastic variation from the Phase 1 gate.
+- A fresh complete two-project capture run was not produced in this bounded verification turn because Chromium launch/webServer operations were blocked or interrupted by the execution environment; the exact runtime limitation is recorded in the Task 8 report rather than represented as visual evidence.
+
 final result: passed
