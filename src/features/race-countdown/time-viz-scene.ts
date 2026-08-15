@@ -19,6 +19,7 @@ import {
   getTimeVizLayout,
   type ViewportKind,
 } from './digit-layout';
+import { applyCountdownVehiclePose } from './countdown-vehicle';
 import type {
   TimeVizComposer,
   TimeVizDependencies,
@@ -461,6 +462,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 19.2));
     camera.lookAt(0, mobile && countdown ? 0.2 : -1.2, 0);
     digitGroup.position.y = mobile ? -1.15 : -0.65;
+    if (currentVehicle) applyCountdownVehiclePose(currentVehicle, viewport);
     if (floor) {
       floor.object.position.y = mobile ? (countdown ? -11.2 : -6.9) : -1.85;
       floor.object.position.z = -1.25;
@@ -616,7 +618,10 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
         if (disposed || vehicle === currentVehicle) return;
         if (currentVehicle) vehicleGroup.remove(currentVehicle);
         currentVehicle = vehicle;
-        if (vehicle) vehicleGroup.add(vehicle);
+        if (vehicle) {
+          applyCountdownVehiclePose(vehicle, viewport);
+          vehicleGroup.add(vehicle);
+        }
       },
       resize: (width, height, pixelRatio) => {
         if (disposed || width <= 0 || height <= 0 || !renderer || !composer || !floor) return;

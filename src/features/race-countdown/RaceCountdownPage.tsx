@@ -4,6 +4,10 @@ import { useI18n, type MessageKey } from '@/src/i18n';
 
 import { CountdownCanvas } from './CountdownCanvas';
 import {
+  loadCountdownVehicle,
+  type CountdownVehicle,
+} from './countdown-vehicle';
+import {
   formatCountdownDigits,
   splitRemainingTime,
   type CountdownParts,
@@ -63,6 +67,8 @@ function countdownUnits(parts: CountdownParts): CountdownUnit[] {
 export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
   const { locale, t } = useI18n();
   const [state, setState] = useState<CountdownPageState>({ status: 'loading' });
+  const [vehicle, setVehicle] = useState<CountdownVehicle | null>(null);
+  const [vehicleState, setVehicleState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const mountedRef = useRef(false);
   const initialResolutionStartedRef = useRef(false);
   const webglUnavailableRef = useRef(false);
@@ -71,6 +77,28 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
 
   useEffect(() => {
     backButtonRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let loadedVehicle: CountdownVehicle | null = null;
+
+    void loadCountdownVehicle().then((nextVehicle) => {
+      if (cancelled) {
+        nextVehicle.dispose();
+        return;
+      }
+      loadedVehicle = nextVehicle;
+      setVehicle(nextVehicle);
+      setVehicleState('ready');
+    }, () => {
+      if (!cancelled) setVehicleState('unavailable');
+    });
+
+    return () => {
+      cancelled = true;
+      loadedVehicle?.dispose();
+    };
   }, []);
 
   const applyResolvedEvent = (event: ResolvedRaceEvent) => {
@@ -147,6 +175,7 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
       className={`race-countdown-page race-countdown-page--${state.status}`}
       data-countdown-display={parts?.elapsed ? 'lights-out' : digits.join('') || 'loading'}
       data-countdown-state={state.status}
+      data-countdown-vehicle={vehicleState}
     >
       {state.status !== 'webgl-fallback' ? (
         <div className="race-countdown-canvas" aria-hidden="true">
@@ -154,6 +183,7 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
             digits={digits}
             mode="countdown"
             seed={COUNTDOWN_SEED}
+            vehicle={vehicle?.object}
             onWebGLFailure={handleWebGLFailure}
           />
         </div>
