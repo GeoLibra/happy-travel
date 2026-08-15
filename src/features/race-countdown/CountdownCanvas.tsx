@@ -66,6 +66,7 @@ export function startCountdownCanvasSceneRequest({
 export function CountdownCanvas({
   digits,
   mode,
+  seed,
   vehicle = null,
   onReady,
   onWebGLFailure,
@@ -124,6 +125,7 @@ export function CountdownCanvas({
       options: {
         canvas,
         mode,
+        seed,
         reducedMotion,
       },
     });
@@ -133,7 +135,7 @@ export function CountdownCanvas({
       cancelRequest();
       if (sceneRef.current === createdScene) sceneRef.current = null;
     };
-  }, [mode, reducedMotion]);
+  }, [mode, reducedMotion, seed]);
 
   useEffect(() => {
     sceneRef.current?.setDigits(digits);
@@ -147,6 +149,7 @@ export function CountdownCanvas({
     <canvas
       ref={canvasRef}
       aria-hidden="true"
+      data-time-viz-canvas
       style={{ display: 'block', height: '100%', width: '100%' }}
     />
   );

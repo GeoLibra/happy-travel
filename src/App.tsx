@@ -37,6 +37,7 @@ import f1EngineShiftSound from './audio/f1-engine-2.mp3';
 import successSound from './audio/success.mp3';
 import { localizeItinerary, useI18n } from './i18n';
 import { EMPTY_SHAKE_STATE, stepShakeDetection } from './lib/shake-detection';
+import { ReferenceTimeVizPage } from './features/race-countdown/ReferenceTimeVizPage';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -53,7 +54,7 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
   }
 };
 
-export default function App() {
+function HappyTravelApp() {
   const { locale, t, toggleLocale } = useI18n();
   const [showWelcome, setShowWelcome] = useState(true);
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
@@ -595,4 +596,10 @@ export default function App() {
     </motion.div>
     </>
   );
+}
+
+export default function App() {
+  return window.location.pathname === '/time-viz-reference'
+    ? <ReferenceTimeVizPage />
+    : <HappyTravelApp />;
 }

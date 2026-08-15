@@ -34,7 +34,7 @@ export default defineConfig({
   projects: [
     {
       name: 'app-desktop-chromium',
-      testMatch: /app-desktop\.spec\.ts/,
+      testMatch: /(?:app-desktop\.spec\.ts|race-countdown\/.*\.spec\.ts)/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 800 },
@@ -106,4 +106,3 @@ export default defineConfig({
     },
   ],
 });
-

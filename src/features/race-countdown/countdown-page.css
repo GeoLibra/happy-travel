@@ -1,0 +1,94 @@
+.time-viz-page {
+  background: #05060a;
+  color: #f8fafc;
+  height: 100svh;
+  inset: 0;
+  overflow: hidden;
+  position: fixed;
+  width: 100vw;
+}
+
+.time-viz-page canvas {
+  inset: 0;
+  position: absolute;
+}
+
+.time-viz-dev-tools {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  pointer-events: none;
+}
+
+.time-viz-fps {
+  background: rgba(3, 17, 41, 0.82);
+  border-bottom: 3px solid #58e9ff;
+  display: grid;
+  height: 46px;
+  left: 2px;
+  padding: 3px 5px;
+  position: absolute;
+  top: 0;
+  width: 78px;
+}
+
+.time-viz-fps strong {
+  color: #79f0ff;
+  font-size: 10px;
+  line-height: 1.1;
+}
+
+.time-viz-fps span {
+  color: rgba(191, 219, 254, 0.7);
+  font-size: 8px;
+}
+
+.time-viz-debug {
+  background: rgba(58, 58, 64, 0.9);
+  border-radius: 6px;
+  color: #d4d4d8;
+  min-width: 256px;
+  pointer-events: auto;
+  position: absolute;
+  right: 8px;
+  top: 7px;
+}
+
+.time-viz-debug summary {
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 25px;
+  list-style-position: inside;
+  text-align: center;
+}
+
+.time-viz-debug dl {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 0;
+  padding: 8px 12px 10px;
+}
+
+.time-viz-debug dl div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.time-viz-debug dd,
+.time-viz-debug dt {
+  margin: 0;
+}
+
+.time-viz-error {
+  left: 50%;
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@media (max-width: 767px) {
+  .time-viz-debug {
+    left: 126px;
+    min-width: 0;
+    right: 8px;
+  }
+}

@@ -23,6 +23,7 @@ export interface TimeVizScene {
 export interface TimeVizSceneOptions {
   canvas: HTMLCanvasElement;
   mode: 'reference' | 'countdown';
+  seed?: number;
   reducedMotion?: boolean;
   onReady?: () => void;
   dependencies?: TimeVizDependencies;
@@ -80,6 +81,7 @@ export interface TimeVizDependencies {
 export interface CountdownCanvasProps {
   digits: string[];
   mode: TimeVizMode;
+  seed?: number;
   vehicle?: THREE.Object3D | null;
   onReady?: () => void;
   onWebGLFailure?: (error: Error) => void;

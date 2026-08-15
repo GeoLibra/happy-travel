@@ -78,8 +78,8 @@ const floorShader = {
     tDiffuse: { value: null },
     textureMatrix: { value: null },
     time: { value: 0 },
-    displacementStrength: { value: 0.055 },
-    blurAmount: { value: 0.0025 },
+    displacementStrength: { value: 0.075 },
+    blurAmount: { value: 0.012 },
   },
   vertexShader: /* glsl */ `
     uniform mat4 textureMatrix;
@@ -134,7 +134,7 @@ const floorShader = {
       #include <logdepthbuf_fragment>
 
       vec4 projectedUv = vUv;
-      projectedUv.xy += vWaveNormal * projectedUv.w * 0.14;
+      projectedUv.xy += vWaveNormal * projectedUv.w * 0.2;
       vec2 blur = vec2(blurAmount * projectedUv.w);
       vec4 reflected = texture2DProj(tDiffuse, projectedUv) * 0.40;
       reflected += texture2DProj(tDiffuse, projectedUv + vec4(blur.x, 0.0, 0.0, 0.0)) * 0.15;
@@ -171,9 +171,9 @@ function createDefaultRenderer(
 const defaultComposerResourceFactories: TimeVizComposerResourceFactories = {
   createBloomPass: () => new UnrealBloomPass(
     new THREE.Vector2(INITIAL_WIDTH, INITIAL_HEIGHT),
-    1.1,
-    0.72,
-    0.16,
+    0.14,
+    0.14,
+    0.68,
   ),
   createComposer: (renderer) => new EffectComposer(renderer) as unknown as TimeVizComposerCore,
   createOutputPass: () => new OutputPass(),
@@ -341,16 +341,13 @@ const defaultDependencies: TimeVizDependencies = {
   cancelAnimationFrame: (frameId) => window.cancelAnimationFrame(frameId),
   createComposer: createDefaultComposer,
   createFloor: createDefaultFloor,
-  createGeometry: () => new RoundedBoxGeometry(0.27, 0.27, 0.34, 3, 0.055),
+  createGeometry: () => new RoundedBoxGeometry(0.34, 0.34, 0.42, 3, 0.065),
   createMaterial: () => new THREE.MeshPhysicalMaterial({
-    clearcoat: 0.42,
-    clearcoatRoughness: 0.18,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.2,
     color: 0xffffff,
-    emissive: 0xffffff,
-    emissiveIntensity: 0.72,
-    metalness: 0.12,
-    roughness: 0.22,
-    vertexColors: true,
+    metalness: 0.08,
+    roughness: 0.24,
   }),
   createRenderer: createDefaultRenderer,
   loadEnvironment: loadDefaultEnvironment,
@@ -390,6 +387,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   scene.background = new THREE.Color(0x05060a);
   const camera = new THREE.PerspectiveCamera(36, INITIAL_WIDTH / INITIAL_HEIGHT, 0.1, 120);
   const digitGroup = new THREE.Group();
+  digitGroup.position.y = -1.05;
   const vehicleGroup = new THREE.Group();
   scene.add(digitGroup, vehicleGroup);
 
@@ -425,8 +423,12 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const updateCameraFraming = () => {
     const mobile = viewport === 'mobile';
     const countdown = options.mode === 'countdown';
-    camera.position.set(0, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 20) : (countdown ? 25 : 18));
-    camera.lookAt(0, mobile && countdown ? 0.2 : 0.35, 0);
+    camera.position.set(1.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 19.2));
+    camera.lookAt(0, mobile && countdown ? 0.2 : -1.2, 0);
+    digitGroup.position.y = mobile ? -0.9 : -1.05;
+    if (floor) {
+      floor.object.position.y = mobile ? (countdown ? -11.2 : -7.4) : -2.45;
+    }
   };
 
   const applyDigits = (digits: string[], forceAll = false) => {
@@ -436,6 +438,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     const instances = buildDigitInstances({
       digits: nextDigits,
       mode: options.mode,
+      seed: options.seed,
       viewport,
     });
     let changed = false;
@@ -449,7 +452,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
         const instanceIndex = firstCell + cellOffset;
         const instance = instances[instanceIndex];
         position.set(instance.position[0], instance.position[1], instance.position[2]);
-        scale.setScalar(instance.visible ? 1 : 0.0001);
+        scale.setScalar(instance.visible ? (viewport === 'mobile' ? 0.84 : 0.72) : 0.0001);
         matrix.compose(position, quaternion, scale);
         cellMesh.setMatrixAt(instanceIndex, matrix);
       }
@@ -480,6 +483,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     const initialInstances = buildDigitInstances({
       digits: currentDigits,
       mode: options.mode,
+      seed: options.seed,
       viewport,
     });
     for (let index = 0; index < initialInstances.length; index += 1) {

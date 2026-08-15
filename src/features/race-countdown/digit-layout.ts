@@ -36,14 +36,14 @@ const DEFAULT_SEED = 26;
 
 const LAYOUTS: Record<ViewportKind, Omit<LayoutMetrics, 'columns' | 'rows' | 'digitCapacity'>> = {
   desktop: {
-    cubeSpacing: 0.34,
-    digitSpacing: 2.83,
+    cubeSpacing: 0.28,
+    digitSpacing: 2.4,
     rowSpacing: 4.1,
   },
   mobile: {
-    cubeSpacing: 0.28,
-    digitSpacing: 2.34,
-    rowSpacing: 3.35,
+    cubeSpacing: 0.32,
+    digitSpacing: 2.3,
+    rowSpacing: 4.95,
   },
 };
 
@@ -65,9 +65,21 @@ function createRandom(seed: number): () => number {
 
 function pastelColor(random: () => number): string {
   const hue = Math.floor(random() * 360);
-  const saturation = 68 + Math.floor(random() * 13);
-  const lightness = 70 + Math.floor(random() * 11);
+  const saturation = 72 + Math.floor(random() * 17);
+  const lightness = 58 + Math.floor(random() * 13);
   return `hsl(${hue} ${saturation}% ${lightness}%)`;
+}
+
+function isGlyphCellVisible(glyph: number[][] | undefined, row: number, column: number): boolean {
+  if (!glyph) return false;
+
+  for (let rowOffset = -1; rowOffset <= 0; rowOffset += 1) {
+    for (let columnOffset = -1; columnOffset <= 0; columnOffset += 1) {
+      if (glyph[row + rowOffset]?.[column + columnOffset] === 1) return true;
+    }
+  }
+
+  return false;
 }
 
 export function getTimeVizLayout(mode: TimeVizMode, viewport: ViewportKind): LayoutMetrics {
@@ -96,8 +108,11 @@ export function buildDigitInstances({
     const groupColumn = digitIndex % layout.columns;
     const groupRow = Math.floor(digitIndex / layout.columns);
     const glyph = digitMatrices[Number(digits[digitIndex])];
-    const originX = (groupColumn - (layout.columns - 1) / 2) * layout.digitSpacing;
+    const originX = viewport === 'desktop' && mode === 'reference'
+      ? (Math.floor(digitIndex / 2) - 1) * 6.4 + ((digitIndex % 2) - 0.5) * layout.digitSpacing
+      : (groupColumn - (layout.columns - 1) / 2) * layout.digitSpacing;
     const originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
+    const verticalCubeSpacing = viewport === 'mobile' ? 0.384 : 0.43;
 
     for (let row = 0; row < DIGIT_ROWS; row += 1) {
       for (let column = 0; column < DIGIT_COLUMNS; column += 1) {
@@ -107,11 +122,11 @@ export function buildDigitInstances({
           groupRow,
           position: [
             originX + (column - (DIGIT_COLUMNS - 1) / 2) * layout.cubeSpacing,
-            originY + ((DIGIT_ROWS - 1) / 2 - row) * layout.cubeSpacing,
+            originY + ((DIGIT_ROWS - 1) / 2 - row) * verticalCubeSpacing,
             0,
           ],
           color: pastelColor(random),
-          visible: glyph?.[row]?.[column] === 1,
+          visible: isGlyphCellVisible(glyph, row, column),
         });
       }
     }
