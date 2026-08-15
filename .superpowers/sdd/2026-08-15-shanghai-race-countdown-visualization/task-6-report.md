@@ -72,3 +72,18 @@ Implemented and committed. The compact itinerary countdown is now a native, keyb
 - Deterministic app-owned AMap resource lifecycle acceptance test — passed.
 - `pnpm exec playwright test tests/e2e/race-countdown/race-countdown-flow.spec.ts --project=app-desktop-chromium` — passed: 7 tests.
 - `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` — passed: 4 tests (`.last-run.json` reports passed with no failures).
+
+## Fix round 4 — vendor-boundary cleanup and deferred-loader evidence
+
+- Replaced the no-op AMap fixture with a vendor-boundary fixture that records every map/layer/marker construction and every `Map.destroy()`, `LabelsLayer.clear()`, `Marker.remove()`, and `LabelMarker.remove()` call.
+- The retained-itinerary flow now verifies each first-generation vendor resource is released exactly once, verifies no cleanup count changes before recreation, and checks the cleanup events precede the second-generation create events. Browser Forward verifies the second generation is also released exactly once.
+- Added a deferred-loader flow against the actual bundled `@amap/amap-jsapi-loader` module. The fixture holds its script response while production `MapComponent` is initializing, opens the countdown to dispose the effect, then completes the loader and proves that no stale map, layer, marker, or label marker attaches while suspended. Returning to the itinerary creates the first vendor resource generation normally.
+- No production change was needed: the existing disposed guard and vendor cleanup calls passed the stronger boundary assertions.
+
+### Fix-round verification
+
+- `pnpm run lint` — passed (`tsc --noEmit`).
+- Focused vendor cleanup/order test — passed.
+- Focused actual deferred-loader disposal test — passed.
+- `pnpm exec playwright test tests/e2e/race-countdown/race-countdown-flow.spec.ts --project=app-desktop-chromium` — passed: 8 tests.
+- `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` — passed: 4 tests.
