@@ -230,6 +230,63 @@ describe('createTimeVizScene lifecycle', () => {
       .toBeLessThan(tracker.composerSetSize.mock.invocationCallOrder[0]);
     scene.dispose();
   });
+
+  it('projects the desktop reference row into source-like viewport margins', async () => {
+    const tracker = createFakeTimeVizDependencies();
+    const createComposer = tracker.dependencies.createComposer;
+    let renderedScene: THREE.Scene | null = null;
+    let renderedCamera: THREE.PerspectiveCamera | null = null;
+    tracker.dependencies.createGeometry = () => new THREE.BoxGeometry(0.16, 0.16, 0.36);
+    tracker.dependencies.createComposer = (renderer, scene, camera, bloomEnabled) => {
+      renderedScene = scene;
+      renderedCamera = camera as THREE.PerspectiveCamera;
+      return createComposer(renderer, scene, camera, bloomEnabled);
+    };
+
+    const scene = await createTimeVizScene({
+      canvas: tracker.canvas,
+      dependencies: tracker.dependencies,
+      mode: 'reference',
+    });
+    scene.setDigits(['8', '8', '8', '8', '8', '8']);
+    scene.resize(1280, 720, 1);
+
+    const camera = renderedCamera as THREE.PerspectiveCamera | null;
+    const root = renderedScene as THREE.Scene | null;
+    if (!camera || !root) throw new Error('Expected the scene and camera to reach the composer');
+    camera.updateMatrixWorld(true);
+    root.updateMatrixWorld(true);
+    const digitMesh = root.getObjectByProperty('isInstancedMesh', true) as THREE.InstancedMesh | undefined;
+    if (!digitMesh) throw new Error('Expected an instanced digit mesh');
+    digitMesh.computeBoundingBox();
+    const bounds = digitMesh.boundingBox?.clone().applyMatrix4(digitMesh.matrixWorld);
+    if (!bounds) throw new Error('Expected digit bounds');
+
+    const projected = [
+      new THREE.Vector3(bounds.min.x, bounds.min.y, bounds.min.z),
+      new THREE.Vector3(bounds.min.x, bounds.min.y, bounds.max.z),
+      new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.min.z),
+      new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.max.z),
+      new THREE.Vector3(bounds.max.x, bounds.min.y, bounds.min.z),
+      new THREE.Vector3(bounds.max.x, bounds.min.y, bounds.max.z),
+      new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.min.z),
+      new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.max.z),
+    ].map((point) => point.project(camera));
+    const left = (Math.min(...projected.map((point) => point.x)) + 1) * 640;
+    const right = (Math.max(...projected.map((point) => point.x)) + 1) * 640;
+    const top = (1 - Math.max(...projected.map((point) => point.y))) * 360;
+    const bottom = (1 - Math.min(...projected.map((point) => point.y))) * 360;
+
+    expect(left).toBeGreaterThanOrEqual(120);
+    expect(left).toBeLessThanOrEqual(180);
+    expect(right).toBeGreaterThanOrEqual(1100);
+    expect(right).toBeLessThanOrEqual(1160);
+    expect(top).toBeGreaterThanOrEqual(210);
+    expect(top).toBeLessThanOrEqual(240);
+    expect(bottom).toBeGreaterThanOrEqual(420);
+    expect(bottom).toBeLessThanOrEqual(450);
+    scene.dispose();
+  });
 });
 
 describe('default composite factory ownership', () => {

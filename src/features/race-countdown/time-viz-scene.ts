@@ -458,10 +458,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const updateCameraFraming = () => {
     const mobile = viewport === 'mobile';
     const countdown = options.mode === 'countdown';
-    // Round-2 evidence measured the desktop row at roughly 1.86x the target
-    // normalized bounds. Scale camera distance by that ratio while preserving
-    // the established aim point and reflector horizon relationship.
-    camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 35.7));
+    camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 19.2));
     camera.lookAt(0, mobile && countdown ? 0.2 : -1.2, 0);
     digitGroup.position.y = mobile ? -1.15 : -0.65;
     if (floor) {

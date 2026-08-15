@@ -80,4 +80,14 @@
 - [P1] Desktop remains unacceptable: after the bounded distance correction, only the first three digits are visible in the lower-right portion of the local comparison. It does not reproduce the source's centered, fully visible six-digit row and balanced horizon. No further exploratory tuning was performed.
 - Console: zero errors; only the existing `RGBELoader` deprecation warning. Focused units 21/21, responsive Playwright 3/3, and `pnpm test:fast` all passed.
 
-final result: blocked
+### Iteration 7 — fresh-owner fix round 4, passed
+
+- Root cause: the round-2 and round-3 desktop screenshots were not reliable evidence from the edited worktree. They show the same lower-right `195` crop and essentially identical scale even though desktop camera Z changed from `19.2` to `35.7`. A fresh worktree-owned 1280 x 720 / DPR 1 browser session proved the current `35.7` head actually rendered all six digits centered, but at only about 55% of the source scale. The prior 1.86x distance correction had therefore been derived from a stale/wrong-server capture rather than the active transform.
+- A renderer-level regression test now projects the real instanced digit bounds through the camera delivered to the composer and requires source-like 1280 x 720 margins. It failed at the stale-evidence-derived `35.7` distance with bounds `left=374`, `right=907`, `top=288`, `bottom=398`.
+- Restoring the reference-only desktop camera distance to `19.2` produces projected bounds within the accepted source envelope while leaving the 20 x 14 lattice, mobile camera/layout, reflection shader, first-frame readiness, and renderer-applied layout observability unchanged.
+- Fresh exact desktop evidence: `output/reference/round-4/source-desktop-1280x720.jpg` and `output/reference/round-4/local-desktop-1280x720.png`, both 1280 x 720 / DPR 1 with digits `195342`; paired source-left/local-right in `output/reference/comparisons/desktop-final.png` at 2560 x 720.
+- The final comparison shows all six digits centered and fully visible. Digit top/bottom placement, overall row width, paired HH/MM/SS cadence, feet, and reflection start align with source-like margins. The remaining liquid-flow phase, seeded color placement, and bloom softness differences are non-blocking P3 variation; there is no readable mirror image and no P1/P2 mismatch.
+- The previously accepted exact 390 x 844 mobile comparison remains `output/reference/comparisons/mobile-final.png`; the fix changes only the reference desktop camera branch.
+- Fresh verification: focused units 22/22, responsive Playwright 3/3, and `pnpm test:fast` passed with 65 unit tests, 10 resolver tests, 6/6 asset validators, and a successful production build. The fresh capture emitted no console errors; diagnostics were the existing `RGBELoader` deprecation and headless Chromium readback-performance warnings.
+
+final result: passed
