@@ -12,12 +12,14 @@ test('reference route exposes one ready canvas and desktop layout', async ({ pag
 });
 
 test('reference route groups digits into three rows on mobile', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
   const countdown = new RaceCountdownPageObject(page);
   await countdown.gotoReference();
-
   await countdown.waitForSceneReady();
+
+  await expect(countdown.layout).toHaveAttribute('data-time-viz-layout', 'desktop-row');
+  await page.setViewportSize({ width: 390, height: 844 });
   await expect(countdown.layout).toHaveAttribute('data-time-viz-layout', 'mobile-three-row');
+  await expect(countdown.scene).toHaveAttribute('data-time-viz-viewport', 'mobile');
 });
 
 test('reference clock advances once per second', async ({ page }) => {

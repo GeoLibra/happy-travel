@@ -25,6 +25,8 @@ function createFakeTimeVizDependencies() {
   const rendererSetPixelRatio = vi.fn();
   const composerSetPixelRatio = vi.fn();
   const composerSetSize = vi.fn();
+  const composerRender = vi.fn();
+  let pendingFrame: FrameRequestCallback | null = null;
 
   const geometry = new THREE.BoxGeometry();
   geometry.dispose = geometryDispose;
@@ -40,7 +42,7 @@ function createFakeTimeVizDependencies() {
     }),
     createComposer: () => ({
       dispose: renderTargetDispose,
-      render: vi.fn(),
+      render: composerRender,
       setPixelRatio: composerSetPixelRatio,
       setSize: composerSetSize,
     }),
@@ -57,7 +59,10 @@ function createFakeTimeVizDependencies() {
       texture: new THREE.Texture(),
     }),
     now: () => 0,
-    requestAnimationFrame: vi.fn().mockReturnValue(73),
+    requestAnimationFrame: vi.fn((callback: FrameRequestCallback) => {
+      pendingFrame = callback;
+      return 73;
+    }),
     cancelAnimationFrame,
     selectQuality: () => ({
       bloomEnabled: true,
@@ -81,6 +86,13 @@ function createFakeTimeVizDependencies() {
     rendererSetPixelRatio,
     composerSetPixelRatio,
     composerSetSize,
+    composerRender,
+    runAnimationFrame: (time = 16) => {
+      if (!pendingFrame) throw new Error('No animation frame pending');
+      const callback = pendingFrame;
+      pendingFrame = null;
+      callback(time);
+    },
     dependencies,
   };
 }
@@ -153,17 +165,49 @@ describe('createTimeVizScene lifecycle', () => {
     expect(tracker.rendererDispose).toHaveBeenCalledTimes(1);
   });
 
-  it('cleans the loaded environment when readiness notification fails', async () => {
+  it('publishes readiness only after the first composed frame', async () => {
+    const tracker = createFakeTimeVizDependencies();
+    const onReady = vi.fn();
+    const scene = await createTimeVizScene({
+      canvas: tracker.canvas,
+      dependencies: tracker.dependencies,
+      mode: 'reference',
+      onReady,
+    });
+
+    expect(scene.getSnapshot()).toMatchObject({
+      frameCount: 0,
+      ready: false,
+      viewport: 'desktop',
+    });
+    expect(onReady).not.toHaveBeenCalled();
+
+    tracker.runAnimationFrame();
+
+    expect(tracker.composerRender).toHaveBeenCalledTimes(1);
+    expect(scene.getSnapshot()).toMatchObject({
+      frameCount: 1,
+      ready: true,
+      viewport: 'desktop',
+    });
+    expect(onReady).toHaveBeenCalledWith(scene.getSnapshot());
+    expect(tracker.composerRender.mock.invocationCallOrder[0])
+      .toBeLessThan(onReady.mock.invocationCallOrder[0]);
+    scene.dispose();
+  });
+
+  it('cleans the loaded environment when first-frame readiness notification fails', async () => {
     const tracker = createFakeTimeVizDependencies();
 
-    await expect(createTimeVizScene({
+    await createTimeVizScene({
       canvas: tracker.canvas,
       dependencies: tracker.dependencies,
       mode: 'reference',
       onReady: () => {
         throw new Error('ready failed');
       },
-    })).rejects.toThrow('ready failed');
+    });
+    expect(() => tracker.runAnimationFrame()).toThrow('ready failed');
     expect(tracker.environmentDispose).toHaveBeenCalledTimes(1);
     expect(tracker.floorDispose).toHaveBeenCalledTimes(1);
     expect(tracker.renderTargetDispose).toHaveBeenCalledTimes(1);

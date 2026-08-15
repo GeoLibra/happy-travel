@@ -5,6 +5,7 @@ import type {
   CountdownCanvasProps,
   TimeVizScene,
   TimeVizSceneOptions,
+  TimeVizSceneSnapshot,
 } from './time-viz-types';
 
 export type { CountdownCanvasProps } from './time-viz-types';
@@ -69,6 +70,7 @@ export function CountdownCanvas({
   seed,
   vehicle = null,
   onReady,
+  onSnapshot,
   onWebGLFailure,
 }: CountdownCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -76,12 +78,14 @@ export function CountdownCanvas({
   const digitsRef = useRef(digits);
   const vehicleRef = useRef(vehicle);
   const onReadyRef = useRef(onReady);
+  const onSnapshotRef = useRef(onSnapshot);
   const onWebGLFailureRef = useRef(onWebGLFailure);
   const [reducedMotion, setReducedMotion] = useState(initialReducedMotion);
 
   digitsRef.current = digits;
   vehicleRef.current = vehicle;
   onReadyRef.current = onReady;
+  onSnapshotRef.current = onSnapshot;
   onWebGLFailureRef.current = onWebGLFailure;
 
   useEffect(() => {
@@ -99,13 +103,17 @@ export function CountdownCanvas({
     let createdScene: TimeVizScene | null = null;
     let resizeObserver: ResizeObserver | null = null;
 
+    const publishSnapshot = (snapshot: TimeVizSceneSnapshot) => {
+      onSnapshotRef.current?.(snapshot);
+    };
+
     const resize = (scene: TimeVizScene, width: number, height: number) => {
       scene.resize(width, height, window.devicePixelRatio || 1);
+      publishSnapshot(scene.getSnapshot());
     };
 
     const cancelRequest = startCountdownCanvasSceneRequest({
       onFailure: (error) => onWebGLFailureRef.current?.(error),
-      onReady: () => onReadyRef.current?.(),
       onScene: (scene) => {
         createdScene = scene;
         sceneRef.current = scene;
@@ -125,6 +133,10 @@ export function CountdownCanvas({
       options: {
         canvas,
         mode,
+        onReady: (snapshot) => {
+          publishSnapshot(snapshot);
+          onReadyRef.current?.(snapshot);
+        },
         seed,
         reducedMotion,
       },

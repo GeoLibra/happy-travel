@@ -14,7 +14,13 @@ function deferred<T>() {
 function fakeScene(): TimeVizScene {
   return {
     dispose: vi.fn(),
-    getSnapshot: () => ({ frameCount: 0, mode: 'reference', ready: true, resourceCount: 1 }),
+    getSnapshot: () => ({
+      frameCount: 0,
+      mode: 'reference',
+      ready: true,
+      resourceCount: 1,
+      viewport: 'desktop',
+    }),
     resize: vi.fn(),
     setDigits: vi.fn(),
     setVehicle: vi.fn(),

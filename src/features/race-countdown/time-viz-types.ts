@@ -7,16 +7,19 @@ import type {
 
 import type { TimeVizMode } from './digit-layout';
 
+export interface TimeVizSceneSnapshot {
+  ready: boolean;
+  frameCount: number;
+  resourceCount: number;
+  mode: 'reference' | 'countdown';
+  viewport: 'desktop' | 'mobile';
+}
+
 export interface TimeVizScene {
   setDigits(digits: string[]): void;
   setVehicle(vehicle: THREE.Object3D | null): void;
   resize(width: number, height: number, pixelRatio: number): void;
-  getSnapshot(): {
-    ready: boolean;
-    frameCount: number;
-    resourceCount: number;
-    mode: 'reference' | 'countdown';
-  };
+  getSnapshot(): TimeVizSceneSnapshot;
   dispose(): void;
 }
 
@@ -25,7 +28,7 @@ export interface TimeVizSceneOptions {
   mode: 'reference' | 'countdown';
   seed?: number;
   reducedMotion?: boolean;
-  onReady?: () => void;
+  onReady?: (snapshot: TimeVizSceneSnapshot) => void;
   dependencies?: TimeVizDependencies;
 }
 
@@ -83,6 +86,7 @@ export interface CountdownCanvasProps {
   mode: TimeVizMode;
   seed?: number;
   vehicle?: THREE.Object3D | null;
-  onReady?: () => void;
+  onReady?: (snapshot: TimeVizSceneSnapshot) => void;
+  onSnapshot?: (snapshot: TimeVizSceneSnapshot) => void;
   onWebGLFailure?: (error: Error) => void;
 }

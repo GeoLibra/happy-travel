@@ -36,12 +36,12 @@ const DEFAULT_SEED = 26;
 
 const LAYOUTS: Record<ViewportKind, Omit<LayoutMetrics, 'columns' | 'rows' | 'digitCapacity'>> = {
   desktop: {
-    cubeSpacing: 0.28,
+    cubeSpacing: 0.33,
     digitSpacing: 2.4,
     rowSpacing: 4.1,
   },
   mobile: {
-    cubeSpacing: 0.32,
+    cubeSpacing: 0.33,
     digitSpacing: 2.3,
     rowSpacing: 4.95,
   },
@@ -63,10 +63,17 @@ function createRandom(seed: number): () => number {
   };
 }
 
-function pastelColor(random: () => number): string {
-  const hue = Math.floor(random() * 360);
-  const saturation = 72 + Math.floor(random() * 17);
-  const lightness = 58 + Math.floor(random() * 13);
+function pastelColor(
+  random: () => number,
+  digitIndex: number,
+  row: number,
+  column: number,
+): string {
+  const jitter = (random() - 0.5) * 16;
+  const spatialHue = digitIndex * 47 + row * 26 - column * 21 + jitter;
+  const hue = Math.floor((spatialHue + 360) % 360);
+  const saturation = 70 + Math.floor(random() * 14);
+  const lightness = 58 + Math.floor(random() * 12);
   return `hsl(${hue} ${saturation}% ${lightness}%)`;
 }
 
@@ -109,10 +116,10 @@ export function buildDigitInstances({
     const groupRow = Math.floor(digitIndex / layout.columns);
     const glyph = digitMatrices[Number(digits[digitIndex])];
     const originX = viewport === 'desktop' && mode === 'reference'
-      ? (Math.floor(digitIndex / 2) - 1) * 6.4 + ((digitIndex % 2) - 0.5) * layout.digitSpacing
+      ? (Math.floor(digitIndex / 2) - 1) * 6.1 + ((digitIndex % 2) - 0.5) * layout.digitSpacing
       : (groupColumn - (layout.columns - 1) / 2) * layout.digitSpacing;
     const originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
-    const verticalCubeSpacing = viewport === 'mobile' ? 0.384 : 0.43;
+    const verticalCubeSpacing = viewport === 'mobile' ? 0.4 : 0.43;
 
     for (let row = 0; row < DIGIT_ROWS; row += 1) {
       for (let column = 0; column < DIGIT_COLUMNS; column += 1) {
@@ -125,7 +132,7 @@ export function buildDigitInstances({
             originY + ((DIGIT_ROWS - 1) / 2 - row) * verticalCubeSpacing,
             0,
           ],
-          color: pastelColor(random),
+          color: pastelColor(random, digitIndex, row, column),
           visible: isGlyphCellVisible(glyph, row, column),
         });
       }

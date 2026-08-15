@@ -19,6 +19,9 @@ export class RaceCountdownPageObject {
 
   async waitForSceneReady() {
     await expect(this.scene).toHaveAttribute('data-time-viz-state', 'ready');
+    await expect.poll(async () => Number(
+      await this.scene.getAttribute('data-time-viz-frame-count'),
+    )).toBeGreaterThanOrEqual(1);
     await expect(this.canvas).toHaveCount(1);
   }
 

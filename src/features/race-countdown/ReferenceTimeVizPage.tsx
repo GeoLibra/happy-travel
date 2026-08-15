@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { CountdownCanvas } from './CountdownCanvas';
+import type { TimeVizSceneSnapshot } from './time-viz-types';
 import './countdown-page.css';
 
 const REFERENCE_SEED = 26;
-const MOBILE_BREAKPOINT = 768;
 
 function clockDigits(date: Date): string[] {
   return [
@@ -32,18 +32,6 @@ function useClockDigits(): string[] {
   }, [override]);
 
   return override ?? clockDigits(now);
-}
-
-function useViewportWidth(): number {
-  const [width, setWidth] = useState(() => window.innerWidth);
-
-  useEffect(() => {
-    const update = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-
-  return width;
 }
 
 function DevelopmentTools({ digits }: { digits: string[] }) {
@@ -86,23 +74,31 @@ function DevelopmentTools({ digits }: { digits: string[] }) {
 
 export function ReferenceTimeVizPage() {
   const digits = useClockDigits();
-  const viewportWidth = useViewportWidth();
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
-  const layout = viewportWidth < MOBILE_BREAKPOINT ? 'mobile-three-row' : 'desktop-row';
+  const [snapshot, setSnapshot] = useState<TimeVizSceneSnapshot | null>(null);
+  const layout = snapshot?.viewport === 'mobile'
+    ? 'mobile-three-row'
+    : snapshot?.viewport === 'desktop' ? 'desktop-row' : 'pending';
 
   return (
     <main
       className="time-viz-page"
       data-time-viz-digits={digits.join('')}
+      data-time-viz-frame-count={snapshot?.frameCount ?? 0}
       data-time-viz-layout={layout}
       data-time-viz-seed={REFERENCE_SEED}
       data-time-viz-state={state}
+      data-time-viz-viewport={snapshot?.viewport ?? 'pending'}
     >
       <CountdownCanvas
         digits={digits}
         mode="reference"
         seed={REFERENCE_SEED}
-        onReady={() => setState('ready')}
+        onReady={(readySnapshot) => {
+          setSnapshot(readySnapshot);
+          setState('ready');
+        }}
+        onSnapshot={setSnapshot}
         onWebGLFailure={() => setState('error')}
       />
       {import.meta.env.DEV ? <DevelopmentTools digits={digits} /> : null}

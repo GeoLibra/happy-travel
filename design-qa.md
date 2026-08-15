@@ -35,16 +35,24 @@
 - Evidence: `output/reference/comparisons/desktop-iteration-1.png` and `output/reference/time-viz-local/mobile-390x844-iteration-2.png`.
 - Fixes: applied a two-cell glyph weight, independent horizontal/vertical cube pitch, desktop pair grouping, per-viewport cube scale, mobile row spacing, and mobile floor depth.
 
-### Iteration 3 — passed
+### Iteration 3 — rejected by independent review
 
 - Post-fix evidence: `output/reference/comparisons/desktop-final.png` and `output/reference/comparisons/mobile-final.png`.
-- Camera framing, digit scale, cube bevel, seeded color balance, bloom, black level, horizon, reflection depth, and mobile three-row grouping have no remaining actionable P0/P1/P2 mismatch.
-- Residual P3: the procedural local liquid ripple bends reflections more vertically than the source capture. The reflective depth, brightness, motion, and horizon are preserved, and exact ripple phase/orientation is GPU- and time-dependent.
+- [P1] Independent review found that the local desktop glyphs remained thinner, sparser, and flatter, with stronger halos and a crisp segmented reflection extending too far into the foreground.
+- [P1] Independent review found that mobile pairs remained smaller and narrower, with different row cadence and an over-bright segmented reflection.
+
+### Iteration 4 — blocked
+
+- Fresh matched desktop evidence: `output/reference/round-1/source-desktop-1280x720.jpg` and `output/reference/round-1/local-desktop-1280x720.jpg`, both 1280 x 720, digits `192440`; paired in `output/reference/comparisons/desktop-final.png` at 2560 x 720.
+- Fixes attempted: increased cube mass and depth, reduced bloom, introduced spatial pastel gradients, adjusted pair spacing/camera pose, and increased reflector blur while lowering the ripple frequency.
+- Glyph bounds, mass, color balance, and desktop pair framing are materially closer.
+- [P1] The local floor remains a vertically segmented mirrored image. The source has a broad, soft, liquid reflection with large horizontal wave bands and diffused color fields. This is an actionable material/reflection mismatch, not a ripple-phase P3.
+- The prior 390 x 844 matched mobile comparison remains blocked by the independent-review P1. A replacement mobile pair was not represented as passing because this round did not clear the desktop P1.
 
 ## Browser interaction and runtime checks
 
 - Primary interactions: debug panel expanded to reveal matching digits, seed 26, and reference mode, then collapsed; live clock advance is covered by browser automation.
-- Console: zero browser console errors in the final mobile state. The only observed non-error diagnostic was Three.js's `RGBELoader` deprecation warning.
-- No actionable P0/P1/P2 findings remain.
+- Console: zero browser console errors in the round-1 local desktop state. The only observed non-error diagnostic was Three.js's `RGBELoader` deprecation warning.
+- Renderer readiness and responsive observability findings are fixed and tested, but the P1 reflector mismatch remains.
 
-final result: passed
+final result: blocked

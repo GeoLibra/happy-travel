@@ -78,8 +78,8 @@ const floorShader = {
     tDiffuse: { value: null },
     textureMatrix: { value: null },
     time: { value: 0 },
-    displacementStrength: { value: 0.075 },
-    blurAmount: { value: 0.012 },
+    displacementStrength: { value: 0.11 },
+    blurAmount: { value: 0.016 },
   },
   vertexShader: /* glsl */ `
     uniform mat4 textureMatrix;
@@ -93,13 +93,13 @@ const floorShader = {
 
     void main() {
       vec3 displaced = position;
-      float xPhase = position.x * 0.72 + time * 0.35;
-      float yPhase = position.y * 0.92 - time * 0.28;
+      float xPhase = position.x * 0.32 + time * 0.22;
+      float yPhase = position.y * 0.44 - time * 0.18;
       float wave = sin(xPhase) * cos(yPhase);
       displaced.z += wave * displacementStrength;
 
-      float dx = cos(xPhase) * cos(yPhase) * 0.72;
-      float dy = -sin(xPhase) * sin(yPhase) * 0.92;
+      float dx = cos(xPhase) * cos(yPhase) * 0.32;
+      float dy = -sin(xPhase) * sin(yPhase) * 0.44;
       vWaveNormal = vec2(dx, dy) * displacementStrength;
       vUv = textureMatrix * vec4(displaced, 1.0);
       gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
@@ -134,13 +134,17 @@ const floorShader = {
       #include <logdepthbuf_fragment>
 
       vec4 projectedUv = vUv;
-      projectedUv.xy += vWaveNormal * projectedUv.w * 0.2;
-      vec2 blur = vec2(blurAmount * projectedUv.w);
-      vec4 reflected = texture2DProj(tDiffuse, projectedUv) * 0.40;
-      reflected += texture2DProj(tDiffuse, projectedUv + vec4(blur.x, 0.0, 0.0, 0.0)) * 0.15;
-      reflected += texture2DProj(tDiffuse, projectedUv - vec4(blur.x, 0.0, 0.0, 0.0)) * 0.15;
-      reflected += texture2DProj(tDiffuse, projectedUv + vec4(0.0, blur.y, 0.0, 0.0)) * 0.15;
-      reflected += texture2DProj(tDiffuse, projectedUv - vec4(0.0, blur.y, 0.0, 0.0)) * 0.15;
+      projectedUv.xy += vWaveNormal * projectedUv.w * 0.18;
+      vec2 blur = vec2(blurAmount, blurAmount * 1.7) * projectedUv.w;
+      vec4 reflected = vec4(0.0);
+      for (float x = -2.0; x <= 2.0; x += 1.0) {
+        for (float y = -2.0; y <= 2.0; y += 1.0) {
+          reflected += texture2DProj(
+            tDiffuse,
+            projectedUv + vec4(blur * vec2(x, y), 0.0, 0.0)
+          ) * 0.045;
+        }
+      }
 
       gl_FragColor = vec4(blendOverlay(reflected.rgb, color), 0.92);
 
@@ -171,9 +175,9 @@ function createDefaultRenderer(
 const defaultComposerResourceFactories: TimeVizComposerResourceFactories = {
   createBloomPass: () => new UnrealBloomPass(
     new THREE.Vector2(INITIAL_WIDTH, INITIAL_HEIGHT),
-    0.14,
-    0.14,
-    0.68,
+    0.035,
+    0.12,
+    0.88,
   ),
   createComposer: (renderer) => new EffectComposer(renderer) as unknown as TimeVizComposerCore,
   createOutputPass: () => new OutputPass(),
@@ -341,13 +345,13 @@ const defaultDependencies: TimeVizDependencies = {
   cancelAnimationFrame: (frameId) => window.cancelAnimationFrame(frameId),
   createComposer: createDefaultComposer,
   createFloor: createDefaultFloor,
-  createGeometry: () => new RoundedBoxGeometry(0.34, 0.34, 0.42, 3, 0.065),
+  createGeometry: () => new RoundedBoxGeometry(0.34, 0.34, 0.72, 3, 0.045),
   createMaterial: () => new THREE.MeshPhysicalMaterial({
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.2,
+    clearcoat: 0.52,
+    clearcoatRoughness: 0.16,
     color: 0xffffff,
     metalness: 0.08,
-    roughness: 0.24,
+    roughness: 0.2,
   }),
   createRenderer: createDefaultRenderer,
   loadEnvironment: loadDefaultEnvironment,
@@ -420,14 +424,22 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     throw error;
   };
 
+  const getSnapshot = () => ({
+    frameCount,
+    mode: options.mode,
+    ready: ready && !disposed,
+    resourceCount: disposed ? 0 : resourceCount,
+    viewport,
+  });
+
   const updateCameraFraming = () => {
     const mobile = viewport === 'mobile';
     const countdown = options.mode === 'countdown';
-    camera.position.set(1.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 19.2));
+    camera.position.set(2.2, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 19.2));
     camera.lookAt(0, mobile && countdown ? 0.2 : -1.2, 0);
-    digitGroup.position.y = mobile ? -0.9 : -1.05;
+    digitGroup.position.y = mobile ? -0.9 : -1;
     if (floor) {
-      floor.object.position.y = mobile ? (countdown ? -11.2 : -7.4) : -2.45;
+      floor.object.position.y = mobile ? (countdown ? -11.2 : -7.4) : -2.25;
     }
   };
 
@@ -452,7 +464,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
         const instanceIndex = firstCell + cellOffset;
         const instance = instances[instanceIndex];
         position.set(instance.position[0], instance.position[1], instance.position[2]);
-        scale.setScalar(instance.visible ? (viewport === 'mobile' ? 0.84 : 0.72) : 0.0001);
+        scale.setScalar(instance.visible ? (viewport === 'mobile' ? 0.91 : 0.94) : 0.0001);
         matrix.compose(position, quaternion, scale);
         cellMesh.setMatrixAt(instanceIndex, matrix);
       }
@@ -524,14 +536,26 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
       ownedResources.push(environment);
     }
 
+    let disposeOwned: (() => void) | null = null;
     const renderFrame: FrameRequestCallback = (time) => {
       if (disposed || !composer || !floor) return;
-      const deltaTime = Math.max(0, Math.min((time - previousFrameTime) / 1000, 0.1));
-      previousFrameTime = time;
-      floor.update((time - animationStartedAt) / 1000);
-      composer.render(deltaTime);
-      frameCount += 1;
-      animationFrameId = dependencies.requestAnimationFrame(renderFrame);
+      try {
+        const deltaTime = Math.max(0, Math.min((time - previousFrameTime) / 1000, 0.1));
+        previousFrameTime = time;
+        floor.update((time - animationStartedAt) / 1000);
+        composer.render(deltaTime);
+        frameCount += 1;
+        if (!ready) {
+          ready = true;
+          options.onReady?.(getSnapshot());
+        }
+        animationFrameId = dependencies.requestAnimationFrame(renderFrame);
+      } catch (error) {
+        ready = false;
+        disposed = true;
+        disposeOwned?.();
+        throw error;
+      }
     };
 
     animationFrameId = dependencies.requestAnimationFrame(renderFrame);
@@ -544,10 +568,9 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     };
     ownedResources.push(animationResource);
     resourceCount = ownedResources.length;
-    ready = true;
     updateCameraFraming();
 
-    const disposeOwned = createIdempotentDisposer([
+    disposeOwned = createIdempotentDisposer([
       animationResource,
       {
         dispose: () => {
@@ -588,21 +611,14 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
           applyDigits(currentDigits, true);
         }
       },
-      getSnapshot: () => ({
-        frameCount,
-        mode: options.mode,
-        ready: ready && !disposed,
-        resourceCount: disposed ? 0 : resourceCount,
-      }),
+      getSnapshot,
       dispose: () => {
         if (disposed) return;
         disposed = true;
         ready = false;
-        disposeOwned();
+        disposeOwned?.();
       },
     };
-
-    options.onReady?.();
     return api;
   } catch (error) {
     return cleanupAfterFailure(error);
