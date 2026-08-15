@@ -28,4 +28,7 @@ Implemented and committed. The compact itinerary countdown is now a native, keyb
 ## Concerns
 
 - A complete post-fix run of all seven countdown-flow tests was not repeated after the parent agent requested immediate handoff. The new navigation test and every focused regression/fallback check listed above passed.
-- The already-launched particle process may finish independently; inspect `output/playwright/test-results/.last-run.json` before treating it as validated.
+
+## Particle regression outcome
+
+- `pnpm exec playwright test tests/e2e/itinerary-particles/particles-behavior.spec.ts --project=particles-e2e-chromium` — passed: 4 tests, no failed tests (`output/playwright/test-results/.last-run.json` reported `status: "passed"`).
