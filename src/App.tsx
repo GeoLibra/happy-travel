@@ -39,6 +39,7 @@ import { localizeItinerary, useI18n } from './i18n';
 import { EMPTY_SHAKE_STATE, stepShakeDetection } from './lib/shake-detection';
 import { ReferenceTimeVizPage } from './features/race-countdown/ReferenceTimeVizPage';
 import { RaceCountdownPage } from './features/race-countdown/RaceCountdownPage';
+import { useCountdownNavigation } from './features/race-countdown/useCountdownNavigation';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -55,7 +56,11 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
   }
 };
 
-function HappyTravelApp() {
+interface HappyTravelAppProps {
+  onOpenCountdown: () => void;
+}
+
+function HappyTravelApp({ onOpenCountdown }: HappyTravelAppProps) {
   const { locale, t, toggleLocale } = useI18n();
   const [showWelcome, setShowWelcome] = useState(true);
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
@@ -347,7 +352,7 @@ function HappyTravelApp() {
             </div>
       </div>
 
-          {!showWelcome && <RaceCountdown />}
+          {!showWelcome && <RaceCountdown onOpen={onOpenCountdown} />}
 
           {/* Day Selector with Swipe Support */}
           {/* Day Selector with Swipe Support */}
@@ -599,10 +604,27 @@ function HappyTravelApp() {
   );
 }
 
+function CountdownNavigationApp() {
+  const { countdownOpen, openCountdown, closeCountdown } = useCountdownNavigation();
+  const [itineraryMounted, setItineraryMounted] = useState(() => !countdownOpen);
+
+  useEffect(() => {
+    if (!countdownOpen) setItineraryMounted(true);
+  }, [countdownOpen]);
+
+  return (
+    <>
+      {itineraryMounted && <HappyTravelApp onOpenCountdown={openCountdown} />}
+      {countdownOpen && (
+        <div className="relative z-[100]">
+          <RaceCountdownPage onBack={closeCountdown} />
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function App() {
   if (window.location.pathname === '/time-viz-reference') return <ReferenceTimeVizPage />;
-  if (window.location.pathname === '/countdown') {
-    return <RaceCountdownPage onBack={() => window.location.assign('/')} />;
-  }
-  return <HappyTravelApp />;
+  return <CountdownNavigationApp />;
 }

@@ -1,6 +1,7 @@
 import { expect, test } from 'playwright/test';
 
 import { RaceCountdownPageObject } from '../pages/RaceCountdownPage';
+import { ItineraryPage } from '../pages/ItineraryPage';
 
 const officialShanghaiFixture = {
   MRData: {
@@ -32,6 +33,20 @@ function raceFixture(date: string, time: string, season = date.slice(0, 4)) {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('happy-travel-locale', 'zh'));
+});
+
+test('opens from the compact countdown and restores itinerary with browser back', async ({ page }) => {
+  test.setTimeout(180_000);
+  const itinerary = new ItineraryPage(page);
+
+  await itinerary.completeWelcomeIgnition();
+  await itinerary.selectDayTab(1);
+  await itinerary.openFullCountdown();
+  await expect(page).toHaveURL(/\/countdown$/);
+
+  await page.goBack();
+  await expect(itinerary.daySelector).toBeVisible();
+  await expect(page.locator('button:has-text("DAY 2") > div')).toBeVisible();
 });
 
 test('shows official status for a future API race', async ({ page }) => {
@@ -87,6 +102,8 @@ test('keeps the resolved countdown and back control usable when WebGL is unavail
   await expect(countdown.domFallback).toBeVisible();
   await expect(countdown.domFallback.locator('[data-countdown-unit]')).toHaveCount(4);
   await expect(countdown.backButton).toBeVisible();
+  await countdown.backButton.click();
+  await expect(page).toHaveURL(/\/$/);
 });
 
 test('updates the polite announcement at minute boundaries instead of every second', async ({ page }) => {

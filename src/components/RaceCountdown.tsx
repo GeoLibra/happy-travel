@@ -17,7 +17,11 @@ interface Particle {
   color: string;
 }
 
-const RaceCountdown: React.FC = () => {
+interface RaceCountdownProps {
+  onOpen?: () => void;
+}
+
+const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Track previous time to detect changes for spawning particles
@@ -430,24 +434,23 @@ const RaceCountdown: React.FC = () => {
   }, []);
 
   return (
-    <motion.div
+    <motion.button
+      type="button"
+      onClick={onOpen}
+      disabled={!onOpen}
+      aria-label="查看全屏倒计时"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       style={{ minHeight: '60px' }}
-      className="w-full flex justify-center relative touch-none"
+      className="relative z-20 flex min-h-[60px] w-full items-center justify-center rounded-xl border border-[#001A30]/10 bg-white/80 px-4 text-sm font-semibold text-[#001A30] shadow-sm transition hover:bg-white disabled:cursor-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E10600]"
     >
+      <span>查看全屏倒计时</span>
       <canvas
          ref={canvasRef}
          className="fixed top-0 left-0 w-screen h-screen pointer-events-none drop-shadow-sm z-[15]"
          aria-label="Race Countdown Canvas"
-         onClick={(e) => {
-           console.log('[RaceCountdown] Canvas clicked (should not happen with pointer-events-none)', {
-             target: e.target,
-             currentTarget: e.currentTarget,
-           });
-         }}
       />
-    </motion.div>
+    </motion.button>
   );
 };
 
