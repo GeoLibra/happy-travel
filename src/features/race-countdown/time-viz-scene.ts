@@ -34,6 +34,7 @@ import type {
   TimeVizScene,
   TimeVizSceneOptions,
 } from './time-viz-types';
+import { createTslTimeVizScene } from './time-viz-tsl';
 
 const ENVIRONMENT_URL = '/environments/lythwood_room_1k.hdr';
 const MOBILE_BREAKPOINT = 768;
@@ -481,6 +482,9 @@ export function parseDigitInstanceColor(value: string): THREE.Color {
 }
 
 export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<TimeVizScene> {
+  if (!options.dependencies) {
+    return createTslTimeVizScene(options);
+  }
   const dependencies = options.dependencies ?? defaultDependencies;
   const quality = dependencies.selectQuality(browserQualityOptions(Boolean(options.reducedMotion)));
   const ownedResources: DisposableResource[] = [];
