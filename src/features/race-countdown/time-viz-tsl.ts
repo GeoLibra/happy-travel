@@ -50,6 +50,7 @@ import {
 } from '@/src/lib/test-observability';
 
 import { applyCountdownVehiclePose } from './countdown-vehicle';
+import { CountdownFireworksSystem } from './countdown-fireworks-tsl';
 import { CountdownStackHeightfield } from './countdown-stack-heightfield';
 import { getTimeVizLayout } from './digit-layout';
 import { TinySDF } from './tiny-sdf';
@@ -454,6 +455,7 @@ export async function createTslTimeVizScene(
   scene.add(mesh);
 
   let fallingMesh: InstancedMesh | null = null;
+  let fireworks: CountdownFireworksSystem | null = null;
 
   if (isCountdown) {
     const ungappedPositions = new Float32Array(ungapped);
@@ -526,6 +528,10 @@ export async function createTslTimeVizScene(
     fallingMesh.position.y = mesh.position.y;
     fallingMesh.rotation.x = mesh.rotation.x;
     scene.add(fallingMesh);
+
+    fireworks = new CountdownFireworksSystem();
+    scene.add(fireworks.points);
+    ownedResources.push(fireworks);
 
     const occupancy = new Uint8Array(instanceCount);
     const nextOccupancy = new Uint8Array(instanceCount);
@@ -851,6 +857,7 @@ export async function createTslTimeVizScene(
         : Math.min(FALL_DT_CLAMP, Math.max(0, (now - lastPhysicsNow) / 1000));
       lastPhysicsNow = now;
       stepFallPhysics(dt);
+      fireworks?.update(now / 1000, dt);
     }
     controls?.update();
     void renderer.render(scene, camera);

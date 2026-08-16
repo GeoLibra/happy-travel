@@ -119,7 +119,11 @@ describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
     const system = new CountdownFireworksSystem();
     const launchSpy = vi.spyOn(system, 'launchRandomFirework');
 
-    // At t = 1.0s, no automated launch yet
+    // Start at t = 0.0s
+    system.update(0.0, 0.02);
+    expect(launchSpy).toHaveBeenCalledTimes(0);
+
+    // At t = 1.0s, no automated launch yet (needs 2.0s)
     system.update(1.0, 0.02);
     expect(launchSpy).toHaveBeenCalledTimes(0);
 

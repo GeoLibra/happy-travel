@@ -156,6 +156,7 @@ export class CountdownFireworksSystem {
   private dirtyLo = Infinity;
   private dirtyHi = 0;
 
+  private startTime = -1;
   private currentTime = 0;
   private nextLaunchTime = FIRST_LAUNCH_DELAY_SECONDS;
   private shells: FireworkShell[] = [];
@@ -195,8 +196,8 @@ export class CountdownFireworksSystem {
     this.geometry.setAttribute('aPhys', this.phAttr);
     this.geometry.setAttribute('aTwink', this.twAttr);
 
-    this.glowTexture = createFireworksGlowTexture();
     this.material = new PointsNodeMaterial();
+    this.material.sizeAttenuation = false;
     this.material.transparent = true;
     this.material.depthWrite = false;
     this.material.blending = THREE.AdditiveBlending;
@@ -204,7 +205,6 @@ export class CountdownFireworksSystem {
     const uTime = this.uTime;
     const uSizeScale = this.uSizeScale;
     const uIntensity = this.uIntensity;
-    const glowMap = this.glowTexture;
 
     const aInitVel = attribute('aInitVel', 'vec3') as ReturnType<typeof vec3>;
     const aColSize = attribute('aColSize', 'vec4') as ReturnType<typeof vec4>;
@@ -264,9 +264,19 @@ export class CountdownFireworksSystem {
       const twinkleVal = float(0.2).add(float(0.8).mul(float(0.5).add(float(0.5).mul(wave))));
       const finalTwinkle = hasTwinkle.select(twinkleVal, float(1));
 
-      const samp = texture(glowMap, pointUV);
-      const texAlpha = samp.a;
-      const coreAlpha = pow(texAlpha, float(4)).mul(float(0.6));
+      const uvOffset = vec2(pointUV).sub(vec2(0.5, 0.5));
+      const dist = uvOffset.length().mul(2.0);
+      const radialAlpha = float(1.0).sub(dist).clamp(0, 1);
+      const glowAlpha = pow(radialAlpha, float(2.2));
+
+      const flareX = float(1.0).sub(uvOffset.x.abs().mul(2.0)).clamp(0, 1);
+      const flareY = float(1.0).sub(uvOffset.y.abs().mul(2.0)).clamp(0, 1);
+      const crossStreak = pow(flareX, float(14.0)).mul(pow(flareY, float(1.5)))
+        .add(pow(flareY, float(14.0)).mul(pow(flareX, float(1.5))))
+        .mul(0.6);
+
+      const texAlpha = glowAlpha.add(crossStreak).clamp(0, 1);
+      const coreAlpha = pow(texAlpha, float(4)).mul(float(0.7));
       const col = mix(aColSize.xyz, vec3(1, 1, 1), coreAlpha);
       const finalAlpha = isDead.select(float(0), texAlpha.mul(alpha).mul(finalTwinkle).mul(uIntensity));
 
@@ -358,6 +368,10 @@ export class CountdownFireworksSystem {
 
   public update(nowSeconds: number, dtSeconds: number): void {
     if (this.disposed) return;
+    if (this.startTime < 0) {
+      this.startTime = nowSeconds;
+      this.nextLaunchTime = nowSeconds + FIRST_LAUNCH_DELAY_SECONDS;
+    }
     this.currentTime = nowSeconds;
     this.uTime.value = nowSeconds;
 
@@ -762,6 +776,5 @@ export class CountdownFireworksSystem {
     this.shells = [];
     this.geometry.dispose();
     this.material.dispose();
-    this.glowTexture.dispose();
   }
 }
