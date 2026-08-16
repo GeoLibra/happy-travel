@@ -42,8 +42,8 @@ export interface FireworkShell {
 const MAX_PARTICLES = 32768;
 const G = 4.2;
 const BURST_SPREAD = 1.35;
-const SIZE_SCALE = 0.72;
-const INTENSITY = 2.8;
+const SIZE_SCALE = 0.28;
+const INTENSITY = 1.6;
 const FIRST_LAUNCH_DELAY_SECONDS = 2.0;
 const RECURRING_LAUNCH_INTERVAL_SECONDS = 60.0;
 const TAU = Math.PI * 2;
@@ -168,7 +168,7 @@ export class CountdownFireworksSystem {
       const birth = aPhys.z;
       const lifespan = aPhys.w;
       const age = uTime.sub(birth);
-      const isDead = age.lessThan(float(0)).or(age.greaterThan(lifespan));
+      const isDead = age.lessThan(float(0)).or(age.greaterThan(lifespan)).or(lifespan.lessThanEqual(float(0)));
       const g = aPhys.x;
       const k = aPhys.y;
       const hasDrag = k.greaterThan(float(1e-4));
@@ -203,7 +203,7 @@ export class CountdownFireworksSystem {
       const birth = aPhys.z;
       const lifespan = aPhys.w;
       const age = uTime.sub(birth);
-      const isDead = age.lessThan(float(0)).or(age.greaterThan(lifespan));
+      const isDead = age.lessThan(float(0)).or(age.greaterThan(lifespan)).or(lifespan.lessThanEqual(float(0)));
       const lifeLeft = float(1).sub(age.div(lifespan.max(float(0.001)))).clamp(0, 1);
       const alpha = min(float(1), lifeLeft.mul(float(1.9)));
 
@@ -218,7 +218,7 @@ export class CountdownFireworksSystem {
       const uv = positionGeometry.xy;
       const r = uv.length().mul(2.0);
       const radial = float(1.0).sub(r).clamp(0, 1);
-      const glow = pow(radial, float(2.0));
+      const glow = pow(radial, float(2.5));
 
       // 4-pointed sharp needle star flares matching reference mt3d texture
       const ax = uv.x.abs().mul(2.0);
@@ -226,13 +226,13 @@ export class CountdownFireworksSystem {
       const fx = float(1.0).sub(ax).clamp(0, 1);
       const fy = float(1.0).sub(ay).clamp(0, 1);
 
-      const flare1 = pow(fx, float(20.0)).mul(pow(fy, float(1.4)));
-      const flare2 = pow(fy, float(20.0)).mul(pow(fx, float(1.4)));
-      const star = flare1.add(flare2).mul(0.95);
+      const flare1 = pow(fx, float(24.0)).mul(pow(fy, float(1.8)));
+      const flare2 = pow(fy, float(24.0)).mul(pow(fx, float(1.8)));
+      const star = flare1.add(flare2).mul(0.7);
 
       const texAlpha = glow.add(star).clamp(0, 1);
-      const coreAlpha = pow(texAlpha, float(4.0)).mul(float(0.7));
-      const col = mix(aColSize.xyz, vec3(1.3, 1.3, 1.3), coreAlpha);
+      const coreAlpha = pow(texAlpha, float(5.0)).mul(float(0.45));
+      const col = mix(aColSize.xyz, vec3(1.0, 1.0, 1.0), coreAlpha);
       const finalAlpha = isDead.select(float(0), texAlpha.mul(alpha).mul(finalTwinkle).mul(uIntensity));
 
       return vec4(col, finalAlpha);
@@ -397,9 +397,6 @@ export class CountdownFireworksSystem {
   }
 
   private explode(shell: FireworkShell): void {
-    // Blinding core flash
-    this.emit(shell.x, shell.y, shell.z, 0, 0, 0, 1.2, 1.2, 1.1, 4.5, 0.18, 0, 0, 0, 0);
-
     switch (shell.type) {
       case 'willow':
         this.burstWillow(shell);

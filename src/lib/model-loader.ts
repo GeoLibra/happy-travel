@@ -46,39 +46,15 @@ export const loadModelWithCache = async (
 
   console.log(`[ModelLoader] Fetching ${url} from server`);
   const response = await fetch(url);
-
-  if (!response.body) {
-    throw new Error('Response body is null');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch model: ${response.statusText}`);
   }
 
-  const contentLength = response.headers.get('Content-Length');
-  const total = contentLength ? parseInt(contentLength, 10) : 0;
-  let loaded = 0;
+  const arrayBuffer = await response.arrayBuffer();
+  onProgress?.(100);
 
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-
-  while(true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    loaded += value.length;
-    if (total > 0) {
-      onProgress?.(Math.round((loaded / total) * 100));
-    }
-  }
-
-  const allChunks = new Uint8Array(loaded);
-  let position = 0;
-  for (const chunk of chunks) {
-    allChunks.set(chunk, position);
-    position += chunk.length;
-  }
-
-  const arrayBuffer = allChunks.buffer;
-
-  // Cache for next time
-  await localforage.setItem(url, arrayBuffer);
+  // Cache asynchronously for next time without blocking
+  void localforage.setItem(url, arrayBuffer).catch(() => {});
 
   return parseGLTFBuffer(arrayBuffer);
 };
