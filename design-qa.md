@@ -99,5 +99,6 @@
 - No P1/P2 visual issue was found. Remaining seeded color, liquid-flow phase, and platform bloom differences remain the accepted P3 GPU/stochastic variation from the Phase 1 gate.
 - A fresh complete two-project capture run was not produced in this bounded verification turn because Chromium launch/webServer operations were blocked or interrupted by the execution environment; the exact runtime limitation is recorded in the Task 8 report rather than represented as visual evidence.
 - Fix round 1 changes only lifecycle instrumentation and affected-test routing. The exact five-cycle desktop browser path passed with real renderer/composer/vehicle/rAF/listener ownership returning to the zero baseline after each close; no camera, vehicle pose, digit, reflection, overlay, or CSS value changed.
+- Fix round 2 changes only affected-project routing and its resolver tests. Direct glyph, HDR environment, lifecycle-helper, and model-loader changes now select the dedicated countdown projects; no visual implementation or accepted evidence changed.
 
 final result: passed

@@ -39,12 +39,17 @@ const APP_MATRIX_PATHS = [
   /^(?:tailwind|postcss)\.config\.[cm]?[jt]s$/,
 ];
 
+const APP_BROWSER_PATHS = [
+  /^src\/components\/digit\.ts$/,
+];
+
 const F1_BROWSER_PATHS = [
   /^src\/App\.tsx$/,
   /^src\/components\/(?:WelcomePage|ParticleBackground)\.tsx$/,
   /^src\/components\/effects\/(?:f1|studio|gpu|showroom|.*Reflection)/,
   /^src\/components\/showroom\//,
   /^src\/lib\/(?:f1-|showroom-)/,
+  /^src\/lib\/model-loader\.ts$/,
   /^public\/models\/.*(?:f1|rb20|redbull|showroom).*\.glb$/i,
   /^tests\/e2e\/f1\//,
   /^tests\/e2e\/renderer-lifecycle\.spec\.ts$/,
@@ -56,8 +61,11 @@ const F1_BROWSER_PATHS = [
 const COUNTDOWN_BROWSER_PATHS = [
   /^src\/features\/race-countdown\//,
   /^src\/components\/RaceCountdown\.tsx$/,
-  /^src\/components\/showroom\/(?:asset-manager|showroom-assets)\.ts$/,
+  /^src\/components\/digit\.ts$/,
+  /^src\/components\/showroom\/(?:asset-manager|showroom-assets|showroom-resource-lifecycle)\.ts$/,
+  /^src\/lib\/model-loader\.ts$/,
   /^src\/lib\/showroom-quality\.ts$/,
+  /^public\/environments\/lythwood_room_1k\.hdr$/,
   /^public\/models\/.*(?:rb20|redbull|showroom).*\.glb$/i,
   /^tests\/(?:e2e|unit)\/race-countdown\//,
   /^tests\/e2e\/pages\/RaceCountdownPage\.ts$/,
@@ -72,6 +80,7 @@ const PARTICLES_BROWSER_PATHS = [
 
 const ROSE_BROWSER_PATHS = [
   /^src\/components\/(?:Rose|.*Rose)/,
+  /^src\/lib\/model-loader\.ts$/,
   /^src\/lib\/rose-/,
   /^public\/models\/rose\.glb$/i,
   /^tests\/e2e\/rose\//,
@@ -105,6 +114,10 @@ export function resolveAffectedPlaywrightProjects(
   }
 
   const selected = new Set<PlaywrightProject>();
+
+  if (relevantPaths.some((path) => matchesAny(path, APP_BROWSER_PATHS))) {
+    selected.add('app-desktop-chromium');
+  }
 
   if (relevantPaths.some((path) => matchesAny(path, F1_BROWSER_PATHS))) {
     selected.add('showroom-desktop-chromium');

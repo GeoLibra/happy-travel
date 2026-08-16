@@ -100,6 +100,67 @@ test('shared showroom dependencies include countdown browser coverage', () => {
   );
 });
 
+test('countdown lifecycle helper preserves showroom coverage and adds countdown coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects([
+      'src/components/showroom/showroom-resource-lifecycle.ts',
+    ]),
+    [
+      'showroom-desktop-chromium',
+      'showroom-mobile-chromium',
+      'showroom-arrival-timeline-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+      'showroom-webkit-smoke',
+      'f1-e2e-chromium',
+    ],
+  );
+});
+
+test('countdown glyph changes preserve app coverage and add countdown coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/components/digit.ts']),
+    [
+      'app-desktop-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+    ],
+  );
+});
+
+test('countdown environment changes select dedicated countdown and lifecycle coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects([
+      'public/environments/lythwood_room_1k.hdr',
+    ]),
+    [
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+    ],
+  );
+});
+
+test('shared model loader changes select all direct browser consumers', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/lib/model-loader.ts']),
+    [
+      'app-desktop-chromium',
+      'showroom-desktop-chromium',
+      'showroom-mobile-chromium',
+      'showroom-arrival-timeline-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+      'showroom-webkit-smoke',
+      'f1-e2e-chromium',
+      'rose-e2e-chromium',
+    ],
+  );
+});
+
 test('particle itinerary changes select app and particles E2E only', () => {
   assert.deepEqual(
     resolveAffectedPlaywrightProjects(['tests/e2e/itinerary-particles/particles.spec.ts']),
