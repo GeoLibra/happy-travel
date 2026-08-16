@@ -290,7 +290,7 @@ export function createDefaultFloor(
     });
     resources.push(reflector);
     reflector.rotation.x = -Math.PI / 2;
-    reflector.position.y = -2.45;
+    reflector.position.y = 0;
     reflector.position.z = -1.25;
     reflector.receiveShadow = true;
     reflector.renderOrder = -1;
@@ -570,16 +570,16 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const updateCameraFraming = () => {
     const mobile = viewport === 'mobile';
     const countdown = options.mode === 'countdown';
-    camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 32 : 27.5) : (countdown ? 25 : 19.2));
-    camera.lookAt(0, mobile && countdown ? 0.2 : -1.2, 0);
+    camera.position.set(0.5, mobile && countdown ? 1.8 : 1.2, mobile ? (countdown ? 32 : 27.5) : (countdown ? 22 : 19.2));
+    camera.lookAt(0, mobile && countdown ? 1.5 : 1.0, 0);
     if (controls) {
-      controls.target.set(0, mobile && countdown ? 0.2 : -0.6, 0);
+      controls.target.set(0, mobile && countdown ? 1.5 : 1.0, 0);
       controls.update();
     }
-    digitGroup.position.y = mobile ? -1.15 : -0.65;
+    digitGroup.position.y = mobile ? 1.5 : 1.4;
     if (currentVehicle) applyCountdownVehiclePose(currentVehicle, viewport);
     if (floor) {
-      floor.object.position.y = mobile ? (countdown ? -11.2 : -6.9) : -1.85;
+      floor.object.position.y = 0;
       floor.object.position.z = -1.25;
     }
   };

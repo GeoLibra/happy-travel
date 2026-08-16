@@ -82,12 +82,12 @@ describe('loadCountdownVehicle', () => {
     const vehicle = new THREE.Group();
 
     applyCountdownVehiclePose(vehicle, 'desktop');
-    expect(vehicle.position.toArray()).toEqual([0, -2.1, 5.6]);
+    expect(vehicle.position.toArray()).toEqual([0, 0, 2.8]);
     expect(vehicle.rotation.toArray().slice(0, 3)).toEqual([0, -0.18, 0]);
     expect(vehicle.scale.toArray()).toEqual([1.15, 1.15, 1.15]);
 
     applyCountdownVehiclePose(vehicle, 'mobile');
-    expect(vehicle.position.toArray()).toEqual([0, -5.8, 4.4]);
+    expect(vehicle.position.toArray()).toEqual([0, 0, 2.2]);
     expect(vehicle.rotation.toArray().slice(0, 3)).toEqual([0, -0.08, 0]);
     expect(vehicle.scale.toArray()).toEqual([0.9, 0.9, 0.9]);
   });

@@ -19,14 +19,14 @@ describe('resolveNextShanghaiRace', () => {
     expect(result.startsAt.toISOString()).toBe('2027-03-21T07:00:00.000Z');
   });
 
-  it('falls back to March 15, 2026 when offline', async () => {
+  it('falls back to next March 15 when offline after current season event', async () => {
     const result = await resolveNextShanghaiRace({
       now: new Date('2026-08-15T00:00:00+08:00'),
       fetchImpl: vi.fn(async () => { throw new Error('offline'); }),
     });
 
     expect(result.source).toBe('estimated');
-    expect(result.startsAt.toISOString()).toBe('2026-03-15T07:00:00.000Z');
+    expect(result.startsAt.toISOString()).toBe('2027-03-15T07:00:00.000Z');
   });
 
   it('discards malformed and past race entries before choosing an official event', async () => {
@@ -75,8 +75,8 @@ describe('resolveNextShanghaiRace', () => {
       await vi.advanceTimersByTimeAsync(250);
       const result = await pending;
 
-      expect(result).toMatchObject({ source: 'estimated', season: 2026 });
-      expect(result.startsAt.toISOString()).toBe('2026-03-15T07:00:00.000Z');
+      expect(result).toMatchObject({ source: 'estimated', season: 2027 });
+      expect(result.startsAt.toISOString()).toBe('2027-03-15T07:00:00.000Z');
       expect(observedSignals).toHaveLength(2);
       expect(observedSignals.every((signal) => signal.aborted)).toBe(true);
     } finally {

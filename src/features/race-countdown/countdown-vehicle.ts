@@ -13,8 +13,8 @@ import type { ViewportKind } from './digit-layout';
 const COUNTDOWN_ENVIRONMENT_INTENSITY = 1.35;
 
 export const COUNTDOWN_VEHICLE_POSES = {
-  desktop: { position: [0, -2.1, 5.6], rotation: [0, -0.18, 0], scale: 1.15 },
-  mobile: { position: [0, -5.8, 4.4], rotation: [0, -0.08, 0], scale: 0.9 },
+  desktop: { position: [0, 0, 2.8], rotation: [0, -0.18, 0], scale: 1.15 },
+  mobile: { position: [0, 0, 2.2], rotation: [0, -0.08, 0], scale: 0.9 },
 } as const;
 
 interface CountdownVehicleAsset {

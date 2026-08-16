@@ -30,10 +30,14 @@ function shanghaiYear(now: Date): number {
   }).format(now));
 }
 
-function fallbackEvent(_now?: Date): ResolvedRaceEvent {
+function fallbackEvent(now: Date = new Date()): ResolvedRaceEvent {
+  const currentYear = shanghaiYear(now);
+  const currentFallbackMs = Date.UTC(currentYear, 2, 15, 7);
+  const season = currentFallbackMs > now.getTime() ? currentYear : currentYear + 1;
+
   return {
-    startsAt: new Date(Date.UTC(2026, 2, 15, 7)),
-    season: 2026,
+    startsAt: new Date(Date.UTC(season, 2, 15, 7)),
+    season,
     source: 'estimated',
   };
 }

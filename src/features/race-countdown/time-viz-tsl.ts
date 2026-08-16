@@ -66,9 +66,20 @@ const FIELD_HEIGHT = 1.5;
 const FIELD_DEPTH = 0.25;
 const PAIR_GAP = 0.5;
 const SUBDIVISIONS = 12;
-const DESKTOP_CAMERA = { x: 0, y: 0.5, z: 20, targetY: 0.5 } as const;
-const MOBILE_CAMERA = { x: -30, y: 2, z: 50, targetY: 2.5 } as const;
+const DESKTOP_CAMERA_REFERENCE = { x: 0, y: 0.5, z: 20, targetY: 0.5 } as const;
+const MOBILE_CAMERA_REFERENCE = { x: -30, y: 2, z: 50, targetY: 2.5 } as const;
+
+const DESKTOP_CAMERA_COUNTDOWN = { x: 0, y: 1.15, z: 23.5, targetY: 1.05 } as const;
+const MOBILE_CAMERA_COUNTDOWN = { x: -18, y: 3.8, z: 26, targetY: 1.2 } as const;
+
 const MASK_DURATION_MS = 800;
+const FALL_GRAVITY = 14;
+const FALL_RESTITUTION = 0.32;
+const FALL_SETTLE_SPEED = 0.55;
+const FALL_FADE_SECONDS = 0.4;
+const FALL_DT_CLAMP = 0.05;
+const FALL_HORIZONTAL_SPEED = 0.7;
+const FALL_DEPTH_SPEED = 0.28;
 const PALETTE = {
   a: new THREE.Color(0.5, 0.5, 0.5),
   b: new THREE.Color(0.5, 0.5, 0.5),
@@ -85,6 +96,40 @@ function circularInOut(value: number): number {
   if (t < 1) return -0.5 * (Math.sqrt(1 - t * t) - 1);
   t -= 2;
   return 0.5 * (Math.sqrt(1 - t * t) + 1);
+}
+
+function remapRangeClamp(
+  value: number,
+  inLow: number,
+  inHigh: number,
+  outLow: number,
+  outHigh: number,
+): number {
+  if (inHigh === inLow) return outLow;
+  const t = (value - inLow) / (inHigh - inLow);
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+  return outLow + (outHigh - outLow) * clamped;
+}
+
+/** Matches countdown `mobileOffset()` local Z after the shared (0,0,-1.8) add. */
+function countdownMobileLocalZ(digitIndex: number): number {
+  if (digitIndex < 3) return -5.4;
+  if (digitIndex < 5) return -3.6;
+  if (digitIndex < 7) return -1.8;
+  return 0;
+}
+
+function sampleGlyphInside(
+  glyph: ReturnType<TinySDF['draw']>,
+  localU: number,
+  v: number,
+): boolean {
+  if (glyph.width <= 0 || glyph.height <= 0) return false;
+  const x = Math.min(glyph.width - 1, Math.max(0, Math.floor(localU * glyph.width)));
+  // DataTexture default flipY=true: GPU v=0 samples the last CPU row.
+  const y = Math.min(glyph.height - 1, Math.max(0, Math.floor((1 - v) * glyph.height)));
+  const r = glyph.data[y * glyph.width + x] / 255;
+  return (1 - r) * 3 < 0.5;
 }
 
 async function loadRussoOne(): Promise<void> {
@@ -118,7 +163,12 @@ function makeSdfTexture(glyph: ReturnType<TinySDF['draw']>): THREE.DataTexture {
   return map;
 }
 
-function createDigitTextureBanks(): { ping: THREE.DataTexture[]; pong: THREE.DataTexture[] } {
+function createDigitTextureBanks(): {
+  ping: THREE.DataTexture[];
+  pong: THREE.DataTexture[];
+  empty: THREE.DataTexture;
+  glyphs: ReturnType<TinySDF['draw']>[];
+} {
   const sdf = new TinySDF({
     fontSize: 512,
     buffer: 18,
@@ -130,20 +180,33 @@ function createDigitTextureBanks(): { ping: THREE.DataTexture[]; pong: THREE.Dat
 
   const ping: THREE.DataTexture[] = [];
   const pong: THREE.DataTexture[] = [];
+  const glyphs: ReturnType<TinySDF['draw']>[] = [];
   for (let digit = 0; digit < 10; digit += 1) {
     const glyph = sdf.draw(String(digit));
+    glyphs.push(glyph);
     ping.push(makeSdfTexture(glyph));
     pong.push(makeSdfTexture(glyph));
   }
-  return { ping, pong };
+  const empty = new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.RedFormat);
+  empty.needsUpdate = true;
+  return { ping, pong, empty, glyphs };
 }
 
 function digitFieldWidth(digitCount: number): number {
   return digitCount;
 }
 
-function pairCountForDigits(digitCount: number): number {
-  return Math.max(1, Math.round(digitCount / 2));
+function getGroupGapCount(digitIndex: number, digitCount: number): number {
+  if (digitCount === 9) {
+    if (digitIndex < 3) return 0;
+    if (digitIndex < 5) return 1;
+    if (digitIndex < 7) return 2;
+    return 3;
+  }
+  if (digitCount === 8) {
+    return digitIndex < 5 ? 0 : 1;
+  }
+  return Math.floor(digitIndex / 2);
 }
 
 export async function createTslTimeVizScene(
@@ -195,6 +258,9 @@ export async function createTslTimeVizScene(
     dispose: () => undefined,
   }, 'composer');
 
+  const isCountdown = options.mode === 'countdown';
+  const desktopCamera = isCountdown ? DESKTOP_CAMERA_COUNTDOWN : DESKTOP_CAMERA_REFERENCE;
+
   const scene = new Scene();
   const bgDark = uniform(vec3(0.03, 0.03, 0.03));
   const bgBlack = uniform(vec3(0, 0, 0));
@@ -202,7 +268,7 @@ export async function createTslTimeVizScene(
   scene.environmentIntensity = 1;
 
   const camera = new PerspectiveCamera(15, 1280 / 720, 0.1, 100);
-  camera.position.set(DESKTOP_CAMERA.x, DESKTOP_CAMERA.y, DESKTOP_CAMERA.z);
+  camera.position.set(desktopCamera.x, desktopCamera.y, desktopCamera.z);
 
   const controls = options.canvas
     ? new OrbitControls(camera, options.canvas)
@@ -211,22 +277,27 @@ export async function createTslTimeVizScene(
     controls.enableDamping = true;
     controls.dampingFactor = 0.1;
     controls.enablePan = false;
-    controls.target.set(0, DESKTOP_CAMERA.targetY, 0);
+    controls.target.set(0, desktopCamera.targetY, 0);
     controls.maxPolarAngle = Math.PI / 2;
     controls.minDistance = 5;
-    controls.maxDistance = 25;
+    controls.maxDistance = isCountdown ? 75 : 25;
     controls.update();
   }
 
   const digitCount = getTimeVizLayout(options.mode, 'desktop').digitCapacity;
   const fieldWidth = digitFieldWidth(digitCount);
-  const pairs = pairCountForDigits(digitCount);
   const cell = 1 / SUBDIVISIONS;
   const cubeSize = cell * 0.95;
   const xCount = Math.round(fieldWidth * SUBDIVISIONS);
   const yCount = Math.round(FIELD_HEIGHT * SUBDIVISIONS);
   const zCount = Math.round(FIELD_DEPTH * SUBDIVISIONS);
   const instanceCount = xCount * yCount * zCount;
+
+  const totalGaps = getGroupGapCount(digitCount - 1, digitCount);
+  const totalFieldWidth = fieldWidth + totalGaps * PAIR_GAP;
+  const xHalf = (totalFieldWidth - cell) / 2;
+  const ungappedXHalf = (fieldWidth - cell) / 2;
+  const yHalf = FIELD_HEIGHT / 2 - cell / 2;
 
   const geometry = ownResource(
     new RoundedBoxGeometry(cubeSize, cubeSize, cubeSize, 1, 0.01),
@@ -236,21 +307,21 @@ export async function createTslTimeVizScene(
 
   const mesh = new InstancedMesh(geometry, material, instanceCount);
   mesh.frustumCulled = false;
-  mesh.position.y = FIELD_HEIGHT / 2;
+  mesh.position.y = isCountdown ? (FIELD_HEIGHT / 2 + 0.5) : (FIELD_HEIGHT / 2);
   mesh.rotation.x = Math.PI / 2;
 
   const dummy = new Object3D();
   const gapped: number[] = [];
   const ungapped: number[] = [];
-  const xHalf = fieldWidth / 2 - cell / 2;
-  const yHalf = FIELD_HEIGHT / 2 - cell / 2;
   let instanceIndex = 0;
 
   for (let x = 0; x < xCount; x += 1) {
-    const cellsPerPair = xCount / pairs;
-    const pairOffset = Math.floor(x / cellsPerPair) * PAIR_GAP;
-    const gappedX = (x / xCount) * fieldWidth + pairOffset - xHalf - PAIR_GAP;
-    const ungappedX = (x / xCount) * fieldWidth - xHalf;
+    const digitIndex = Math.floor(x / SUBDIVISIONS);
+    const cellInDigit = x % SUBDIVISIONS;
+    const gapCount = getGroupGapCount(digitIndex, digitCount);
+    const pairOffset = gapCount * PAIR_GAP;
+    const gappedX = digitIndex * 1.0 + cellInDigit * cell + pairOffset - xHalf;
+    const ungappedX = (x / xCount) * fieldWidth - ungappedXHalf;
     for (let y = 0; y < yCount; y += 1) {
       for (let z = 0; z < zCount; z += 1) {
         const depth = (z / zCount) * FIELD_DEPTH;
@@ -271,12 +342,13 @@ export async function createTslTimeVizScene(
   const ungappedNode = instancedBufferAttribute(ungappedAttr) as ReturnType<typeof vec3>;
 
   const digitMaps = createDigitTextureBanks();
-  [...digitMaps.ping, ...digitMaps.pong].forEach((map) => {
+  [...digitMaps.ping, digitMaps.empty].forEach((map) => {
     ownedResources.push(map);
   });
 
-  const currentNodes = digitMaps.ping.slice(0, digitCount).map((map) => texture(map));
-  const previousNodes = digitMaps.pong.slice(0, digitCount).map((map) => texture(map));
+  const glyphNodes = digitMaps.ping.map((map) => texture(map));
+  const currentIds = Array.from({ length: digitCount }, () => uniform(0));
+  const previousIds = Array.from({ length: digitCount }, () => uniform(0));
   const maskUniform = uniform(0);
   const mobileUniform = uniform(0);
   const timeMul = uniform(0.2);
@@ -303,27 +375,47 @@ export async function createTslTimeVizScene(
   });
 
   const sampleBank = (
-    nodes: ReturnType<typeof texture>[],
+    ids: ReturnType<typeof uniform>[],
   ) => Fn(() => {
     const uv = digitUvNode();
     const localU = fract(uv.x.mul(digitCount));
     const localUv = vec2(localU, uv.y);
-    const index = floor(uv.x.mul(digitCount));
-    const result = color(0, 0, 0).toVar();
-    for (let digit = 0; digit < digitCount; digit += 1) {
-      const active = index.equal(float(digit));
-      const sample = float(1).sub(texture(nodes[digit], localUv).r);
-      result.assign(result.add(active.select(sample, float(0))));
+    const slot = floor(uv.x.mul(digitCount));
+    const activeId = float(-1).toVar();
+    for (let index = 0; index < digitCount; index += 1) {
+      activeId.assign(slot.equal(float(index)).select(ids[index], activeId));
+    }
+    const result = float(0).toVar();
+    for (let glyph = 0; glyph < 10; glyph += 1) {
+      const sample = float(1).sub(texture(glyphNodes[glyph], localUv).r);
+      result.assign(result.add(activeId.equal(float(glyph)).select(sample, float(0))));
     }
     return result;
   });
 
-  const currentMask = sampleBank(currentNodes);
-  const previousMask = sampleBank(previousNodes);
+  const currentMask = sampleBank(currentIds);
+  const previousMask = sampleBank(previousIds);
   const blendedMask = Fn(() => mix(previousMask(), currentMask(), maskUniform));
   const cubeScale = Fn(() => remapClamp(blendedMask().mul(3).r, 0, 0.5, 1, 0));
+  let stepFallPhysics: (dt: number) => void = () => undefined;
+  let syncOccupancyOnTween: (nextDigits: string[]) => void = () => undefined;
+  let lastPhysicsNow = 0;
 
-  const mobileOffset = Fn(() => {
+  const mobileOffset = isCountdown ? Fn(() => {
+    const index = floor(digitUvNode().x.mul(digitCount));
+    const offset = vec3(0, 0, 0).toVar();
+    If(index.lessThan(float(3)), () => {
+      offset.assign(vec3(2.6, 0, -3.6));
+    }).ElseIf(index.lessThan(float(5)), () => {
+      offset.assign(vec3(0.9, 0, -1.8));
+    }).ElseIf(index.lessThan(float(7)), () => {
+      offset.assign(vec3(-0.9, 0, 0.0));
+    }).Else(() => {
+      offset.assign(vec3(-2.6, 0, 1.8));
+    });
+    offset.assign(offset.add(vec3(0, 0, -1.8)));
+    return offset;
+  }) : Fn(() => {
     const index = floor(digitUvNode().x.mul(digitCount));
     const offset = vec3(0, 0, 0).toVar();
     If(index.lessThan(float(2)), () => {
@@ -340,15 +432,188 @@ export async function createTslTimeVizScene(
     return remapClamp(noise, 0, 1, 0, 1).add(time.mul(timeMul));
   });
 
-  const colorNode = Fn(() => {
-    const t = noiseNode().mod(1).mul(remapClamp(cubeScale(), 0, 1, 0, 1));
-    const rainbow = cosinePalette(t);
-    return saturateColor(rainbow, 0.8);
-  });
+  if (isCountdown) {
+    const ungappedPositions = new Float32Array(ungapped);
+    const instanceHeight = new Float32Array(instanceCount);
+    const instanceSlot = new Int16Array(instanceCount);
+    for (let i = 0; i < instanceCount; i += 1) {
+      const ungappedX = ungappedPositions[i * 3];
+      instanceHeight[i] = ungappedPositions[i * 3 + 2];
+      const u = remapRangeClamp(ungappedX, fieldWidth / -2, fieldWidth / 2, 0, 1);
+      instanceSlot[i] = Math.floor(u * digitCount);
+    }
 
-  material.colorNode = colorNode();
+    const fallOffsetArray = new Float32Array(instanceCount * 3);
+    const fallingArray = new Float32Array(instanceCount);
+    const fallScaleArray = new Float32Array(instanceCount);
+    fallScaleArray.fill(1);
+    const fallVelocity = new Float32Array(instanceCount * 3);
+    const fadeElapsed = new Float32Array(instanceCount);
+    fadeElapsed.fill(-1);
+    const occupancy = new Uint8Array(instanceCount);
+    const nextOccupancy = new Uint8Array(instanceCount);
+    const fallingList = new Int32Array(instanceCount);
+    let fallingCount = 0;
+    let occupancySeeded = false;
+
+    const fallOffsetAttr = new InstancedBufferAttribute(fallOffsetArray, 3);
+    const fallingAttr = new InstancedBufferAttribute(fallingArray, 1);
+    const fallScaleAttr = new InstancedBufferAttribute(fallScaleArray, 1);
+    const fallOffsetNode = instancedBufferAttribute(fallOffsetAttr) as ReturnType<typeof vec3>;
+    const fallingNode = instancedBufferAttribute(fallingAttr) as ReturnType<typeof float>;
+    const fallScaleNode = instancedBufferAttribute(fallScaleAttr) as ReturnType<typeof float>;
+
+    const liveScale = Fn(() => mix(cubeScale(), fallScaleNode, fallingNode));
+    material.positionNode = positionGeometry
+      .mul(liveScale())
+      .add(mix(vec3(0), mobileOffset(), mobileUniform))
+      .add(fallOffsetNode);
+    material.colorNode = Fn(() => {
+      const t = noiseNode().mod(1).mul(remapClamp(liveScale(), 0, 1, 0, 1));
+      const rainbow = cosinePalette(t);
+      return saturateColor(rainbow, 0.8);
+    })();
+
+    const instanceInsideGlyph = (index: number, digits: string[]): boolean => {
+      const slot = instanceSlot[index];
+      if (slot < 0 || slot >= digitCount) return false;
+      const char = digits[slot] ?? ' ';
+      if (char === ' ') return false;
+      const parsed = Number.parseInt(char, 10);
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 9) return false;
+      const glyph = digitMaps.glyphs[parsed];
+      if (!glyph) return false;
+      const ungappedX = ungappedPositions[index * 3];
+      const height = instanceHeight[index];
+      const u = remapRangeClamp(ungappedX, fieldWidth / -2, fieldWidth / 2, 0, 1);
+      const v = remapRangeClamp(height, FIELD_HEIGHT / -2, FIELD_HEIGHT / 2, 0, 1);
+      const localU = u * digitCount - slot;
+      return sampleGlyphInside(glyph, localU, v);
+    };
+
+    const fillOccupancy = (digits: string[], out: Uint8Array) => {
+      for (let i = 0; i < instanceCount; i += 1) {
+        out[i] = instanceInsideGlyph(i, digits) ? 1 : 0;
+      }
+    };
+
+    const instanceMaxFallZ = (index: number, mobile: boolean): number => {
+      const slot = instanceSlot[index];
+      const mobileZ = mobile ? countdownMobileLocalZ(slot) : 0;
+      return mesh.position.y - instanceHeight[index] - cubeSize * 0.5 - mobileZ;
+    };
+
+    const resetFallInstance = (index: number) => {
+      fallingArray[index] = 0;
+      fallScaleArray[index] = 1;
+      fallOffsetArray[index * 3] = 0;
+      fallOffsetArray[index * 3 + 1] = 0;
+      fallOffsetArray[index * 3 + 2] = 0;
+      fallVelocity[index * 3] = 0;
+      fallVelocity[index * 3 + 1] = 0;
+      fallVelocity[index * 3 + 2] = 0;
+      fadeElapsed[index] = -1;
+    };
+
+    const startFallInstance = (index: number) => {
+      fallingArray[index] = 1;
+      fallScaleArray[index] = 1;
+      fallOffsetArray[index * 3] = 0;
+      fallOffsetArray[index * 3 + 1] = 0;
+      fallOffsetArray[index * 3 + 2] = 0;
+      fallVelocity[index * 3] = (Math.random() - 0.5) * 2 * FALL_HORIZONTAL_SPEED;
+      fallVelocity[index * 3 + 1] = (Math.random() - 0.5) * 2 * FALL_DEPTH_SPEED;
+      fallVelocity[index * 3 + 2] = 0;
+      fadeElapsed[index] = -1;
+      fallingList[fallingCount] = index;
+      fallingCount += 1;
+    };
+
+    const markFallAttrsDirty = () => {
+      fallOffsetAttr.needsUpdate = true;
+      fallingAttr.needsUpdate = true;
+      fallScaleAttr.needsUpdate = true;
+    };
+
+    syncOccupancyOnTween = (nextDigits: string[]) => {
+      if (!occupancySeeded) {
+        fillOccupancy(nextDigits, occupancy);
+        occupancySeeded = true;
+        return;
+      }
+      fillOccupancy(nextDigits, nextOccupancy);
+      for (let i = 0; i < instanceCount; i += 1) {
+        const wasInside = occupancy[i] === 1;
+        const nowInside = nextOccupancy[i] === 1;
+        if (nowInside) {
+          if (fallingArray[i] > 0.5) resetFallInstance(i);
+        } else if (wasInside && fallingArray[i] < 0.5) {
+          startFallInstance(i);
+        }
+      }
+      occupancy.set(nextOccupancy);
+      markFallAttrsDirty();
+    };
+
+    stepFallPhysics = (dt: number) => {
+      if (dt <= 0 || fallingCount === 0) return;
+      const mobile = mobileUniform.value > 0.5;
+      let write = 0;
+      for (let n = 0; n < fallingCount; n += 1) {
+        const i = fallingList[n];
+        if (fallingArray[i] < 0.5) continue;
+
+        const maxZ = instanceMaxFallZ(i, mobile);
+        const fade = fadeElapsed[i];
+        if (fade >= 0) {
+          const nextFade = fade + dt;
+          const scale = 1 - nextFade / FALL_FADE_SECONDS;
+          if (scale <= 0) {
+            resetFallInstance(i);
+            continue;
+          }
+          fadeElapsed[i] = nextFade;
+          fallScaleArray[i] = scale;
+          fallOffsetArray[i * 3 + 2] = maxZ;
+          fallingList[write] = i;
+          write += 1;
+          continue;
+        }
+
+        fallVelocity[i * 3 + 2] += FALL_GRAVITY * dt;
+        fallOffsetArray[i * 3] += fallVelocity[i * 3] * dt;
+        fallOffsetArray[i * 3 + 1] += fallVelocity[i * 3 + 1] * dt;
+        fallOffsetArray[i * 3 + 2] += fallVelocity[i * 3 + 2] * dt;
+
+        if (fallOffsetArray[i * 3 + 2] >= maxZ) {
+          fallOffsetArray[i * 3 + 2] = maxZ;
+          fallVelocity[i * 3 + 2] *= -FALL_RESTITUTION;
+          fallVelocity[i * 3] *= 0.55;
+          fallVelocity[i * 3 + 1] *= 0.55;
+          if (Math.abs(fallVelocity[i * 3 + 2]) < FALL_SETTLE_SPEED) {
+            fallVelocity[i * 3] = 0;
+            fallVelocity[i * 3 + 1] = 0;
+            fallVelocity[i * 3 + 2] = 0;
+            fadeElapsed[i] = 0;
+          }
+        }
+
+        fallingList[write] = i;
+        write += 1;
+      }
+      fallingCount = write;
+      markFallAttrsDirty();
+    };
+  } else {
+    material.positionNode = positionGeometry.mul(cubeScale()).add(mix(vec3(0), mobileOffset(), mobileUniform));
+    material.colorNode = Fn(() => {
+      const t = noiseNode().mod(1).mul(remapClamp(cubeScale(), 0, 1, 0, 1));
+      const rainbow = cosinePalette(t);
+      return saturateColor(rainbow, 0.8);
+    })();
+  }
+
   material.metalnessNode = float(1);
-  material.positionNode = positionGeometry.mul(cubeScale()).add(mix(vec3(0), mobileOffset(), mobileUniform));
 
   scene.add(mesh);
 
@@ -376,6 +641,7 @@ export async function createTslTimeVizScene(
 
   const floorMesh = new Mesh(new BoxGeometry(50, 0.001, 50), floorMaterial);
   floorMesh.position.set(0, 0, 0);
+  floorMesh.renderOrder = -1;
   scene.add(reflection.target, floorMesh);
   ownResource({ dispose: () => reflection.dispose() }, 'floor');
 
@@ -393,8 +659,9 @@ export async function createTslTimeVizScene(
   let currentVehicle: THREE.Object3D | null = null;
 
   let currentDigits = Array.from({ length: digitCount }, () => '0');
-  let maskFrom = 0;
-  let maskTo = 0;
+  let activeBank: 'ping' | 'pong' = 'ping';
+  let maskFrom = 1;
+  let maskTo = 1;
   let maskStartedAt = 0;
   let disposed = false;
   let ready = false;
@@ -403,31 +670,38 @@ export async function createTslTimeVizScene(
   let releaseAnimationFrame: (() => void) | null = null;
   let disposeOwned: (() => void) | null = null;
 
-  const applyTextures = (digits: string[], bank: typeof currentNodes, maps: THREE.DataTexture[]) => {
+  const applyIds = (digits: string[], ids: typeof currentIds) => {
     for (let i = 0; i < digitCount; i += 1) {
-      const parsed = Number.parseInt(digits[i] ?? '0', 10);
-      const index = Number.isFinite(parsed) ? Math.min(9, Math.max(0, parsed)) : 0;
-      bank[i].value = maps[index];
+      const char = digits[i] ?? ' ';
+      if (char === ' ') {
+        ids[i].value = -1;
+        continue;
+      }
+      const parsed = Number.parseInt(char, 10);
+      ids[i].value = Number.isFinite(parsed) ? Math.min(9, Math.max(0, parsed)) : -1;
     }
   };
 
   const startMaskTween = (nextDigits: string[]) => {
-    const asNumber = Number(nextDigits.join(''));
-    if (asNumber % 2 === 0) {
-      applyTextures(nextDigits, currentNodes, digitMaps.ping);
+    if (activeBank === 'ping') {
+      applyIds(nextDigits, previousIds);
+      maskFrom = 1;
+      maskTo = 0;
+      activeBank = 'pong';
+    } else {
+      applyIds(nextDigits, currentIds);
       maskFrom = 0;
       maskTo = 1;
-    } else {
-      applyTextures(nextDigits, previousNodes, digitMaps.pong);
-      maskFrom = 0;
-      maskTo = 0;
+      activeBank = 'ping';
     }
     maskStartedAt = performance.now();
     currentDigits = nextDigits.slice(0, digitCount);
+    syncOccupancyOnTween(nextDigits);
   };
 
-  applyTextures(currentDigits, currentNodes, digitMaps.ping);
-  applyTextures(currentDigits, previousNodes, digitMaps.pong);
+  applyIds(currentDigits, currentIds);
+  applyIds(currentDigits, previousIds);
+  maskUniform.value = 1;
 
   const getSnapshot = (): TimeVizSceneSnapshot => ({
     frameCount,
@@ -442,14 +716,16 @@ export async function createTslTimeVizScene(
     const mobile = height > 0 && width / height < MOBILE_ASPECT;
     const layoutChanged = layoutMobile !== mobile;
     mobileUniform.value = mobile ? 1 : 0;
+    const desktopCam = isCountdown ? DESKTOP_CAMERA_COUNTDOWN : DESKTOP_CAMERA_REFERENCE;
+    const mobileCam = isCountdown ? MOBILE_CAMERA_COUNTDOWN : MOBILE_CAMERA_REFERENCE;
     if (layoutChanged) {
       layoutMobile = mobile;
       if (mobile) {
-        camera.position.set(MOBILE_CAMERA.x, MOBILE_CAMERA.y, MOBILE_CAMERA.z);
-        controls?.target.set(0, MOBILE_CAMERA.targetY, 0);
+        camera.position.set(mobileCam.x, mobileCam.y, mobileCam.z);
+        controls?.target.set(0, mobileCam.targetY, 0);
       } else {
-        camera.position.set(DESKTOP_CAMERA.x, DESKTOP_CAMERA.y, DESKTOP_CAMERA.z);
-        controls?.target.set(0, DESKTOP_CAMERA.targetY, 0);
+        camera.position.set(desktopCam.x, desktopCam.y, desktopCam.z);
+        controls?.target.set(0, desktopCam.targetY, 0);
       }
       if (currentVehicle) {
         applyCountdownVehiclePose(currentVehicle, mobile ? 'mobile' : 'desktop');
@@ -475,6 +751,13 @@ export async function createTslTimeVizScene(
     const t = Math.min(1, Math.max(0, elapsed / MASK_DURATION_MS));
     const eased = options.reducedMotion ? 1 : circularInOut(t);
     maskUniform.value = maskFrom + (maskTo - maskFrom) * eased;
+    if (isCountdown) {
+      const dt = lastPhysicsNow === 0
+        ? 0
+        : Math.min(FALL_DT_CLAMP, Math.max(0, (now - lastPhysicsNow) / 1000));
+      lastPhysicsNow = now;
+      stepFallPhysics(dt);
+    }
     controls?.update();
     void renderer.render(scene, camera);
     frameCount += 1;
@@ -516,9 +799,14 @@ export async function createTslTimeVizScene(
   return {
     setDigits: (digits) => {
       if (disposed) return;
-      const next = Array.from({ length: digitCount }, (_, index) => (
-        /^\d$/.test(digits[index] ?? '') ? digits[index] : '0'
-      ));
+      const is6 = isCountdown && digits.length === 6;
+      const normalized = is6 ? [' ', ' ', ' ', ...digits] : digits;
+      mesh.position.x = is6 ? -1.75 : 0;
+      const next = Array.from({ length: digitCount }, (_, index) => {
+        const char = normalized[index];
+        if (char === ' ') return ' ';
+        return /^\d$/.test(char ?? '') ? (char as string) : '0';
+      });
       if (next.join('') === currentDigits.join('')) return;
       startMaskTween(next);
     },
