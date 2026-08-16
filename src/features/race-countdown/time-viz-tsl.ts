@@ -77,6 +77,7 @@ const FALL_GRAVITY = 14;
 const FALL_RESTITUTION = 0.32;
 const FALL_SETTLE_SPEED = 0.55;
 const FALL_FADE_SECONDS = 0.4;
+const FALL_GROUND_DWELL_SECONDS = 60.0;
 const FALL_DT_CLAMP = 0.05;
 const FALL_HORIZONTAL_SPEED = 0.7;
 const FALL_DEPTH_SPEED = 0.28;
@@ -109,6 +110,14 @@ function remapRangeClamp(
   const t = (value - inLow) / (inHigh - inLow);
   const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
   return outLow + (outHigh - outLow) * clamped;
+}
+
+/** Matches countdown `mobileOffset()` local X. */
+function countdownMobileLocalX(digitIndex: number): number {
+  if (digitIndex < 3) return 2.6;
+  if (digitIndex < 5) return 0.9;
+  if (digitIndex < 7) return -0.9;
+  return -2.6;
 }
 
 /** Matches countdown `mobileOffset()` local Z after the shared (0,0,-1.8) add. */
@@ -432,8 +441,22 @@ export async function createTslTimeVizScene(
     return remapClamp(noise, 0, 1, 0, 1).add(time.mul(timeMul));
   });
 
+  material.positionNode = positionGeometry
+    .mul(cubeScale())
+    .add(mix(vec3(0), mobileOffset(), mobileUniform));
+  material.colorNode = Fn(() => {
+    const t = noiseNode().mod(1).mul(remapClamp(cubeScale(), 0, 1, 0, 1));
+    const rainbow = cosinePalette(t);
+    return saturateColor(rainbow, 0.8);
+  })();
+  material.metalnessNode = float(1);
+  scene.add(mesh);
+
+  let fallingMesh: InstancedMesh | null = null;
+
   if (isCountdown) {
     const ungappedPositions = new Float32Array(ungapped);
+    const gappedPositions = new Float32Array(gapped);
     const instanceHeight = new Float32Array(instanceCount);
     const instanceSlot = new Int16Array(instanceCount);
     for (let i = 0; i < instanceCount; i += 1) {
@@ -443,36 +466,67 @@ export async function createTslTimeVizScene(
       instanceSlot[i] = Math.floor(u * digitCount);
     }
 
-    const fallOffsetArray = new Float32Array(instanceCount * 3);
-    const fallingArray = new Float32Array(instanceCount);
-    const fallScaleArray = new Float32Array(instanceCount);
-    fallScaleArray.fill(1);
-    const fallVelocity = new Float32Array(instanceCount * 3);
-    const fadeElapsed = new Float32Array(instanceCount);
-    fadeElapsed.fill(-1);
-    const occupancy = new Uint8Array(instanceCount);
-    const nextOccupancy = new Uint8Array(instanceCount);
-    const fallingList = new Int32Array(instanceCount);
-    let fallingCount = 0;
-    let occupancySeeded = false;
+    const MAX_FALL_PARTICLES = 8192;
+    const fallBaseX = new Float32Array(MAX_FALL_PARTICLES);
+    const fallBaseY = new Float32Array(MAX_FALL_PARTICLES);
+    const fallBaseZ = new Float32Array(MAX_FALL_PARTICLES);
+    const fallOffsetX = new Float32Array(MAX_FALL_PARTICLES);
+    const fallOffsetY = new Float32Array(MAX_FALL_PARTICLES);
+    const fallOffsetZ = new Float32Array(MAX_FALL_PARTICLES);
+    const fallVelX = new Float32Array(MAX_FALL_PARTICLES);
+    const fallVelY = new Float32Array(MAX_FALL_PARTICLES);
+    const fallVelZ = new Float32Array(MAX_FALL_PARTICLES);
+    const fallMaxZ = new Float32Array(MAX_FALL_PARTICLES);
+    const fallFadeElapsed = new Float32Array(MAX_FALL_PARTICLES);
+    fallFadeElapsed.fill(-1);
+    const fallGroundDwell = new Float32Array(MAX_FALL_PARTICLES);
+    fallGroundDwell.fill(-1);
+    const slotActive = new Uint8Array(MAX_FALL_PARTICLES);
+    const activeIndices = new Int32Array(MAX_FALL_PARTICLES);
+    let activeCount = 0;
+    let poolIndex = 0;
 
-    const fallOffsetAttr = new InstancedBufferAttribute(fallOffsetArray, 3);
-    const fallingAttr = new InstancedBufferAttribute(fallingArray, 1);
+    const fallPosArray = new Float32Array(MAX_FALL_PARTICLES * 3);
+    const fallScaleArray = new Float32Array(MAX_FALL_PARTICLES);
+    const fallNoiseArray = new Float32Array(MAX_FALL_PARTICLES * 3);
+
+    const fallPosAttr = new InstancedBufferAttribute(fallPosArray, 3);
     const fallScaleAttr = new InstancedBufferAttribute(fallScaleArray, 1);
-    const fallOffsetNode = instancedBufferAttribute(fallOffsetAttr) as ReturnType<typeof vec3>;
-    const fallingNode = instancedBufferAttribute(fallingAttr) as ReturnType<typeof float>;
-    const fallScaleNode = instancedBufferAttribute(fallScaleAttr) as ReturnType<typeof float>;
+    const fallNoiseAttr = new InstancedBufferAttribute(fallNoiseArray, 3);
 
-    const liveScale = Fn(() => mix(cubeScale(), fallScaleNode, fallingNode));
-    material.positionNode = positionGeometry
-      .mul(liveScale())
-      .add(mix(vec3(0), mobileOffset(), mobileUniform))
-      .add(fallOffsetNode);
-    material.colorNode = Fn(() => {
-      const t = noiseNode().mod(1).mul(remapClamp(liveScale(), 0, 1, 0, 1));
+    const fallPosNode = instancedBufferAttribute(fallPosAttr) as ReturnType<typeof vec3>;
+    const fallScaleNode = instancedBufferAttribute(fallScaleAttr) as ReturnType<typeof float>;
+    const fallNoiseNode = instancedBufferAttribute(fallNoiseAttr) as ReturnType<typeof vec3>;
+
+    const fallingMaterial = new MeshStandardNodeMaterial();
+    ownedResources.push(fallingMaterial);
+
+    fallingMaterial.positionNode = positionGeometry
+      .mul(fallScaleNode)
+      .add(fallPosNode);
+
+    const fallingNoise = Fn(() => {
+      const noise = mx_noise_float(fallNoiseNode.mul(texScale), 0.75, 0.5);
+      return remapClamp(noise, 0, 1, 0, 1).add(time.mul(timeMul));
+    });
+
+    fallingMaterial.colorNode = Fn(() => {
+      const t = fallingNoise().mod(1).mul(remapClamp(fallScaleNode, 0, 1, 0, 1));
       const rainbow = cosinePalette(t);
       return saturateColor(rainbow, 0.8);
     })();
+
+    fallingMaterial.metalnessNode = float(1);
+
+    fallingMesh = new InstancedMesh(geometry, fallingMaterial, MAX_FALL_PARTICLES);
+    fallingMesh.frustumCulled = false;
+    fallingMesh.position.y = mesh.position.y;
+    fallingMesh.rotation.x = mesh.rotation.x;
+    scene.add(fallingMesh);
+
+    const occupancy = new Uint8Array(instanceCount);
+    const nextOccupancy = new Uint8Array(instanceCount);
+    let occupancySeeded = false;
 
     const instanceInsideGlyph = (index: number, digits: string[]): boolean => {
       const slot = instanceSlot[index];
@@ -497,125 +551,144 @@ export async function createTslTimeVizScene(
       }
     };
 
-    const instanceMaxFallZ = (index: number, mobile: boolean): number => {
+    const spawnParticle = (index: number, isMobile: boolean) => {
       const slot = instanceSlot[index];
-      const mobileZ = mobile ? countdownMobileLocalZ(slot) : 0;
-      return mesh.position.y - instanceHeight[index] - cubeSize * 0.5 - mobileZ;
-    };
+      const gx = gappedPositions[index * 3];
+      const gy = gappedPositions[index * 3 + 1];
+      const gz = gappedPositions[index * 3 + 2];
+      const mobX = isMobile ? countdownMobileLocalX(slot) : 0;
+      const mobZ = isMobile ? countdownMobileLocalZ(slot) : 0;
 
-    const resetFallInstance = (index: number) => {
-      fallingArray[index] = 0;
-      fallScaleArray[index] = 1;
-      fallOffsetArray[index * 3] = 0;
-      fallOffsetArray[index * 3 + 1] = 0;
-      fallOffsetArray[index * 3 + 2] = 0;
-      fallVelocity[index * 3] = 0;
-      fallVelocity[index * 3 + 1] = 0;
-      fallVelocity[index * 3 + 2] = 0;
-      fadeElapsed[index] = -1;
-    };
+      const p = poolIndex;
+      poolIndex = (poolIndex + 1) % MAX_FALL_PARTICLES;
 
-    const startFallInstance = (index: number) => {
-      fallingArray[index] = 1;
-      fallScaleArray[index] = 1;
-      fallOffsetArray[index * 3] = 0;
-      fallOffsetArray[index * 3 + 1] = 0;
-      fallOffsetArray[index * 3 + 2] = 0;
-      fallVelocity[index * 3] = (Math.random() - 0.5) * 2 * FALL_HORIZONTAL_SPEED;
-      fallVelocity[index * 3 + 1] = (Math.random() - 0.5) * 2 * FALL_DEPTH_SPEED;
-      fallVelocity[index * 3 + 2] = 0;
-      fadeElapsed[index] = -1;
-      fallingList[fallingCount] = index;
-      fallingCount += 1;
+      if (slotActive[p] === 0) {
+        slotActive[p] = 1;
+        activeIndices[activeCount] = p;
+        activeCount += 1;
+      }
+
+      fallBaseX[p] = gx + mobX;
+      fallBaseY[p] = gy;
+      fallBaseZ[p] = gz + mobZ;
+      fallOffsetX[p] = 0;
+      fallOffsetY[p] = 0;
+      fallOffsetZ[p] = 0;
+      fallVelX[p] = (Math.random() - 0.5) * 2 * FALL_HORIZONTAL_SPEED;
+      fallVelY[p] = (Math.random() - 0.5) * 2 * FALL_DEPTH_SPEED;
+      fallVelZ[p] = 0;
+      fallMaxZ[p] = mesh.position.y - gz - mobZ - cubeSize * 0.5;
+      fallFadeElapsed[p] = -1;
+      fallGroundDwell[p] = -1;
+
+      fallPosArray[p * 3] = fallBaseX[p];
+      fallPosArray[p * 3 + 1] = fallBaseY[p];
+      fallPosArray[p * 3 + 2] = fallBaseZ[p];
+      fallScaleArray[p] = 1;
+      fallNoiseArray[p * 3] = gx;
+      fallNoiseArray[p * 3 + 1] = gy;
+      fallNoiseArray[p * 3 + 2] = gz;
     };
 
     const markFallAttrsDirty = () => {
-      fallOffsetAttr.needsUpdate = true;
-      fallingAttr.needsUpdate = true;
+      fallPosAttr.needsUpdate = true;
       fallScaleAttr.needsUpdate = true;
+      fallNoiseAttr.needsUpdate = true;
     };
 
     syncOccupancyOnTween = (nextDigits: string[]) => {
+      const isMobile = mobileUniform.value > 0.5;
       if (!occupancySeeded) {
         fillOccupancy(nextDigits, occupancy);
         occupancySeeded = true;
         return;
       }
       fillOccupancy(nextDigits, nextOccupancy);
+      let spawned = false;
       for (let i = 0; i < instanceCount; i += 1) {
         const wasInside = occupancy[i] === 1;
         const nowInside = nextOccupancy[i] === 1;
-        if (nowInside) {
-          if (fallingArray[i] > 0.5) resetFallInstance(i);
-        } else if (wasInside && fallingArray[i] < 0.5) {
-          startFallInstance(i);
+        if (wasInside && !nowInside) {
+          spawnParticle(i, isMobile);
+          spawned = true;
         }
       }
       occupancy.set(nextOccupancy);
-      markFallAttrsDirty();
+      if (spawned) {
+        markFallAttrsDirty();
+      }
     };
 
     stepFallPhysics = (dt: number) => {
-      if (dt <= 0 || fallingCount === 0) return;
-      const mobile = mobileUniform.value > 0.5;
+      if (dt <= 0 || activeCount === 0) return;
       let write = 0;
-      for (let n = 0; n < fallingCount; n += 1) {
-        const i = fallingList[n];
-        if (fallingArray[i] < 0.5) continue;
+      for (let n = 0; n < activeCount; n += 1) {
+        const p = activeIndices[n];
+        if (slotActive[p] === 0) continue;
 
-        const maxZ = instanceMaxFallZ(i, mobile);
-        const fade = fadeElapsed[i];
+        const maxZ = fallMaxZ[p];
+        const fade = fallFadeElapsed[p];
         if (fade >= 0) {
           const nextFade = fade + dt;
           const scale = 1 - nextFade / FALL_FADE_SECONDS;
           if (scale <= 0) {
-            resetFallInstance(i);
+            slotActive[p] = 0;
+            fallScaleArray[p] = 0;
             continue;
           }
-          fadeElapsed[i] = nextFade;
-          fallScaleArray[i] = scale;
-          fallOffsetArray[i * 3 + 2] = maxZ;
-          fallingList[write] = i;
+          fallFadeElapsed[p] = nextFade;
+          fallScaleArray[p] = scale;
+          fallPosArray[p * 3 + 2] = fallBaseZ[p] + maxZ;
+          activeIndices[write] = p;
           write += 1;
           continue;
         }
 
-        fallVelocity[i * 3 + 2] += FALL_GRAVITY * dt;
-        fallOffsetArray[i * 3] += fallVelocity[i * 3] * dt;
-        fallOffsetArray[i * 3 + 1] += fallVelocity[i * 3 + 1] * dt;
-        fallOffsetArray[i * 3 + 2] += fallVelocity[i * 3 + 2] * dt;
+        if (fallGroundDwell[p] >= 0) {
+          const nextDwell = fallGroundDwell[p] + dt;
+          if (nextDwell >= FALL_GROUND_DWELL_SECONDS) {
+            fallGroundDwell[p] = -1;
+            fallFadeElapsed[p] = 0;
+          } else {
+            fallGroundDwell[p] = nextDwell;
+          }
+          fallPosArray[p * 3 + 2] = fallBaseZ[p] + maxZ;
+          fallScaleArray[p] = 1;
+          activeIndices[write] = p;
+          write += 1;
+          continue;
+        }
 
-        if (fallOffsetArray[i * 3 + 2] >= maxZ) {
-          fallOffsetArray[i * 3 + 2] = maxZ;
-          fallVelocity[i * 3 + 2] *= -FALL_RESTITUTION;
-          fallVelocity[i * 3] *= 0.55;
-          fallVelocity[i * 3 + 1] *= 0.55;
-          if (Math.abs(fallVelocity[i * 3 + 2]) < FALL_SETTLE_SPEED) {
-            fallVelocity[i * 3] = 0;
-            fallVelocity[i * 3 + 1] = 0;
-            fallVelocity[i * 3 + 2] = 0;
-            fadeElapsed[i] = 0;
+        fallVelZ[p] += FALL_GRAVITY * dt;
+        fallOffsetX[p] += fallVelX[p] * dt;
+        fallOffsetY[p] += fallVelY[p] * dt;
+        fallOffsetZ[p] += fallVelZ[p] * dt;
+
+        if (fallOffsetZ[p] >= maxZ) {
+          fallOffsetZ[p] = maxZ;
+          fallVelZ[p] *= -FALL_RESTITUTION;
+          fallVelX[p] *= 0.55;
+          fallVelY[p] *= 0.55;
+          if (Math.abs(fallVelZ[p]) < FALL_SETTLE_SPEED) {
+            fallVelX[p] = 0;
+            fallVelY[p] = 0;
+            fallVelZ[p] = 0;
+            fallGroundDwell[p] = 0;
           }
         }
 
-        fallingList[write] = i;
+        fallPosArray[p * 3] = fallBaseX[p] + fallOffsetX[p];
+        fallPosArray[p * 3 + 1] = fallBaseY[p] + fallOffsetY[p];
+        fallPosArray[p * 3 + 2] = fallBaseZ[p] + fallOffsetZ[p];
+        fallScaleArray[p] = 1;
+
+        activeIndices[write] = p;
         write += 1;
       }
-      fallingCount = write;
+      activeCount = write;
       markFallAttrsDirty();
     };
-  } else {
-    material.positionNode = positionGeometry.mul(cubeScale()).add(mix(vec3(0), mobileOffset(), mobileUniform));
-    material.colorNode = Fn(() => {
-      const t = noiseNode().mod(1).mul(remapClamp(cubeScale(), 0, 1, 0, 1));
-      const rainbow = cosinePalette(t);
-      return saturateColor(rainbow, 0.8);
-    })();
   }
-
-  material.metalnessNode = float(1);
-
-  scene.add(mesh);
 
   const reflection = reflector({
     bounces: false,
@@ -802,6 +875,9 @@ export async function createTslTimeVizScene(
       const is6 = isCountdown && digits.length === 6;
       const normalized = is6 ? [' ', ' ', ' ', ...digits] : digits;
       mesh.position.x = is6 ? -1.75 : 0;
+      if (fallingMesh) {
+        fallingMesh.position.x = mesh.position.x;
+      }
       const next = Array.from({ length: digitCount }, (_, index) => {
         const char = normalized[index];
         if (char === ' ') return ' ';
