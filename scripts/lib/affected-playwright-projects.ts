@@ -29,6 +29,7 @@ const FULL_MATRIX_PATHS = [
   /^index\.html$/,
   /^src\/App\.tsx$/,
   /^src\/i18n\.tsx$/,
+  /^src\/lib\/test-observability\.ts$/,
   /^src\/components\/(?:WelcomePage|ParticleBackground)\.tsx$/,
 ];
 
@@ -55,6 +56,8 @@ const F1_BROWSER_PATHS = [
 const COUNTDOWN_BROWSER_PATHS = [
   /^src\/features\/race-countdown\//,
   /^src\/components\/RaceCountdown\.tsx$/,
+  /^src\/components\/showroom\/(?:asset-manager|showroom-assets)\.ts$/,
+  /^src\/lib\/showroom-quality\.ts$/,
   /^public\/models\/.*(?:rb20|redbull|showroom).*\.glb$/i,
   /^tests\/(?:e2e|unit)\/race-countdown\//,
   /^tests\/e2e\/pages\/RaceCountdownPage\.ts$/,

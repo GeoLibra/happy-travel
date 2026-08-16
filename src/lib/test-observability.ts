@@ -41,13 +41,32 @@ export interface HappyTravelTestSnapshot {
 
 export interface CountdownTestSnapshot {
   activeAnimationFrames: number;
+  activeListeners: number;
   activeScenes: number;
+  composers: number;
+  environments: number;
   frameCount: number;
+  floors: number;
+  geometries: number;
+  materials: number;
   mode: 'countdown' | null;
   ready: boolean;
+  renderers: number;
   resourceCount: number;
+  vehicles: number;
   viewport: 'desktop' | 'mobile' | null;
 }
+
+export type CountdownResourceKind =
+  | 'animationFrame'
+  | 'composer'
+  | 'environment'
+  | 'floor'
+  | 'geometry'
+  | 'listener'
+  | 'material'
+  | 'renderer'
+  | 'vehicle';
 
 export interface HappyTravelTestAPI {
   countdown: () => CountdownTestSnapshot;
@@ -70,6 +89,27 @@ declare global {
 const registeredScenes = new Map<string, () => SceneAudit>();
 const activeAnimationFrames = new Set<number>();
 const activeListeners = new Set<{ target: EventTarget; type: string; listener: any }>();
+const countdownResourceCounts: Record<CountdownResourceKind, number> = {
+  animationFrame: 0,
+  composer: 0,
+  environment: 0,
+  floor: 0,
+  geometry: 0,
+  listener: 0,
+  material: 0,
+  renderer: 0,
+  vehicle: 0,
+};
+
+export function trackCountdownResource(kind: CountdownResourceKind): () => void {
+  countdownResourceCounts[kind] += 1;
+  let active = true;
+  return () => {
+    if (!active) return;
+    active = false;
+    countdownResourceCounts[kind] -= 1;
+  };
+}
 
 export function registerScene(sceneId: string, auditGetter: () => SceneAudit): () => void {
   registeredScenes.set(sceneId, auditGetter);
@@ -164,6 +204,24 @@ export function snapshot(): HappyTravelTestSnapshot {
   };
 }
 
+export function countdownResourceSnapshot() {
+  const resourceCount = Object.values(countdownResourceCounts)
+    .reduce((total, count) => total + count, 0);
+
+  return {
+    activeAnimationFrames: countdownResourceCounts.animationFrame,
+    activeListeners: countdownResourceCounts.listener,
+    composers: countdownResourceCounts.composer,
+    environments: countdownResourceCounts.environment,
+    floors: countdownResourceCounts.floor,
+    geometries: countdownResourceCounts.geometry,
+    materials: countdownResourceCounts.material,
+    renderers: countdownResourceCounts.renderer,
+    resourceCount,
+    vehicles: countdownResourceCounts.vehicle,
+  };
+}
+
 export function countdownSnapshot(): CountdownTestSnapshot {
   const audit = sceneAudit('race-countdown');
   const details = audit?.details ?? {};
@@ -173,12 +231,11 @@ export function countdownSnapshot(): CountdownTestSnapshot {
     : null;
 
   return {
-    activeAnimationFrames: audit?.activeAnimationFrames ?? 0,
+    ...countdownResourceSnapshot(),
     activeScenes: audit ? 1 : 0,
     frameCount: typeof details.frameCount === 'number' ? details.frameCount : 0,
     mode,
     ready: details.ready === true,
-    resourceCount: typeof details.resourceCount === 'number' ? details.resourceCount : 0,
     viewport,
   };
 }

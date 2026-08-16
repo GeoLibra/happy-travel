@@ -12,6 +12,10 @@ import {
   selectShowroomQuality,
   type ShowroomQualityOptions,
 } from '@/src/lib/showroom-quality';
+import {
+  trackCountdownResource,
+  type CountdownResourceKind,
+} from '@/src/lib/test-observability';
 
 import {
   buildDigitInstances,
@@ -410,6 +414,27 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const dependencies = options.dependencies ?? defaultDependencies;
   const quality = dependencies.selectQuality(browserQualityOptions(Boolean(options.reducedMotion)));
   const ownedResources: DisposableResource[] = [];
+  const ownResource = <T extends DisposableResource>(
+    resource: T,
+    kind: CountdownResourceKind,
+  ): T => {
+    if (options.mode !== 'countdown') {
+      ownedResources.push(resource);
+      return resource;
+    }
+
+    const release = trackCountdownResource(kind);
+    let disposed = false;
+    ownedResources.push({
+      dispose: () => {
+        if (disposed) return;
+        resource.dispose();
+        disposed = true;
+        release();
+      },
+    });
+    return resource;
+  };
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x05060a);
   const camera = new THREE.PerspectiveCamera(36, INITIAL_WIDTH / INITIAL_HEIGHT, 0.1, 120);
@@ -501,13 +526,13 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   };
 
   try {
-    renderer = dependencies.createRenderer(options.canvas, quality);
-    ownedResources.push(renderer);
+    renderer = ownResource(
+      dependencies.createRenderer(options.canvas, quality),
+      'renderer',
+    );
 
-    cellGeometry = dependencies.createGeometry();
-    ownedResources.push(cellGeometry);
-    cellMaterial = dependencies.createMaterial();
-    ownedResources.push(cellMaterial);
+    cellGeometry = ownResource(dependencies.createGeometry(), 'geometry');
+    cellMaterial = ownResource(dependencies.createMaterial(), 'material');
 
     const capacity = getTimeVizLayout(options.mode, viewport).digitCapacity;
     const instanceCount = capacity * CELLS_PER_DIGIT;
@@ -540,17 +565,21 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     rimLight.position.set(-5, 2.5, 5);
     scene.add(rimLight);
 
-    floor = dependencies.createFloor(
-      renderer,
-      INITIAL_WIDTH,
-      INITIAL_HEIGHT,
-      !quality.reducedMotion && quality.level !== 'low',
+    floor = ownResource(
+      dependencies.createFloor(
+        renderer,
+        INITIAL_WIDTH,
+        INITIAL_HEIGHT,
+        !quality.reducedMotion && quality.level !== 'low',
+      ),
+      'floor',
     );
-    ownedResources.push(floor);
     scene.add(floor.object);
 
-    composer = dependencies.createComposer(renderer, scene, camera, quality.bloomEnabled);
-    ownedResources.push(composer);
+    composer = ownResource(
+      dependencies.createComposer(renderer, scene, camera, quality.bloomEnabled),
+      'composer',
+    );
 
     try {
       environment = await dependencies.loadEnvironment(renderer, ENVIRONMENT_URL);
@@ -559,12 +588,22 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     }
     if (environment) {
       scene.environment = environment.texture;
-      ownedResources.push(environment);
+      ownResource(environment, 'environment');
     }
 
     let disposeOwned: (() => void) | null = null;
-    const renderFrame: FrameRequestCallback = (time) => {
+    let releaseAnimationFrame: (() => void) | null = null;
+    let renderFrame: FrameRequestCallback;
+    const scheduleAnimationFrame = () => {
+      animationFrameId = dependencies.requestAnimationFrame(renderFrame);
+      if (options.mode === 'countdown') {
+        releaseAnimationFrame = trackCountdownResource('animationFrame');
+      }
+    };
+    renderFrame = (time) => {
       if (disposed || !composer || !floor) return;
+      releaseAnimationFrame?.();
+      releaseAnimationFrame = null;
       try {
         const deltaTime = Math.max(0, Math.min((time - previousFrameTime) / 1000, 0.1));
         previousFrameTime = time;
@@ -575,7 +614,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
           ready = true;
           options.onReady?.(getSnapshot());
         }
-        animationFrameId = dependencies.requestAnimationFrame(renderFrame);
+        scheduleAnimationFrame();
       } catch (error) {
         ready = false;
         disposed = true;
@@ -584,12 +623,14 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
       }
     };
 
-    animationFrameId = dependencies.requestAnimationFrame(renderFrame);
+    scheduleAnimationFrame();
     const animationResource: DisposableResource = {
       dispose: () => {
         if (animationFrameId === null) return;
         dependencies.cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
+        releaseAnimationFrame?.();
+        releaseAnimationFrame = null;
       },
     };
     ownedResources.push(animationResource);

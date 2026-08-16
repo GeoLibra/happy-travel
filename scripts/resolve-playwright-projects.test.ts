@@ -74,6 +74,32 @@ test('race countdown changes select desktop, mobile, and WebGL lifecycle coverag
   );
 });
 
+test('shared observability changes select the complete scene safety matrix', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/lib/test-observability.ts']),
+    ALL_PLAYWRIGHT_PROJECTS,
+  );
+});
+
+test('shared showroom dependencies include countdown browser coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects([
+      'src/lib/showroom-quality.ts',
+      'src/components/showroom/asset-manager.ts',
+    ]),
+    [
+      'showroom-desktop-chromium',
+      'showroom-mobile-chromium',
+      'showroom-arrival-timeline-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+      'showroom-webkit-smoke',
+      'f1-e2e-chromium',
+    ],
+  );
+});
+
 test('particle itinerary changes select app and particles E2E only', () => {
   assert.deepEqual(
     resolveAffectedPlaywrightProjects(['tests/e2e/itinerary-particles/particles.spec.ts']),

@@ -5,6 +5,7 @@ import {
   applyCountdownVehiclePose,
   loadCountdownVehicle,
 } from '@/src/features/race-countdown/countdown-vehicle';
+import { countdownSnapshot } from '@/src/lib/test-observability';
 
 function createCachedModel() {
   const scene = new THREE.Group();
@@ -56,8 +57,10 @@ describe('loadCountdownVehicle', () => {
     expect(secondMaterialDispose).not.toHaveBeenCalled();
     expect(sharedMaterialDispose).not.toHaveBeenCalled();
     expect(sharedGeometryDispose).not.toHaveBeenCalled();
+    expect(countdownSnapshot().vehicles).toBe(1);
 
     second.dispose();
+    expect(countdownSnapshot().vehicles).toBe(0);
   });
 
   it('uses the accepted RB20 asset and reports a failed asset load', async () => {

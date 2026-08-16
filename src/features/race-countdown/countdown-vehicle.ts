@@ -6,6 +6,7 @@ import {
   type AssetLoadResult,
 } from '@/src/components/showroom/asset-manager';
 import { SHOWROOM_ASSETS } from '@/src/components/showroom/showroom-assets';
+import { trackCountdownResource } from '@/src/lib/test-observability';
 
 import type { ViewportKind } from './digit-layout';
 
@@ -81,6 +82,7 @@ export async function loadCountdownVehicle(
     child.receiveShadow = true;
   });
 
+  const releaseVehicle = trackCountdownResource('vehicle');
   let disposed = false;
   return {
     object,
@@ -91,6 +93,7 @@ export async function loadCountdownVehicle(
       for (const material of ownedMaterials) material.dispose();
       ownedMaterials.clear();
       ownedManager?.dispose();
+      releaseVehicle();
     },
   };
 }

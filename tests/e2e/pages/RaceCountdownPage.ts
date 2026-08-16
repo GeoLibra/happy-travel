@@ -2,11 +2,19 @@ import { expect, type Locator, type Page } from 'playwright/test';
 
 export interface CountdownObservabilitySnapshot {
   activeAnimationFrames: number;
+  activeListeners: number;
   activeScenes: number;
+  composers: number;
+  environments: number;
   frameCount: number;
+  floors: number;
+  geometries: number;
+  materials: number;
   mode: 'countdown' | null;
   ready: boolean;
+  renderers: number;
   resourceCount: number;
+  vehicles: number;
   viewport: 'desktop' | 'mobile' | null;
 }
 

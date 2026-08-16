@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { registerScene } from '@/src/lib/test-observability';
+import {
+  countdownResourceSnapshot,
+  registerScene,
+  trackCountdownResource,
+} from '@/src/lib/test-observability';
 
 import { createTimeVizScene } from './time-viz-scene';
 import type {
@@ -110,6 +114,9 @@ export function CountdownCanvas({
       onWebGLFailureRef.current?.(new Error('Countdown WebGL context lost'));
     };
     canvas.addEventListener('webglcontextlost', handleContextLost);
+    const releaseContextListener = mode === 'countdown'
+      ? trackCountdownResource('listener')
+      : () => {};
 
     const publishSnapshot = (snapshot: TimeVizSceneSnapshot) => {
       onSnapshotRef.current?.(snapshot);
@@ -128,17 +135,18 @@ export function CountdownCanvas({
         if (mode === 'countdown') {
           unregisterCountdownScene = registerScene('race-countdown', () => {
             const snapshot = scene.getSnapshot();
+            const resources = countdownResourceSnapshot();
             return {
               sceneId: 'race-countdown',
               phase: snapshot.ready ? 'ready' : 'initializing',
-              geometries: 0,
-              textures: 0,
+              geometries: resources.geometries,
+              textures: resources.environments,
               programs: 0,
-              activeAnimationFrames: 1,
-              activeListeners: 1,
-              activeRenderTargets: 0,
-              materials: 0,
-              details: snapshot,
+              activeAnimationFrames: resources.activeAnimationFrames,
+              activeListeners: resources.activeListeners,
+              activeRenderTargets: resources.composers + resources.floors,
+              materials: resources.materials,
+              details: { ...snapshot, resources },
             };
           });
         }
@@ -169,9 +177,13 @@ export function CountdownCanvas({
 
     return () => {
       canvas.removeEventListener('webglcontextlost', handleContextLost);
+      releaseContextListener();
       resizeObserver?.disconnect();
-      unregisterCountdownScene?.();
-      cancelRequest();
+      try {
+        cancelRequest();
+      } finally {
+        unregisterCountdownScene?.();
+      }
       if (sceneRef.current === createdScene) sceneRef.current = null;
     };
   }, [mode, reducedMotion, seed]);

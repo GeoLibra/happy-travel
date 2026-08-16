@@ -98,5 +98,6 @@
 - The Task 8 changes add observability, context-loss handling, and test configuration only; they do not alter camera, digit, vehicle, reflection, overlay, or CSS composition. Dedicated Playwright projects now lock the requested 1280 x 720 and 390 x 844 viewports, and the responsive assertions validate each project's actual viewport/layout contract.
 - No P1/P2 visual issue was found. Remaining seeded color, liquid-flow phase, and platform bloom differences remain the accepted P3 GPU/stochastic variation from the Phase 1 gate.
 - A fresh complete two-project capture run was not produced in this bounded verification turn because Chromium launch/webServer operations were blocked or interrupted by the execution environment; the exact runtime limitation is recorded in the Task 8 report rather than represented as visual evidence.
+- Fix round 1 changes only lifecycle instrumentation and affected-test routing. The exact five-cycle desktop browser path passed with real renderer/composer/vehicle/rAF/listener ownership returning to the zero baseline after each close; no camera, vehicle pose, digit, reflection, overlay, or CSS value changed.
 
 final result: passed

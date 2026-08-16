@@ -13,6 +13,7 @@ import type {
   TimeVizDependencies,
   TimeVizRenderer,
 } from '@/src/features/race-countdown/time-viz-types';
+import { countdownSnapshot } from '@/src/lib/test-observability';
 
 function createFakeTimeVizDependencies() {
   const rendererDispose = vi.fn();
@@ -115,6 +116,41 @@ describe('createTimeVizScene lifecycle', () => {
     expect(tracker.floorDispose).toHaveBeenCalledTimes(1);
     expect(tracker.environmentDispose).toHaveBeenCalledTimes(1);
     expect(tracker.cancelAnimationFrame).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps real countdown renderer, resources, and animation frame tracked until disposal', async () => {
+    const tracker = createFakeTimeVizDependencies();
+    const scene = await createTimeVizScene({
+      canvas: tracker.canvas,
+      dependencies: tracker.dependencies,
+      mode: 'countdown',
+    });
+
+    expect(countdownSnapshot()).toMatchObject({
+      activeAnimationFrames: 1,
+      composers: 1,
+      environments: 1,
+      floors: 1,
+      geometries: 1,
+      materials: 1,
+      renderers: 1,
+    });
+    expect(countdownSnapshot().resourceCount).toBeGreaterThan(0);
+
+    tracker.runAnimationFrame();
+    expect(countdownSnapshot().activeAnimationFrames).toBe(1);
+
+    scene.dispose();
+    expect(countdownSnapshot()).toMatchObject({
+      activeAnimationFrames: 0,
+      composers: 0,
+      environments: 0,
+      floors: 0,
+      geometries: 0,
+      materials: 0,
+      renderers: 0,
+      resourceCount: 0,
+    });
   });
 
   it('cleans renderer and geometry when material creation fails', async () => {
