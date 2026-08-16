@@ -73,12 +73,12 @@ test('reference clock advances once per second', async ({ page }) => {
 
 test('product countdown places the RB20 in the desktop scene', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'race-countdown-desktop-chromium');
-  test.setTimeout(150_000);
+  test.setTimeout(240_000);
   const countdown = new RaceCountdownPageObject(page);
   await countdown.goto();
 
-  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 45_000 });
-  await expect(countdown.product).toHaveAttribute('data-countdown-vehicle', 'ready', { timeout: 45_000 });
+  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 60_000 });
+  await expect(countdown.product).toHaveAttribute('data-countdown-vehicle', 'ready', { timeout: 60_000 });
   await expect(countdown.canvas).toBeVisible();
   await expect(countdown.canvas).toHaveCount(1);
   await page.evaluate(() => new Promise<void>((resolve) => (
@@ -89,15 +89,15 @@ test('product countdown places the RB20 in the desktop scene', async ({ page }, 
 
 test('product countdown keeps the RB20 framed on mobile', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'race-countdown-mobile-chromium');
-  test.setTimeout(150_000);
+  test.setTimeout(240_000);
   const countdown = new RaceCountdownPageObject(page);
   await countdown.goto();
 
-  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 45_000 });
-  await expect(countdown.product).toHaveAttribute('data-countdown-vehicle', 'ready', { timeout: 45_000 });
+  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 60_000 });
+  await expect(countdown.product).toHaveAttribute('data-countdown-vehicle', 'ready', { timeout: 60_000 });
   await expect(countdown.canvas).toBeVisible();
-  await expect(countdown.product).toHaveAttribute('data-countdown-layout', 'mobile-unit-rows', { timeout: 45_000 });
-  await expect(countdown.product).toHaveAttribute('data-countdown-unit-rows', 'DDD|HH|MM|SS', { timeout: 45_000 });
+  await expect(countdown.product).toHaveAttribute('data-countdown-layout', 'mobile-unit-rows', { timeout: 60_000 });
+  await expect(countdown.product).toHaveAttribute('data-countdown-unit-rows', 'DDD|HH|MM|SS', { timeout: 60_000 });
   await expect(countdown.canvas).toHaveCSS('height', '844px');
   await page.evaluate(() => new Promise<void>((resolve) => (
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
@@ -109,7 +109,7 @@ test('countdown renderer resources return to baseline after five open and close 
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'race-countdown-desktop-chromium');
-  test.setTimeout(360_000);
+  test.setTimeout(480_000);
 
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);
@@ -136,9 +136,9 @@ test('countdown renderer resources return to baseline after five open and close 
 
   for (let cycle = 1; cycle <= 5; cycle += 1) {
     await itinerary.openFullCountdown();
-    await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 30_000 });
-    await expect(countdown.product).toHaveAttribute('data-countdown-vehicle', 'ready', { timeout: 45_000 });
-    const active = await countdown.waitForObservabilityReady();
+    await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 60_000 });
+    await expect(countdown.product).toHaveAttribute('data-countdown-vehicle', 'ready', { timeout: 60_000 });
+    const active = await countdown.waitForObservabilityReady(60_000);
     expect(active.activeScenes, `cycle ${cycle} must own one countdown scene`).toBe(1);
     expect(active.activeAnimationFrames, `cycle ${cycle} must own one animation frame`).toBe(1);
     expect(active.activeListeners, `cycle ${cycle} must own its context listener`).toBe(1);

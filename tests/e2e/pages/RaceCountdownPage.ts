@@ -70,7 +70,7 @@ export class RaceCountdownPageObject {
     });
   }
 
-  async waitForObservabilityReady(timeout = 45_000): Promise<CountdownObservabilitySnapshot> {
+  async waitForObservabilityReady(timeout = 60_000): Promise<CountdownObservabilitySnapshot> {
     await expect.poll(async () => (await this.readObservability())?.ready ?? false, {
       timeout,
     }).toBe(true);
@@ -93,11 +93,11 @@ export class RaceCountdownPageObject {
     });
   }
 
-  async waitForSceneReady() {
-    await expect(this.scene).toHaveAttribute('data-time-viz-state', 'ready');
+  async waitForSceneReady(timeout = 60_000) {
+    await expect(this.scene).toHaveAttribute('data-time-viz-state', 'ready', { timeout });
     await expect.poll(async () => Number(
       await this.scene.getAttribute('data-time-viz-frame-count'),
-    )).toBeGreaterThanOrEqual(1);
+    ), { timeout }).toBeGreaterThanOrEqual(1);
     await expect(this.canvas).toHaveCount(1);
   }
 

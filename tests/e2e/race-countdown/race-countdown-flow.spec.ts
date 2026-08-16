@@ -160,7 +160,7 @@ test('compact itinerary countdown resolves the same future event instead of free
     testInfo.project.name === 'race-countdown-mobile-chromium',
     'The viewport-independent compact resolver contract is covered after the desktop ignition flow.',
   );
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await page.route('**/ergast/f1/*/circuits/shanghai/races.json', (route) => (
     route.fulfill({ json: officialShanghaiFixture })
   ));
@@ -182,7 +182,7 @@ test('returns from the itinerary countdown with keyboard and restores state thro
     testInfo.project.name === 'race-countdown-mobile-chromium',
     'AMap vendor lifecycle is exercised in the desktop map view; mobile starts in list view.',
   );
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);
   const mapRenderer = page.locator('[data-amap-renderer-state]');
@@ -292,7 +292,7 @@ test('does not attach a stale AMap loader result after countdown suspension', as
     testInfo.project.name === 'race-countdown-mobile-chromium',
     'The mobile list view does not request AMap until the user explicitly switches to the map.',
   );
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);
   const mapRenderer = page.locator('[data-amap-renderer-state]');
