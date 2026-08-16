@@ -144,25 +144,31 @@ function sampleGlyphInside(
 }
 
 async function loadRussoOne(): Promise<void> {
-  if (typeof document === 'undefined') return;
-  const href = 'https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Anton&family=Audiowide&family=Russo+One&display=swap';
-  if (!document.querySelector(`link[data-time-viz-font="russo"]`)) {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    link.dataset.timeVizFont = 'russo';
-    document.head.appendChild(link);
-    await new Promise<void>((resolve, reject) => {
-      link.onload = () => resolve();
-      link.onerror = () => reject(new Error('Russo One stylesheet failed'));
-    }).catch(async () => {
-      if (typeof FontFace === 'undefined') return;
-      const face = new FontFace(FONT_FAMILY, `url(${FONT_URL})`, { weight: 'normal' });
-      document.fonts.add(await face.load());
-    });
+  if (typeof document === 'undefined' || typeof FontFace === 'undefined') return;
+
+  // Check if font is already loaded in the document font set
+  const alreadyLoaded = Array.from(document.fonts).some(
+    f => f.family === FONT_FAMILY && f.status === 'loaded'
+  );
+  if (alreadyLoaded) return;
+
+  // Use local font directly to avoid flaky remote font loading
+  const localFontExists = Array.from(document.fonts).some(
+    f => f.family === FONT_FAMILY
+  );
+  if (!localFontExists) {
+    const face = new FontFace(FONT_FAMILY, `url(${FONT_URL})`, { weight: 'normal' });
+    document.fonts.add(await face.load());
   }
+
   await document.fonts.load(`512px "${FONT_FAMILY}"`);
   await document.fonts.ready;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Countdown scene creation aborted', 'AbortError');
+  }
 }
 
 function makeSdfTexture(glyph: ReturnType<TinySDF['draw']>): THREE.DataTexture {
@@ -252,6 +258,7 @@ export async function createTslTimeVizScene(
   };
 
   await loadRussoOne();
+  throwIfAborted(options.signal);
 
   const renderer = new WebGPURenderer({
     antialias: true,
@@ -259,6 +266,10 @@ export async function createTslTimeVizScene(
     powerPreference: 'high-performance',
   });
   await renderer.init();
+  if (options.signal?.aborted) {
+    renderer.dispose();
+    throw new DOMException('Countdown scene creation aborted', 'AbortError');
+  }
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1;
@@ -476,8 +487,13 @@ export async function createTslTimeVizScene(
         maxParticles: MAX_FALL_PARTICLES,
         cubeSize,
       });
+      throwIfAborted(options.signal);
       ownedResources.push(rapierPhysics);
-    } catch {
+    } catch (error) {
+      if (options.signal?.aborted) {
+        createIdempotentDisposer([...ownedResources].reverse())();
+        throw error;
+      }
       rapierPhysics = null;
     }
 
@@ -624,10 +640,15 @@ export async function createTslTimeVizScene(
 
   try {
     const hdr = await new RGBELoader().loadAsync(ENVIRONMENT_URL);
+    throwIfAborted(options.signal);
     hdr.mapping = EquirectangularReflectionMapping;
     scene.environment = hdr;
     ownResource({ dispose: () => hdr.dispose() }, 'environment');
-  } catch {
+  } catch (error) {
+    if (options.signal?.aborted) {
+      createIdempotentDisposer([...ownedResources].reverse())();
+      throw error;
+    }
     scene.environment = null;
   }
 

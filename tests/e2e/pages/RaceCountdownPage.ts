@@ -24,12 +24,10 @@ export class RaceCountdownPageObject {
   readonly canvas: Locator;
   readonly layout: Locator;
   readonly product: Locator;
-  readonly sourceStatus: Locator;
   readonly liveStatus: Locator;
   readonly domFallback: Locator;
   readonly lightsOut: Locator;
   readonly backButton: Locator;
-  readonly unitLabels: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -37,12 +35,10 @@ export class RaceCountdownPageObject {
     this.canvas = page.locator('canvas[data-time-viz-canvas]');
     this.layout = page.locator('[data-time-viz-layout]');
     this.product = page.locator('main[data-countdown-state]');
-    this.sourceStatus = page.locator('[data-countdown-source]');
     this.liveStatus = page.locator('[data-countdown-live]');
     this.domFallback = page.locator('[data-countdown-fallback]');
     this.lightsOut = page.getByText('LIGHTS OUT', { exact: true });
     this.backButton = page.getByRole('button', { name: '返回行程' });
-    this.unitLabels = page.locator('.race-countdown-unit-labels > span');
   }
 
   async goto() {

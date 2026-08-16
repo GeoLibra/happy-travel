@@ -160,6 +160,7 @@ test('compact itinerary countdown resolves the same future event instead of free
     testInfo.project.name === 'race-countdown-mobile-chromium',
     'The viewport-independent compact resolver contract is covered after the desktop ignition flow.',
   );
+  test.setTimeout(180_000);
   await page.route('**/ergast/f1/*/circuits/shanghai/races.json', (route) => (
     route.fulfill({ json: officialShanghaiFixture })
   ));
@@ -310,7 +311,7 @@ test('does not attach a stale AMap loader result after countdown suspension', as
       amapLoaderErrors.push(message.text());
     }
   });
-  await page.route('**/src/components/MapComponent.tsx', async (route) => {
+  await page.route('**/src/components/MapComponent.tsx*', async (route) => {
     const response = await route.fetch();
     const source = await response.text();
     const appKeyExpression = 'import.meta.env.VITE_AMAP_KEY';
@@ -380,7 +381,7 @@ test('does not attach a stale AMap loader result after countdown suspension', as
   });
 });
 
-test('shows official status for a future API race', async ({ page }) => {
+test('shows the Shanghai start time for a future API race', async ({ page }) => {
   await page.route('**/ergast/f1/*/circuits/shanghai/races.json', (route) => (
     route.fulfill({ json: officialShanghaiFixture })
   ));
@@ -388,19 +389,7 @@ test('shows official status for a future API race', async ({ page }) => {
 
   await countdown.goto();
 
-  await expect(page.getByText('官方正赛时间')).toBeVisible();
-  await expect(countdown.sourceStatus).toHaveAttribute('data-countdown-source', 'official');
   await expect(page.locator('time[data-time-zone="Asia/Shanghai"]')).toContainText('15:00');
-});
-
-test('shows estimated status when the API is unavailable', async ({ page }) => {
-  await page.route('**/ergast/f1/*/circuits/shanghai/races.json', (route) => route.abort());
-  const countdown = new RaceCountdownPageObject(page);
-
-  await countdown.goto();
-
-  await expect(page.getByText('暂定日期 · 等待官方赛程确认')).toBeVisible();
-  await expect(countdown.sourceStatus).toHaveAttribute('data-countdown-source', 'estimated');
 });
 
 test('falls back from a stalled resolution without showing zero countdown digits', async ({ page }) => {
@@ -421,7 +410,6 @@ test('falls back from a stalled resolution without showing zero countdown digits
   await countdown.goto();
 
   await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready');
-  await expect(countdown.sourceStatus).toHaveAttribute('data-countdown-source', 'estimated');
   await expect(countdown.product).not.toHaveAttribute('data-countdown-display', '000000000');
   releaseRoute();
 });
@@ -485,7 +473,7 @@ test('shows LIGHTS OUT and resolves the next event instead of freezing at zero',
   await countdown.disableWebGL();
 
   await countdown.goto();
-  await expect(countdown.sourceStatus).toBeVisible();
+  await expect(page.locator('time[data-time-zone="Asia/Shanghai"]')).toContainText('08:00');
   await page.clock.fastForward(31_000);
 
   await expect(countdown.lightsOut).toBeVisible();

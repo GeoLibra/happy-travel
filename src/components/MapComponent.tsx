@@ -155,20 +155,12 @@ const MapComponent: React.FC<MapProps> = ({
 
     if (!mapRef.current) return;
     let disposed = false;
+    let mapInitialized = false;
     setRendererState('initializing');
 
-    // Use ResizeObserver to ensure container has size before initializing map
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry.contentRect.width > 0 && entry.contentRect.height > 0 && !amapInstance.current) {
-        initMap();
-        observer.disconnect();
-      }
-    });
-
-    observer.observe(mapRef.current);
-
     const initMap = () => {
+      if (mapInitialized || disposed || !mapRef.current) return;
+      mapInitialized = true;
       (window as any)._AMapSecurityConfig = {
         securityJsCode: import.meta.env.VITE_AMAP_SECURITY_CODE,
       };
@@ -268,6 +260,20 @@ const MapComponent: React.FC<MapProps> = ({
         console.error('AMap Loader Error:', e);
       });
     };
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+        initMap();
+        observer.disconnect();
+      }
+    });
+
+    if (mapRef.current.clientWidth > 0 && mapRef.current.clientHeight > 0) {
+      initMap();
+    } else {
+      observer.observe(mapRef.current);
+    }
 
     return () => {
       disposed = true;

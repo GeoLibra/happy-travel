@@ -490,7 +490,6 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
 
   return (
     <motion.div
-      ref={triggerRef}
       aria-label="赛事倒计时"
       data-compact-countdown-display={compactDisplay}
       data-compact-countdown-source={resolvedEvent?.source}
@@ -499,8 +498,24 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       style={{ minHeight: '60px' }}
-      className="relative z-20 flex min-h-[60px] w-full items-center justify-center rounded-xl border border-[#001A30]/10 bg-white/80 px-4 text-sm font-semibold text-[#001A30] shadow-sm select-none"
+      className="relative z-20 flex min-h-[60px] w-full items-center justify-center rounded-xl border border-[#001A30]/10 bg-white/80 px-4 text-sm font-semibold text-[#001A30] shadow-sm select-none cursor-pointer"
+      onClick={onOpen}
     >
+      <button
+        ref={triggerRef as any}
+        type="button"
+        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+        data-compact-countdown-display={compactDisplay}
+        data-compact-countdown-source={resolvedEvent?.source}
+        data-compact-countdown-state={resolvedEvent ? 'ready' : 'loading'}
+        data-compact-countdown-target={resolvedEvent?.startsAt.toISOString()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen?.();
+        }}
+      >
+        查看全屏倒计时
+      </button>
       <span className="sr-only">赛事倒计时</span>
 
       <canvas

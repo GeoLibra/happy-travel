@@ -219,6 +219,14 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
 
         <header className="race-countdown-header">
           <p className="race-countdown-kicker">{t('countdown.eventTitle')}</p>
+          {event ? (
+            <time
+              className="race-countdown-target"
+              data-time-zone="Asia/Shanghai"
+            >
+              {formatShanghaiTime(event, locale)}
+            </time>
+          ) : null}
         </header>
 
         {state.status === 'loading' ? (
@@ -230,12 +238,19 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
           </section>
         ) : state.status === 'webgl-fallback' ? (
           <section className="race-countdown-dom-fallback" data-countdown-fallback>
-            {units.map((unit) => (
-              <div data-countdown-unit={unit.key} key={unit.key}>
-                <strong>{unit.value}</strong>
-                <span>{t(unit.messageKey)}</span>
+            {parts?.elapsed ? (
+              <div className="race-countdown-lights-out" data-countdown-lights-out>
+                <strong>LIGHTS OUT</strong>
+                <span>{t('countdown.lightsOut')}</span>
               </div>
-            ))}
+            ) : (
+              units.map((unit) => (
+                <div data-countdown-unit={unit.key} key={unit.key}>
+                  <strong>{unit.value}</strong>
+                  <span>{t(unit.messageKey)}</span>
+                </div>
+              ))
+            )}
           </section>
         ) : null}
 

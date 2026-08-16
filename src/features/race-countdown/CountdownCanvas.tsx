@@ -42,8 +42,9 @@ export function startCountdownCanvasSceneRequest({
 }: CountdownCanvasSceneRequest): () => void {
   let cancelled = false;
   let activeScene: TimeVizScene | null = null;
+  const controller = new AbortController();
 
-  void factory(options).then((scene) => {
+  void factory({ ...options, signal: controller.signal }).then((scene) => {
     if (cancelled) {
       scene.dispose();
       return;
@@ -65,6 +66,7 @@ export function startCountdownCanvasSceneRequest({
   return () => {
     if (cancelled) return;
     cancelled = true;
+    controller.abort();
     activeScene?.dispose();
     activeScene = null;
   };

@@ -485,7 +485,8 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   if (!options.dependencies) {
     try {
       return await createTslTimeVizScene(options);
-    } catch {
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
       // Fallback to WebGL implementation when WebGPU is unsupported in environment
     }
   }
@@ -620,6 +621,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   };
 
   try {
+    if (options.signal?.aborted) throw new DOMException('Countdown scene creation aborted', 'AbortError');
     renderer = ownResource(
       dependencies.createRenderer(options.canvas, quality),
       'renderer',
@@ -682,7 +684,8 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
 
     try {
       environment = await dependencies.loadEnvironment(renderer, ENVIRONMENT_URL);
-    } catch {
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
       environment = null;
     }
     if (environment) {

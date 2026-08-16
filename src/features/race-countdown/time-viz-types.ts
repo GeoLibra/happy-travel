@@ -28,6 +28,7 @@ export interface TimeVizSceneOptions {
   mode: 'reference' | 'countdown';
   seed?: number;
   reducedMotion?: boolean;
+  signal?: AbortSignal;
   onReady?: (snapshot: TimeVizSceneSnapshot) => void;
   dependencies?: TimeVizDependencies;
 }
