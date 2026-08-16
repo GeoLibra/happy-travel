@@ -117,7 +117,7 @@ describe('CountdownRapierPhysics', () => {
     const scaleAttr = new THREE.InstancedBufferAttribute(new Float32Array(10), 1);
     const noiseAttr = new THREE.InstancedBufferAttribute(new Float32Array(30), 3);
 
-    physics.spawnCube(1.5, 3.0, -1.0, [1.5, 2.0, 0.5]);
+    physics.spawnCube(1.5, 3.0, -1.0, [1.5, 2.0, 0.5], [0, 0, 0]);
     physics.step(0.016);
 
     physics.syncToInstancedMesh(mesh, scaleAttr, noiseAttr);

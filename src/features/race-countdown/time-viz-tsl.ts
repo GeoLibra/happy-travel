@@ -51,7 +51,7 @@ import {
 
 import { applyCountdownVehiclePose } from './countdown-vehicle';
 import { CountdownFireworksSystem } from './countdown-fireworks-tsl';
-import { CountdownStackHeightfield } from './countdown-stack-heightfield';
+import { CountdownRapierPhysics } from './countdown-rapier-physics';
 import { getTimeVizLayout } from './digit-layout';
 import { TinySDF } from './tiny-sdf';
 import type {
@@ -454,9 +454,9 @@ export async function createTslTimeVizScene(
   })();
   material.metalnessNode = float(1);
   scene.add(mesh);
-
   let fallingMesh: InstancedMesh | null = null;
   let fireworks: CountdownFireworksSystem | null = null;
+  let rapierPhysics: CountdownRapierPhysics | null = null;
 
   if (isCountdown) {
     const ungappedPositions = new Float32Array(ungapped);
@@ -470,46 +470,25 @@ export async function createTslTimeVizScene(
       instanceSlot[i] = Math.floor(u * digitCount);
     }
 
-    const MAX_FALL_PARTICLES = 8192;
-    const fallBaseX = new Float32Array(MAX_FALL_PARTICLES);
-    const fallBaseY = new Float32Array(MAX_FALL_PARTICLES);
-    const fallBaseZ = new Float32Array(MAX_FALL_PARTICLES);
-    const fallOffsetX = new Float32Array(MAX_FALL_PARTICLES);
-    const fallOffsetY = new Float32Array(MAX_FALL_PARTICLES);
-    const fallOffsetZ = new Float32Array(MAX_FALL_PARTICLES);
-    const fallVelX = new Float32Array(MAX_FALL_PARTICLES);
-    const fallVelY = new Float32Array(MAX_FALL_PARTICLES);
-    const fallVelZ = new Float32Array(MAX_FALL_PARTICLES);
-    const fallMaxZ = new Float32Array(MAX_FALL_PARTICLES);
-    const fallFadeElapsed = new Float32Array(MAX_FALL_PARTICLES);
-    fallFadeElapsed.fill(-1);
-    const fallGroundDwell = new Float32Array(MAX_FALL_PARTICLES);
-    fallGroundDwell.fill(-1);
-    const slotActive = new Uint8Array(MAX_FALL_PARTICLES);
-    const activeIndices = new Int32Array(MAX_FALL_PARTICLES);
-    let activeCount = 0;
-    let poolIndex = 0;
-    const heightfield = new CountdownStackHeightfield();
-    let lastHeightfieldResetTime = 0;
+    const MAX_FALL_PARTICLES = 1500;
+    try {
+      rapierPhysics = await CountdownRapierPhysics.create({
+        maxParticles: MAX_FALL_PARTICLES,
+        cubeSize,
+      });
+      ownedResources.push(rapierPhysics);
+    } catch {
+      rapierPhysics = null;
+    }
 
-    const fallPosArray = new Float32Array(MAX_FALL_PARTICLES * 3);
-    const fallScaleArray = new Float32Array(MAX_FALL_PARTICLES);
-    const fallNoiseArray = new Float32Array(MAX_FALL_PARTICLES * 3);
+    const fallScaleAttr = new InstancedBufferAttribute(new Float32Array(MAX_FALL_PARTICLES), 1);
+    const fallNoiseAttr = new InstancedBufferAttribute(new Float32Array(MAX_FALL_PARTICLES * 3), 3);
 
-    const fallPosAttr = new InstancedBufferAttribute(fallPosArray, 3);
-    const fallScaleAttr = new InstancedBufferAttribute(fallScaleArray, 1);
-    const fallNoiseAttr = new InstancedBufferAttribute(fallNoiseArray, 3);
-
-    const fallPosNode = instancedBufferAttribute(fallPosAttr) as ReturnType<typeof vec3>;
     const fallScaleNode = instancedBufferAttribute(fallScaleAttr) as ReturnType<typeof float>;
     const fallNoiseNode = instancedBufferAttribute(fallNoiseAttr) as ReturnType<typeof vec3>;
 
     const fallingMaterial = new MeshStandardNodeMaterial();
     ownedResources.push(fallingMaterial);
-
-    fallingMaterial.positionNode = positionGeometry
-      .mul(fallScaleNode)
-      .add(fallPosNode);
 
     const fallingNoise = Fn(() => {
       const noise = mx_noise_float(fallNoiseNode.mul(texScale), 0.75, 0.5);
@@ -526,19 +505,24 @@ export async function createTslTimeVizScene(
 
     fallingMesh = new InstancedMesh(geometry, fallingMaterial, MAX_FALL_PARTICLES);
     fallingMesh.frustumCulled = false;
-    fallingMesh.position.y = mesh.position.y;
-    fallingMesh.rotation.x = mesh.rotation.x;
+    fallingMesh.position.set(0, 0, 0);
+    fallingMesh.rotation.set(0, 0, 0);
+    const zeroMat = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < MAX_FALL_PARTICLES; i += 1) {
+      fallingMesh.setMatrixAt(i, zeroMat);
+    }
+    fallingMesh.instanceMatrix.needsUpdate = true;
     scene.add(fallingMesh);
 
     fireworks = new CountdownFireworksSystem();
-    scene.add(fireworks.mesh);
+    scene.add(fireworks.points);
     ownedResources.push(fireworks);
 
     if (options.canvas) {
       const targetCanvas = options.canvas;
       const onPointerDown = (e: MouseEvent | PointerEvent) => {
         if (e.button === 0) {
-          fireworks?.launchRandomFirework();
+          fireworks?.launchFestivalDisplay();
         }
       };
       targetCanvas.addEventListener('pointerdown', onPointerDown);
@@ -574,51 +558,6 @@ export async function createTslTimeVizScene(
       }
     };
 
-    const spawnParticle = (index: number, isMobile: boolean) => {
-      const slot = instanceSlot[index];
-      const gx = gappedPositions[index * 3];
-      const gy = gappedPositions[index * 3 + 1];
-      const gz = gappedPositions[index * 3 + 2];
-      const mobX = isMobile ? countdownMobileLocalX(slot) : 0;
-      const mobZ = isMobile ? countdownMobileLocalZ(slot) : 0;
-
-      const p = poolIndex;
-      poolIndex = (poolIndex + 1) % MAX_FALL_PARTICLES;
-
-      if (slotActive[p] === 0) {
-        slotActive[p] = 1;
-        activeIndices[activeCount] = p;
-        activeCount += 1;
-      }
-
-      fallBaseX[p] = gx + mobX;
-      fallBaseY[p] = gy;
-      fallBaseZ[p] = gz + mobZ;
-      fallOffsetX[p] = 0;
-      fallOffsetY[p] = 0;
-      fallOffsetZ[p] = 0;
-      fallVelX[p] = (Math.random() - 0.5) * 2 * FALL_HORIZONTAL_SPEED;
-      fallVelY[p] = (Math.random() - 0.5) * 2 * FALL_DEPTH_SPEED;
-      fallVelZ[p] = 0;
-      fallMaxZ[p] = mesh.position.y - gz - mobZ - cubeSize * 0.5;
-      fallFadeElapsed[p] = -1;
-      fallGroundDwell[p] = -1;
-
-      fallPosArray[p * 3] = fallBaseX[p];
-      fallPosArray[p * 3 + 1] = fallBaseY[p];
-      fallPosArray[p * 3 + 2] = fallBaseZ[p];
-      fallScaleArray[p] = 1;
-      fallNoiseArray[p * 3] = gx;
-      fallNoiseArray[p * 3 + 1] = gy;
-      fallNoiseArray[p * 3 + 2] = gz;
-    };
-
-    const markFallAttrsDirty = () => {
-      fallPosAttr.needsUpdate = true;
-      fallScaleAttr.needsUpdate = true;
-      fallNoiseAttr.needsUpdate = true;
-    };
-
     syncOccupancyOnTween = (nextDigits: string[]) => {
       const isMobile = mobileUniform.value > 0.5;
       if (!occupancySeeded) {
@@ -627,107 +566,31 @@ export async function createTslTimeVizScene(
         return;
       }
       fillOccupancy(nextDigits, nextOccupancy);
-      let spawned = false;
+      if (!rapierPhysics) return;
+
       for (let i = 0; i < instanceCount; i += 1) {
         const wasInside = occupancy[i] === 1;
         const nowInside = nextOccupancy[i] === 1;
         if (wasInside && !nowInside) {
-          spawnParticle(i, isMobile);
-          spawned = true;
+          const slot = instanceSlot[i];
+          const gx = gappedPositions[i * 3];
+          const gy = gappedPositions[i * 3 + 1];
+          const gz = gappedPositions[i * 3 + 2];
+          const mobX = isMobile ? countdownMobileLocalX(slot) : 0;
+          const mobZ = isMobile ? countdownMobileLocalZ(slot) : 0;
+          const worldX = gx + mobX + (mesh.position.x || 0);
+          const worldY = mesh.position.y - gz - mobZ;
+          const worldZ = gy;
+          rapierPhysics.spawnCube(worldX, worldY, worldZ, [gx, gy, gz]);
         }
       }
       occupancy.set(nextOccupancy);
-      if (spawned) {
-        markFallAttrsDirty();
-      }
     };
 
     stepFallPhysics = (dt: number) => {
-      if (dt <= 0 || activeCount === 0) return;
-      let write = 0;
-      for (let n = 0; n < activeCount; n += 1) {
-        const p = activeIndices[n];
-        if (slotActive[p] === 0) continue;
-
-        const maxZ = fallMaxZ[p];
-        const fade = fallFadeElapsed[p];
-        if (fade >= 0) {
-          const nextFade = fade + dt;
-          const scale = 1 - nextFade / FALL_FADE_SECONDS;
-          if (scale <= 0) {
-            slotActive[p] = 0;
-            fallScaleArray[p] = 0;
-            continue;
-          }
-          fallFadeElapsed[p] = nextFade;
-          fallScaleArray[p] = scale;
-          fallPosArray[p * 3 + 2] = fallBaseZ[p] + maxZ;
-          activeIndices[write] = p;
-          write += 1;
-          continue;
-        }
-
-        if (fallGroundDwell[p] >= 0) {
-          const nextDwell = fallGroundDwell[p] + dt;
-          if (nextDwell >= FALL_GROUND_DWELL_SECONDS) {
-            fallGroundDwell[p] = -1;
-            fallFadeElapsed[p] = 0;
-          } else {
-            fallGroundDwell[p] = nextDwell;
-          }
-          fallScaleArray[p] = 1;
-          activeIndices[write] = p;
-          write += 1;
-          continue;
-        }
-
-        fallVelZ[p] += FALL_GRAVITY * dt;
-        fallOffsetX[p] += fallVelX[p] * dt;
-        fallOffsetY[p] += fallVelY[p] * dt;
-        fallOffsetZ[p] += fallVelZ[p] * dt;
-
-        const currentX = fallBaseX[p] + fallOffsetX[p];
-        const currentY = fallBaseY[p] + fallOffsetY[p];
-        const stackH = heightfield.queryHeight(currentX, currentY);
-        const curMaxZ = maxZ - stackH;
-
-        if (fallOffsetZ[p] >= curMaxZ) {
-          fallOffsetZ[p] = curMaxZ;
-          const grad = heightfield.queryGradient(currentX, currentY);
-          const slopeStrength = Math.hypot(grad.gx, grad.gy);
-
-          if (slopeStrength > 0.08 || stackH >= heightfield.maxHeight * 0.9) {
-            // Slope sliding downhill + forward/lateral scatter
-            fallVelX[p] = fallVelX[p] * (1 - 1.8 * dt) - grad.gx * 3.5 * dt + (Math.random() - 0.5) * 0.2 * dt;
-            fallVelY[p] = fallVelY[p] * (1 - 1.8 * dt) - grad.gy * 3.5 * dt + 0.3 * dt;
-            fallVelZ[p] *= -0.15;
-          } else {
-            // Ground friction deceleration
-            fallVelX[p] *= Math.max(0, 1 - 4.5 * dt);
-            fallVelY[p] *= Math.max(0, 1 - 4.5 * dt);
-            fallVelZ[p] *= -FALL_RESTITUTION;
-            if (Math.hypot(fallVelX[p], fallVelY[p]) < 0.1 && Math.abs(fallVelZ[p]) < FALL_SETTLE_SPEED) {
-              fallVelX[p] = 0;
-              fallVelY[p] = 0;
-              fallVelZ[p] = 0;
-              if (fallGroundDwell[p] < 0) {
-                fallGroundDwell[p] = 0;
-                heightfield.deposit(currentX, currentY, cubeSize * 0.7);
-              }
-            }
-          }
-        }
-
-        fallPosArray[p * 3] = fallBaseX[p] + fallOffsetX[p];
-        fallPosArray[p * 3 + 1] = fallBaseY[p] + fallOffsetY[p];
-        fallPosArray[p * 3 + 2] = fallBaseZ[p] + fallOffsetZ[p];
-        fallScaleArray[p] = 1;
-
-        activeIndices[write] = p;
-        write += 1;
-      }
-      activeCount = write;
-      markFallAttrsDirty();
+      if (dt <= 0 || !rapierPhysics || !fallingMesh) return;
+      rapierPhysics.step(dt);
+      rapierPhysics.syncToInstancedMesh(fallingMesh, fallScaleAttr, fallNoiseAttr);
     };
   }
 
@@ -843,6 +706,10 @@ export async function createTslTimeVizScene(
       }
       if (currentVehicle) {
         applyCountdownVehiclePose(currentVehicle, mobile ? 'mobile' : 'desktop');
+        rapierPhysics?.updateVehicleCollider(
+          { x: currentVehicle.position.x, y: currentVehicle.position.y + 0.35, z: currentVehicle.position.z },
+          { x: 1.1, y: 0.35, z: 2.2 },
+        );
       }
     }
     camera.aspect = width / Math.max(height, 1);
@@ -917,9 +784,6 @@ export async function createTslTimeVizScene(
       const is6 = isCountdown && digits.length === 6;
       const normalized = is6 ? [' ', ' ', ' ', ...digits] : digits;
       mesh.position.x = is6 ? -1.75 : 0;
-      if (fallingMesh) {
-        fallingMesh.position.x = mesh.position.x;
-      }
       const next = Array.from({ length: digitCount }, (_, index) => {
         const char = normalized[index];
         if (char === ' ') return ' ';
@@ -935,6 +799,12 @@ export async function createTslTimeVizScene(
       if (vehicle) {
         applyCountdownVehiclePose(vehicle, mobileUniform.value ? 'mobile' : 'desktop');
         vehicleGroup.add(vehicle);
+        rapierPhysics?.updateVehicleCollider(
+          { x: vehicle.position.x, y: vehicle.position.y + 0.35, z: vehicle.position.z },
+          { x: 1.1, y: 0.35, z: 2.2 },
+        );
+      } else {
+        rapierPhysics?.removeVehicleCollider();
       }
     },
     resize: (width, height, pixelRatio) => {

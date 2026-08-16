@@ -36,27 +36,28 @@ export interface FireworkShell {
   color: THREE.Color;
   type: FireworkBurstType;
   trailTimer: number;
+  burstScale?: number;
 }
 
-const MAX_PARTICLES = 16384;
+const MAX_PARTICLES = 32768;
 const G = 4.2;
 const BURST_SPREAD = 1.35;
-const SIZE_SCALE = 0.55;
-const INTENSITY = 2.5;
+const SIZE_SCALE = 0.72;
+const INTENSITY = 2.8;
 const FIRST_LAUNCH_DELAY_SECONDS = 2.0;
 const RECURRING_LAUNCH_INTERVAL_SECONDS = 60.0;
 const TAU = Math.PI * 2;
 
 const PALETTE: THREE.Color[] = [
-  new THREE.Color().setHSL(0 / 360, 1, 0.6),
-  new THREE.Color().setHSL(22 / 360, 1, 0.58),
-  new THREE.Color().setHSL(45 / 360, 1, 0.6),
-  new THREE.Color().setHSL(120 / 360, 0.9, 0.55),
-  new THREE.Color().setHSL(170 / 360, 0.95, 0.58),
-  new THREE.Color().setHSL(205 / 360, 1, 0.6),
-  new THREE.Color().setHSL(235 / 360, 1, 0.62),
-  new THREE.Color().setHSL(280 / 360, 0.9, 0.66),
-  new THREE.Color().setHSL(330 / 360, 1, 0.68),
+  new THREE.Color().setHSL(0 / 360, 1.0, 0.6),    // Red
+  new THREE.Color().setHSL(25 / 360, 1.0, 0.58),  // Orange
+  new THREE.Color().setHSL(48 / 360, 1.0, 0.6),   // Gold/Yellow
+  new THREE.Color().setHSL(120 / 360, 0.9, 0.55), // Green
+  new THREE.Color().setHSL(175 / 360, 1.0, 0.58), // Electric Cyan
+  new THREE.Color().setHSL(210 / 360, 1.0, 0.6),  // Sky Blue
+  new THREE.Color().setHSL(240 / 360, 1.0, 0.65), // Royal Blue
+  new THREE.Color().setHSL(285 / 360, 0.95, 0.66),// Purple
+  new THREE.Color().setHSL(335 / 360, 1.0, 0.68), // Neon Magenta
 ];
 
 function rand(minVal: number, maxVal: number): number {
@@ -73,11 +74,11 @@ function pickRandomColor(): THREE.Color {
 
 function pickRandomBurstType(): FireworkBurstType {
   const r = Math.random();
-  if (r < 0.24) return 'peony';
-  if (r < 0.42) return 'palette';
-  if (r < 0.58) return 'willow';
-  if (r < 0.72) return 'ring';
-  if (r < 0.86) return 'double';
+  if (r < 0.22) return 'willow';
+  if (r < 0.44) return 'double';
+  if (r < 0.62) return 'peony';
+  if (r < 0.78) return 'palette';
+  if (r < 0.90) return 'ring';
   return 'glitter';
 }
 
@@ -162,6 +163,7 @@ export class CountdownFireworksSystem {
     const aPhys = instancedBufferAttribute(this.phAttr) as ReturnType<typeof vec4>;
     const aTwink = instancedBufferAttribute(this.twAttr) as ReturnType<typeof vec2>;
 
+    // Vertex shader: Closed-form trajectory physics + camera billboard alignment
     this.material.vertexNode = Fn(() => {
       const birth = aPhys.z;
       const lifespan = aPhys.w;
@@ -196,6 +198,7 @@ export class CountdownFireworksSystem {
       return cameraProjectionMatrix.mul(vec4(viewPos, 1.0));
     })();
 
+    // Fragment shader: Exact 1:1 needle star flares + radial core over-exposure
     this.material.outputNode = Fn(() => {
       const birth = aPhys.z;
       const lifespan = aPhys.w;
@@ -212,20 +215,24 @@ export class CountdownFireworksSystem {
       const finalTwinkle = hasTwinkle.select(twinkleVal, float(1));
 
       // Centered plane UV in [-0.5, 0.5]
-      const uvOffset = positionGeometry.xy;
-      const dist = uvOffset.length().mul(2.0);
-      const radialAlpha = float(1.0).sub(dist).clamp(0, 1);
-      const glowAlpha = pow(radialAlpha, float(2.0));
+      const uv = positionGeometry.xy;
+      const r = uv.length().mul(2.0);
+      const radial = float(1.0).sub(r).clamp(0, 1);
+      const glow = pow(radial, float(2.0));
 
-      const flareX = float(1.0).sub(uvOffset.x.abs().mul(2.0)).clamp(0, 1);
-      const flareY = float(1.0).sub(uvOffset.y.abs().mul(2.0)).clamp(0, 1);
-      const crossStreak = pow(flareX, float(14.0)).mul(pow(flareY, float(1.5)))
-        .add(pow(flareY, float(14.0)).mul(pow(flareX, float(1.5))))
-        .mul(0.6);
+      // 4-pointed sharp needle star flares matching reference mt3d texture
+      const ax = uv.x.abs().mul(2.0);
+      const ay = uv.y.abs().mul(2.0);
+      const fx = float(1.0).sub(ax).clamp(0, 1);
+      const fy = float(1.0).sub(ay).clamp(0, 1);
 
-      const texAlpha = glowAlpha.add(crossStreak).clamp(0, 1);
-      const coreAlpha = pow(texAlpha, float(4)).mul(float(0.7));
-      const col = mix(aColSize.xyz, vec3(1, 1, 1), coreAlpha);
+      const flare1 = pow(fx, float(20.0)).mul(pow(fy, float(1.4)));
+      const flare2 = pow(fy, float(20.0)).mul(pow(fx, float(1.4)));
+      const star = flare1.add(flare2).mul(0.95);
+
+      const texAlpha = glow.add(star).clamp(0, 1);
+      const coreAlpha = pow(texAlpha, float(4.0)).mul(float(0.7));
+      const col = mix(aColSize.xyz, vec3(1.3, 1.3, 1.3), coreAlpha);
       const finalAlpha = isDead.select(float(0), texAlpha.mul(alpha).mul(finalTwinkle).mul(uIntensity));
 
       return vec4(col, finalAlpha);
@@ -237,10 +244,41 @@ export class CountdownFireworksSystem {
     this.points = this.mesh;
   }
 
+  public launchFestivalDisplay(): void {
+    if (this.disposed) return;
+    // Shell 1: Grand Golden Willow in the center-right high altitude
+    this.shells.push({
+      x: rand(0.5, 3.5),
+      y: 0,
+      z: rand(-2.5, -4.5),
+      vx: rand(-0.1, 0.15),
+      vy: rand(5.6, 6.4),
+      vz: rand(-0.15, 0.15),
+      color: new THREE.Color().setHSL(45 / 360, 1.0, 0.6),
+      type: 'willow',
+      trailTimer: 0,
+      burstScale: 1.15,
+    });
+
+    // Shell 2: Electric Cyan + Neon Pink Double Chrysanthemum slightly lower and left
+    this.shells.push({
+      x: rand(-3.5, -1.0),
+      y: 0,
+      z: rand(-2.0, -4.0),
+      vx: rand(-0.15, 0.1),
+      vy: rand(4.8, 5.4),
+      vz: rand(-0.15, 0.15),
+      color: new THREE.Color().setHSL(175 / 360, 1.0, 0.6),
+      type: 'double',
+      trailTimer: 0,
+      burstScale: 1.0,
+    });
+  }
+
   public launchRandomFirework(): void {
     if (this.disposed) return;
-    const x = rand(-5.5, 5.5);
-    const z = rand(-2.0, -6.0);
+    const x = rand(-5.0, 5.0);
+    const z = rand(-2.0, -5.5);
     const y = 0;
     const vx = rand(-0.25, 0.25);
     const vz = rand(-0.25, 0.25);
@@ -324,9 +362,9 @@ export class CountdownFireworksSystem {
     this.currentTime = nowSeconds;
     this.uTime.value = nowSeconds;
 
-    // Check automated launch schedule (first at 2s, recurring every 60s)
+    // Check automated launch schedule (first festival display at 2s, recurring every 60s)
     if (this.currentTime >= this.nextLaunchTime) {
-      this.launchRandomFirework();
+      this.launchFestivalDisplay();
       this.nextLaunchTime += RECURRING_LAUNCH_INTERVAL_SECONDS;
     }
 
@@ -352,27 +390,29 @@ export class CountdownFireworksSystem {
 
       shell.trailTimer -= dt;
       if (shell.trailTimer <= 0) {
-        shell.trailTimer = 0.015;
-        for (let n = 0; n < 2; n += 1) {
+        shell.trailTimer = 0.012;
+        // Rising rocket trail sparks
+        for (let n = 0; n < 3; n += 1) {
           this.emit(
-            shell.x + rand(-0.06, 0.06),
-            shell.y + rand(-0.06, 0.06),
-            shell.z + rand(-0.06, 0.06),
-            rand(-0.25, 0.25),
-            -shell.vy * 0.08 + rand(-0.2, 0.2),
-            rand(-0.25, 0.25),
+            shell.x + rand(-0.05, 0.05),
+            shell.y + rand(-0.05, 0.05),
+            shell.z + rand(-0.05, 0.05),
+            rand(-0.2, 0.2),
+            -shell.vy * 0.12 + rand(-0.15, 0.15),
+            rand(-0.2, 0.2),
             1.0,
-            0.78,
-            0.42,
-            0.6,
-            rand(0.25, 0.45),
+            0.82,
+            0.45,
+            0.75,
+            rand(0.28, 0.52),
             1.8,
             0.4,
-            rand(25, 40),
+            rand(25, 45),
             Math.random() * TAU,
           );
         }
-        this.emit(shell.x, shell.y, shell.z, 0, 0, 0, 1, 0.95, 0.82, 0.9, 0.08, 0, 0, 0, 0);
+        // Bright leading comet core
+        this.emit(shell.x, shell.y, shell.z, 0, 0, 0, 1, 0.98, 0.88, 1.2, 0.08, 0, 0, 0, 0);
       }
 
       // Peak of ascent
@@ -384,8 +424,8 @@ export class CountdownFireworksSystem {
   }
 
   private explode(shell: FireworkShell): void {
-    // Core flash
-    this.emit(shell.x, shell.y, shell.z, 0, 0, 0, 1, 1, 0.95, 3.5, 0.15, 0, 0, 0, 0);
+    // Blinding core flash
+    this.emit(shell.x, shell.y, shell.z, 0, 0, 0, 1.2, 1.2, 1.1, 4.5, 0.18, 0, 0, 0, 0);
 
     switch (shell.type) {
       case 'willow':
@@ -409,10 +449,11 @@ export class CountdownFireworksSystem {
   }
 
   private burstPeony(shell: FireworkShell): void {
-    const n = randInt(220, 320);
-    const speed = rand(2.8, 4.2) * BURST_SPREAD;
+    const scale = shell.burstScale || 1.0;
+    const n = randInt(350, 480);
+    const speed = rand(3.2, 4.6) * BURST_SPREAD * scale;
     const c = shell.color;
-    const secondary = Math.random() < 0.4 ? pickRandomColor() : null;
+    const secondary = Math.random() < 0.45 ? pickRandomColor() : null;
 
     for (let i = 0; i < n; i += 1) {
       const u = Math.random() * 2 - 1;
@@ -420,7 +461,7 @@ export class CountdownFireworksSystem {
       const rr = Math.sqrt(1 - u * u);
       const sp = speed * rand(0.85, 1.15);
       const col = secondary && Math.random() < 0.5 ? secondary : c;
-      const gl = Math.random() < 0.22;
+      const gl = Math.random() < 0.25;
 
       this.emit(
         shell.x,
@@ -432,19 +473,20 @@ export class CountdownFireworksSystem {
         col.r,
         col.g,
         col.b,
-        rand(0.7, 1.1),
-        rand(1.3, 2.1),
+        rand(0.75, 1.15),
+        rand(1.5, 2.4),
         1.1,
         0.8,
-        gl ? rand(14, 28) : 0,
+        gl ? rand(16, 32) : 0,
         gl ? Math.random() * TAU : 0,
       );
     }
   }
 
   private burstPalette(shell: FireworkShell): void {
-    const n = randInt(220, 300);
-    const speed = rand(2.8, 4.0) * BURST_SPREAD;
+    const scale = shell.burstScale || 1.0;
+    const n = randInt(360, 480);
+    const speed = rand(3.2, 4.6) * BURST_SPREAD * scale;
 
     for (let i = 0; i < n; i += 1) {
       const u = Math.random() * 2 - 1;
@@ -464,19 +506,20 @@ export class CountdownFireworksSystem {
         col.r,
         col.g,
         col.b,
-        rand(0.7, 1.0),
-        rand(1.3, 2.1),
+        rand(0.75, 1.1),
+        rand(1.5, 2.4),
         1.1,
         0.8,
-        gl ? rand(14, 28) : 0,
+        gl ? rand(16, 32) : 0,
         gl ? Math.random() * TAU : 0,
       );
     }
   }
 
   private burstWillow(shell: FireworkShell): void {
-    const strands = randInt(120, 160);
-    const speed = rand(2.6, 3.6) * BURST_SPREAD;
+    const scale = shell.burstScale || 1.0;
+    const strands = randInt(180, 240);
+    const speed = rand(2.8, 4.0) * BURST_SPREAD * scale;
 
     for (let i = 0; i < strands; i += 1) {
       const u = Math.random() * 2 - 1;
@@ -484,10 +527,11 @@ export class CountdownFireworksSystem {
       const rr = Math.sqrt(1 - u * u);
       const sp = speed * rand(0.85, 1.1);
       const vx = rr * Math.cos(th) * sp;
-      const vy = u * sp + rand(0.2, 0.6);
+      const vy = u * sp + rand(0.2, 0.7);
       const vz = rr * Math.sin(th) * sp;
-      const life = rand(2.8, 3.8);
+      const life = rand(3.2, 4.2);
 
+      // Lead golden spark
       this.emit(
         shell.x,
         shell.y,
@@ -496,30 +540,31 @@ export class CountdownFireworksSystem {
         vy,
         vz,
         1.0,
-        0.72,
-        0.32,
-        0.8,
+        0.76,
+        0.35,
+        0.9,
         life,
         0.45,
         0.85,
       );
 
-      for (let j = 1; j <= 10; j += 1) {
-        const off = j * 0.06;
+      // Dense cascading willow sub-particles (12 sparks per strand)
+      for (let j = 1; j <= 12; j += 1) {
+        const off = j * 0.055;
         const ll = life - off;
-        if (ll <= 0.06) break;
+        if (ll <= 0.05) break;
 
         this.emit(
           shell.x,
           shell.y,
           shell.z,
-          vx + rand(-0.06, 0.06),
-          vy + rand(-0.06, 0.06),
-          vz + rand(-0.06, 0.06),
+          vx + rand(-0.05, 0.05),
+          vy + rand(-0.05, 0.05),
+          vz + rand(-0.05, 0.05),
           1.0,
-          Math.max(0.4, 0.66 - j * 0.025),
-          0.22,
-          Math.max(0.4, 0.8 - j * 0.04),
+          Math.max(0.42, 0.72 - j * 0.025),
+          0.25,
+          Math.max(0.45, 0.88 - j * 0.035),
           ll,
           0.45,
           0.85,
@@ -531,8 +576,67 @@ export class CountdownFireworksSystem {
     }
   }
 
+  private burstDouble(shell: FireworkShell): void {
+    const scale = shell.burstScale || 1.0;
+    // 1:1 Sumida river double burst colors: Electric Cyan outer ring + Neon Pink inner core
+    const c1 = new THREE.Color().setHSL(175 / 360, 1.0, 0.6);
+    const c2 = new THREE.Color().setHSL(335 / 360, 1.0, 0.68);
+
+    // Inner core dense ball
+    for (let i = 0; i < 220; i += 1) {
+      const u = Math.random() * 2 - 1;
+      const th = Math.random() * TAU;
+      const rr = Math.sqrt(1 - u * u);
+      const sp = rand(1.8, 2.7) * BURST_SPREAD * scale;
+
+      this.emit(
+        shell.x,
+        shell.y,
+        shell.z,
+        rr * Math.cos(th) * sp,
+        u * sp,
+        rr * Math.sin(th) * sp,
+        c2.r,
+        c2.g,
+        c2.b,
+        0.9,
+        rand(1.4, 2.0),
+        1.1,
+        0.8,
+      );
+    }
+
+    // Outer sparkling sphere
+    for (let i = 0; i < 320; i += 1) {
+      const u = Math.random() * 2 - 1;
+      const th = Math.random() * TAU;
+      const rr = Math.sqrt(1 - u * u);
+      const sp = rand(3.6, 4.8) * BURST_SPREAD * scale;
+      const gl = Math.random() < 0.35;
+
+      this.emit(
+        shell.x,
+        shell.y,
+        shell.z,
+        rr * Math.cos(th) * sp,
+        u * sp,
+        rr * Math.sin(th) * sp,
+        c1.r,
+        c1.g,
+        c1.b,
+        1.0,
+        rand(1.6, 2.5),
+        0.95,
+        0.8,
+        gl ? rand(18, 32) : 0,
+        gl ? Math.random() * TAU : 0,
+      );
+    }
+  }
+
   private burstRing(shell: FireworkShell): void {
-    const nr = randInt(90, 120);
+    const scale = shell.burstScale || 1.0;
+    const nr = randInt(150, 190);
     const c = shell.color;
     const cc = pickRandomColor();
     const ax = Math.random() * Math.PI;
@@ -553,7 +657,7 @@ export class CountdownFireworksSystem {
       const x1 = dx0 * cy + z1 * sy;
       const z2 = -dx0 * sy + z1 * cy;
 
-      const sp = rand(3.0, 3.8) * BURST_SPREAD;
+      const sp = rand(3.4, 4.4) * BURST_SPREAD * scale;
       this.emit(
         shell.x,
         shell.y,
@@ -564,18 +668,18 @@ export class CountdownFireworksSystem {
         c.r,
         c.g,
         c.b,
-        0.8,
-        rand(1.4, 2.0),
+        0.95,
+        rand(1.5, 2.3),
         0.9,
         0.75,
       );
     }
 
-    for (let i = 0; i < 50; i += 1) {
+    for (let i = 0; i < 90; i += 1) {
       const u = Math.random() * 2 - 1;
       const th = Math.random() * TAU;
       const rr = Math.sqrt(1 - u * u);
-      const sp = rand(1.2, 2.0) * BURST_SPREAD;
+      const sp = rand(1.3, 2.3) * BURST_SPREAD * scale;
 
       this.emit(
         shell.x,
@@ -587,81 +691,28 @@ export class CountdownFireworksSystem {
         cc.r,
         cc.g,
         cc.b,
-        0.7,
-        rand(1.0, 1.5),
+        0.8,
+        rand(1.1, 1.7),
         1.2,
         0.8,
       );
     }
   }
 
-  private burstDouble(shell: FireworkShell): void {
-    const c1 = shell.color;
-    const c2 = pickRandomColor();
-
-    for (let i = 0; i < 110; i += 1) {
-      const u = Math.random() * 2 - 1;
-      const th = Math.random() * TAU;
-      const rr = Math.sqrt(1 - u * u);
-      const sp = rand(1.6, 2.4) * BURST_SPREAD;
-
-      this.emit(
-        shell.x,
-        shell.y,
-        shell.z,
-        rr * Math.cos(th) * sp,
-        u * sp,
-        rr * Math.sin(th) * sp,
-        c1.r,
-        c1.g,
-        c1.b,
-        0.75,
-        rand(1.2, 1.8),
-        1.1,
-        0.8,
-      );
-    }
-
-    for (let i = 0; i < 150; i += 1) {
-      const u = Math.random() * 2 - 1;
-      const th = Math.random() * TAU;
-      const rr = Math.sqrt(1 - u * u);
-      const sp = rand(3.4, 4.4) * BURST_SPREAD;
-      const gl = Math.random() < 0.3;
-
-      this.emit(
-        shell.x,
-        shell.y,
-        shell.z,
-        rr * Math.cos(th) * sp,
-        u * sp,
-        rr * Math.sin(th) * sp,
-        c2.r,
-        c2.g,
-        c2.b,
-        0.8,
-        rand(1.5, 2.2),
-        0.95,
-        0.8,
-        gl ? rand(16, 30) : 0,
-        gl ? Math.random() * TAU : 0,
-      );
-    }
-  }
-
   private burstGlitter(shell: FireworkShell): void {
-    const n = randInt(180, 260);
-    const speed = rand(2.6, 3.8) * BURST_SPREAD;
+    const scale = shell.burstScale || 1.0;
+    const n = randInt(300, 420);
+    const speed = rand(3.0, 4.2) * BURST_SPREAD * scale;
     const gold = Math.random() < 0.5;
-    const r = gold ? 1.0 : 0.82;
-    const g = gold ? 0.85 : 0.9;
-    const b = gold ? 0.5 : 1.0;
+    const r = gold ? 1.0 : 0.85;
+    const g = gold ? 0.88 : 0.92;
+    const b = gold ? 0.55 : 1.0;
 
     for (let i = 0; i < n; i += 1) {
       const u = Math.random() * 2 - 1;
       const th = Math.random() * TAU;
       const rr = Math.sqrt(1 - u * u);
-      const sp = speed * rand(0.7, 1.15);
+      const sp = speed * rand(0.75, 1.15);
 
       this.emit(
         shell.x,
@@ -673,11 +724,11 @@ export class CountdownFireworksSystem {
         r,
         g,
         b,
-        rand(0.7, 1.0),
-        rand(1.5, 2.5),
+        rand(0.8, 1.15),
+        rand(1.6, 2.6),
         1.0,
         0.8,
-        rand(18, 34),
+        rand(20, 38),
         Math.random() * TAU,
       );
     }

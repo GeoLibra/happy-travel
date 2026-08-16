@@ -107,7 +107,7 @@ describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
 
   it('triggers first launch at 2.0s and next launch 60s later', () => {
     const system = new CountdownFireworksSystem();
-    const launchSpy = vi.spyOn(system, 'launchRandomFirework');
+    const launchSpy = vi.spyOn(system, 'launchFestivalDisplay');
 
     // Start at t = 0.0s
     system.update(0.0, 0.02);
