@@ -59,8 +59,8 @@ describe('CountdownRapierPhysics', () => {
     const physics = await CountdownRapierPhysics.create({
       maxParticles: 10,
       cubeSize: 0.2,
-      groundDwellSeconds: 0.1,
-      fadeSeconds: 0.1,
+      groundDwellSeconds: 1.0,
+      fadeSeconds: 0.5,
     });
 
     const idx = physics.spawnCube(0, 0.2, 0, [0, 0, 0], [0, 0, 0], [0, 0, 0]);
@@ -71,14 +71,14 @@ describe('CountdownRapierPhysics', () => {
     }
     expect(physics.getParticleState(idx)).toBe('dwelling');
 
-    // Advance dwell duration (0.1s + margin)
-    for (let i = 0; i < 10; i += 1) {
+    // Advance dwell duration (1.0s)
+    for (let i = 0; i < 70; i += 1) {
       physics.step(0.016);
     }
     expect(physics.getParticleState(idx)).toBe('fading');
 
-    // Advance fade duration (0.1s + margin)
-    for (let i = 0; i < 10; i += 1) {
+    // Advance fade duration (0.5s)
+    for (let i = 0; i < 40; i += 1) {
       physics.step(0.016);
     }
     expect(physics.getParticleState(idx)).toBe('inactive');

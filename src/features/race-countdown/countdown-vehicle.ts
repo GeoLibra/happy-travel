@@ -45,19 +45,26 @@ export function applyCountdownVehiclePose(
   object.updateMatrix();
 }
 
+let sharedVehicleManager: ShowroomAssetManager | null = null;
+
+function getSharedVehicleManager(): ShowroomAssetManager {
+  if (!sharedVehicleManager || sharedVehicleManager.isManagerDisposed) {
+    sharedVehicleManager = new ShowroomAssetManager();
+  }
+  return sharedVehicleManager;
+}
+
 export async function loadCountdownVehicle(
   options: CountdownVehicleOptions = {},
 ): Promise<CountdownVehicle> {
-  const ownedManager = options.loader ? null : new ShowroomAssetManager();
-  const loader = options.loader ?? ownedManager as CountdownVehicleLoader;
+  const loader = options.loader ?? getSharedVehicleManager();
   const result = await loader.loadModel(SHOWROOM_ASSETS.car);
-
-  if (!result.success || !result.data?.scene) {
-    ownedManager?.dispose();
+  const modelData = result.data as { scene?: THREE.Group } | undefined;
+  if (!result.success || !modelData?.scene) {
     throw result.error ?? new Error(`Unable to load countdown vehicle: ${SHOWROOM_ASSETS.car}`);
   }
 
-  const object = cloneSkinnedHierarchy(result.data.scene) as THREE.Group;
+  const object = cloneSkinnedHierarchy(modelData.scene) as THREE.Group;
   const ownedMaterials = new Set<THREE.Material>();
   const materialClones = new Map<THREE.Material, THREE.Material>();
 
@@ -92,7 +99,6 @@ export async function loadCountdownVehicle(
       object.removeFromParent();
       for (const material of ownedMaterials) material.dispose();
       ownedMaterials.clear();
-      ownedManager?.dispose();
       releaseVehicle();
     },
   };

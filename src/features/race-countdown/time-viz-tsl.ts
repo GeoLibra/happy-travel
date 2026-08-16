@@ -470,7 +470,7 @@ export async function createTslTimeVizScene(
       instanceSlot[i] = Math.floor(u * digitCount);
     }
 
-    const MAX_FALL_PARTICLES = 1500;
+    const MAX_FALL_PARTICLES = CountdownRapierPhysics.DEFAULT_MAX_PARTICLES;
     try {
       rapierPhysics = await CountdownRapierPhysics.create({
         maxParticles: MAX_FALL_PARTICLES,

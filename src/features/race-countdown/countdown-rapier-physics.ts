@@ -23,13 +23,14 @@ export async function initRapier(): Promise<typeof RAPIER> {
 }
 
 export class CountdownRapierPhysics {
-  public static readonly DEFAULT_MAX_PARTICLES = 1500;
+  public static readonly DEFAULT_MAX_PARTICLES = 600;
   public static readonly DEFAULT_CUBE_SIZE = 0.155;
   public static readonly DEFAULT_GRAVITY = { x: 0, y: -12.0, z: 0 };
-  public static readonly DEFAULT_RESTITUTION = 0.28;
-  public static readonly DEFAULT_FRICTION = 0.55;
-  public static readonly DEFAULT_DWELL_SECONDS = 60.0;
+  public static readonly DEFAULT_RESTITUTION = 0.22;
+  public static readonly DEFAULT_FRICTION = 0.65;
+  public static readonly DEFAULT_DWELL_SECONDS = 12.0;
   public static readonly DEFAULT_FADE_SECONDS = 0.4;
+  public static readonly TARGET_ACTIVE_CAP = 250;
 
   public readonly world: RAPIER.World;
   public readonly groundCollider: RAPIER.Collider;
@@ -107,8 +108,8 @@ export class CountdownRapierPhysics {
     for (let i = 0; i < this.maxParticles; i += 1) {
       const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(0, -999, 0)
-        .setLinearDamping(0.35)
-        .setAngularDamping(0.55);
+        .setLinearDamping(0.85)
+        .setAngularDamping(1.2);
       const body = this.world.createRigidBody(bodyDesc);
       body.setEnabled(false);
 
@@ -139,14 +140,14 @@ export class CountdownRapierPhysics {
     body.setTranslation({ x: worldX, y: worldY, z: worldZ }, true);
     body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
 
-    const vx = initialVel ? initialVel[0] : (Math.random() - 0.5) * 1.4;
-    const vy = initialVel ? initialVel[1] : (Math.random() - 0.5) * 0.4;
-    const vz = initialVel ? initialVel[2] : (Math.random() - 0.5) * 0.8;
+    const vx = initialVel ? initialVel[0] : (Math.random() - 0.5) * 1.2;
+    const vy = initialVel ? initialVel[1] : (Math.random() - 0.5) * 0.3;
+    const vz = initialVel ? initialVel[2] : (Math.random() - 0.5) * 0.7;
     body.setLinvel({ x: vx, y: vy, z: vz }, true);
 
-    const wx = initialAngVel ? initialAngVel[0] : (Math.random() - 0.5) * 6.0;
-    const wy = initialAngVel ? initialAngVel[1] : (Math.random() - 0.5) * 6.0;
-    const wz = initialAngVel ? initialAngVel[2] : (Math.random() - 0.5) * 6.0;
+    const wx = initialAngVel ? initialAngVel[0] : (Math.random() - 0.5) * 5.0;
+    const wy = initialAngVel ? initialAngVel[1] : (Math.random() - 0.5) * 5.0;
+    const wz = initialAngVel ? initialAngVel[2] : (Math.random() - 0.5) * 5.0;
     body.setAngvel({ x: wx, y: wy, z: wz }, true);
     body.wakeUp();
 
@@ -173,6 +174,11 @@ export class CountdownRapierPhysics {
     this.world.step();
 
     if (this.activeCount === 0) return;
+
+    // Dynamic pressure relief: if many cubes accumulate in piles, accelerate dwell timer of oldest cubes
+    const pressureMultiplier = this.activeCount > CountdownRapierPhysics.TARGET_ACTIVE_CAP
+      ? (this.activeCount / CountdownRapierPhysics.TARGET_ACTIVE_CAP) * 1.5
+      : 1.0;
 
     let write = 0;
     for (let n = 0; n < this.activeCount; n += 1) {
@@ -201,12 +207,14 @@ export class CountdownRapierPhysics {
       }
 
       if (state === 'dwelling') {
-        const nextDwell = this.dwellTimes[p] + clampedDt;
+        const nextDwell = this.dwellTimes[p] + clampedDt * pressureMultiplier;
         this.dwellTimes[p] = nextDwell;
 
         if (nextDwell >= this.groundDwellSeconds) {
           this.states[p] = 'fading';
           this.fadeTimes[p] = 0;
+          // Disable rigid body physics while shrinking to avoid CPU contact solving
+          body.setEnabled(false);
         }
 
         this.activeIndices[write] = p;
@@ -221,13 +229,15 @@ export class CountdownRapierPhysics {
       const angSpeed = Math.hypot(angVel.x, angVel.y, angVel.z);
       const pos = body.translation();
 
-      const isNearGround = pos.y <= this.cubeSize * 3.5;
+      // Check if settled (on floor or atop stack pile anywhere below spawn height)
+      const isLowSpeed = linSpeed < 0.20 && angSpeed < 0.35;
       const isSleeping = body.isSleeping();
-      const isResting = linSpeed < 0.18 && angSpeed < 0.35 && isNearGround;
+      const isBelowSpawn = pos.y <= 3.5;
 
-      if (isSleeping || isResting) {
+      if ((isSleeping || isLowSpeed) && isBelowSpawn) {
         this.states[p] = 'dwelling';
         this.dwellTimes[p] = 0;
+        body.sleep();
       }
 
       this.activeIndices[write] = p;
