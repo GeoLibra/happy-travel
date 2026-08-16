@@ -3,33 +3,25 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   CountdownFireworksSystem,
-  createFireworksGlowTexture,
   type FireworkBurstType,
 } from '@/src/features/race-countdown/countdown-fireworks-tsl';
 
 describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
-  it('creates a glow texture with valid fallback or canvas', () => {
-    const tex = createFireworksGlowTexture();
-    expect(tex).toBeDefined();
-    expect(tex.isTexture).toBe(true);
-    tex.dispose();
-  });
-
-  it('initializes particle buffers, attributes, and Points object', () => {
+  it('initializes particle buffers, attributes, and InstancedMesh object', () => {
     const system = new CountdownFireworksSystem();
-    expect(system.points).toBeDefined();
-    expect(system.points.isPoints).toBe(true);
-    expect(system.points.frustumCulled).toBe(false);
-    expect(system.points.renderOrder).toBe(5);
+    expect(system.mesh).toBeDefined();
+    expect(system.mesh.isInstancedMesh).toBe(true);
+    expect(system.mesh.frustumCulled).toBe(false);
+    expect(system.mesh.renderOrder).toBe(5);
 
-    const geo = system.points.geometry;
-    expect(geo.getAttribute('position')).toBeDefined();
+    const geo = system.mesh.geometry;
+    expect(geo.getAttribute('aCenter')).toBeDefined();
     expect(geo.getAttribute('aInitVel')).toBeDefined();
     expect(geo.getAttribute('aColSize')).toBeDefined();
     expect(geo.getAttribute('aPhys')).toBeDefined();
     expect(geo.getAttribute('aTwink')).toBeDefined();
 
-    const mat = system.points.material as THREE.Material & {
+    const mat = system.mesh.material as THREE.Material & {
       transparent: boolean;
       depthWrite: boolean;
       blending: THREE.Blending;
@@ -41,11 +33,11 @@ describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
     system.dispose();
   });
 
-  it('emits particles and marks buffer update ranges', () => {
+  it('emits particles and uploads dirty attributes', () => {
     const system = new CountdownFireworksSystem();
-    const posAttr = system.points.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const posAttr = system.mesh.geometry.getAttribute('aCenter') as THREE.BufferAttribute;
 
-    expect(posAttr.updateRanges.length).toBe(0);
+    const initialVersion = posAttr.version;
 
     system.emit(
       0, 5, -10, // px, py, pz
@@ -61,8 +53,7 @@ describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
 
     system.update(1.0, 0.016);
 
-    expect(posAttr.updateRanges.length).toBeGreaterThan(0);
-    expect(system.points.geometry.drawRange.count).toBeGreaterThan(0);
+    expect(posAttr.version).toBeGreaterThan(initialVersion);
 
     system.dispose();
   });
@@ -74,14 +65,13 @@ describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
     system.launchRandomFirework();
 
     // Step physics forward until the shell reaches the peak of ascent and explodes
-    // Initial vy ~ 7-9, G = 5.5 => reaches peak around t ~ 1.3 - 1.6s
     for (let step = 0; step < 120; step += 1) {
       system.update(step * 0.02, 0.02);
     }
 
-    // After bursting, hundreds of particles should have been emitted
-    const drawCount = system.points.geometry.drawRange.count;
-    expect(drawCount).toBeGreaterThan(100);
+    // After bursting, live particles should have been emitted
+    const liveCount = (system as unknown as { liveCount: number }).liveCount;
+    expect(liveCount).toBeGreaterThan(100);
 
     system.dispose();
   });
@@ -93,8 +83,8 @@ describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
       const system = new CountdownFireworksSystem();
       const shell = {
         x: 0,
-        y: 6,
-        z: -10,
+        y: 3.5,
+        z: -5,
         vx: 0,
         vy: 0.1, // Near peak, will explode immediately on next update
         vz: 0,
@@ -108,8 +98,8 @@ describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
 
       system.update(0.1, 0.02);
 
-      const drawCount = system.points.geometry.drawRange.count;
-      expect(drawCount).toBeGreaterThan(50);
+      const liveCount = (system as unknown as { liveCount: number }).liveCount;
+      expect(liveCount).toBeGreaterThan(50);
 
       system.dispose();
     }
@@ -159,8 +149,8 @@ describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
 
   it('disposes all internal resources cleanly and idempotently', () => {
     const system = new CountdownFireworksSystem();
-    const geoDispose = vi.spyOn(system.points.geometry, 'dispose');
-    const matDispose = vi.spyOn(system.points.material as THREE.Material, 'dispose');
+    const geoDispose = vi.spyOn(system.mesh.geometry, 'dispose');
+    const matDispose = vi.spyOn(system.mesh.material as THREE.Material, 'dispose');
 
     system.dispose();
     expect(geoDispose).toHaveBeenCalledTimes(1);

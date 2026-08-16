@@ -97,7 +97,6 @@ export function CountdownCanvas({
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const handleChange = (event: MediaQueryListEvent) => setReducedMotion(event.matches);
-    setReducedMotion(mediaQuery.matches);
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
@@ -110,7 +109,10 @@ export function CountdownCanvas({
     let resizeObserver: ResizeObserver | null = null;
     let unregisterCountdownScene: (() => void) | null = null;
 
-    const handleContextLost = () => {
+    let unmounted = false;
+    const handleContextLost = (event: Event) => {
+      if (unmounted) return;
+      event.preventDefault?.();
       onWebGLFailureRef.current?.(new Error('Countdown WebGL context lost'));
     };
     canvas.addEventListener('webglcontextlost', handleContextLost);
@@ -176,6 +178,7 @@ export function CountdownCanvas({
     });
 
     return () => {
+      unmounted = true;
       canvas.removeEventListener('webglcontextlost', handleContextLost);
       releaseContextListener();
       resizeObserver?.disconnect();

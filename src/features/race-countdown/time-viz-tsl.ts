@@ -275,7 +275,8 @@ export async function createTslTimeVizScene(
   const scene = new Scene();
   const bgDark = uniform(vec3(0.03, 0.03, 0.03));
   const bgBlack = uniform(vec3(0, 0, 0));
-  (scene as unknown as { background: unknown }).background = screenUV.distance(0.5).remap(0, 1).mix(bgDark, bgBlack);
+  scene.background = new THREE.Color(0x05060a);
+  (scene as unknown as { backgroundNode?: unknown }).backgroundNode = screenUV.distance(0.5).remap(0, 1).mix(bgDark, bgBlack);
   scene.environmentIntensity = 1;
 
   const camera = new PerspectiveCamera(15, 1280 / 720, 0.1, 100);
@@ -530,7 +531,7 @@ export async function createTslTimeVizScene(
     scene.add(fallingMesh);
 
     fireworks = new CountdownFireworksSystem();
-    scene.add(fireworks.points);
+    scene.add(fireworks.mesh);
     ownedResources.push(fireworks);
 
     if (options.canvas) {

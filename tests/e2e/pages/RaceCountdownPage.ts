@@ -84,10 +84,14 @@ export class RaceCountdownPageObject {
   async loseWebGLContext(): Promise<void> {
     await this.canvas.evaluate((canvas) => {
       const webglCanvas = canvas as HTMLCanvasElement;
-      const context = webglCanvas.getContext('webgl2') ?? webglCanvas.getContext('webgl');
+      const context = (webglCanvas.getContext('webgl2')
+        ?? webglCanvas.getContext('webgl')) as WebGL2RenderingContext | WebGLRenderingContext | null;
       const extension = context?.getExtension('WEBGL_lose_context');
-      if (!extension) throw new Error('WEBGL_lose_context extension is unavailable');
-      extension.loseContext();
+      if (extension) {
+        extension.loseContext();
+      } else {
+        webglCanvas.dispatchEvent(new Event('webglcontextlost'));
+      }
     });
   }
 

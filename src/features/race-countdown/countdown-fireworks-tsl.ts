@@ -1,26 +1,23 @@
 import * as THREE from 'three';
 import {
-  BufferAttribute,
-  BufferGeometry,
-  CanvasTexture,
-  DataTexture,
   DynamicDrawUsage,
-  Points,
-  PointsNodeMaterial,
-  RGBAFormat,
+  InstancedBufferAttribute,
+  InstancedMesh,
+  MeshBasicNodeMaterial,
+  PlaneGeometry,
 } from 'three/webgpu';
 import {
   Fn,
-  attribute,
+  cameraProjectionMatrix,
   exp,
   float,
+  instancedBufferAttribute,
   min,
   mix,
-  pointUV,
+  modelViewMatrix,
   positionGeometry,
   pow,
   sin,
-  texture,
   uniform,
   vec2,
   vec3,
@@ -41,10 +38,10 @@ export interface FireworkShell {
   trailTimer: number;
 }
 
-const MAX_PARTICLES = 30000;
+const MAX_PARTICLES = 16384;
 const G = 4.2;
 const BURST_SPREAD = 1.35;
-const SIZE_SCALE = 32.0;
+const SIZE_SCALE = 0.55;
 const INTENSITY = 2.5;
 const FIRST_LAUNCH_DELAY_SECONDS = 2.0;
 const RECURRING_LAUNCH_INTERVAL_SECONDS = 60.0;
@@ -84,57 +81,11 @@ function pickRandomBurstType(): FireworkBurstType {
   return 'glitter';
 }
 
-export function createFireworksGlowTexture(): THREE.Texture {
-  if (typeof document !== 'undefined') {
-    const size = 128;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      const center = size / 2;
-      const radial = ctx.createRadialGradient(center, center, 0, center, center, center);
-      radial.addColorStop(0.0, 'rgba(255,255,255,1)');
-      radial.addColorStop(0.15, 'rgba(255,255,255,0.95)');
-      radial.addColorStop(0.35, 'rgba(255,255,255,0.40)');
-      radial.addColorStop(0.60, 'rgba(255,255,255,0.12)');
-      radial.addColorStop(1.0, 'rgba(255,255,255,0)');
-      ctx.fillStyle = radial;
-      ctx.fillRect(0, 0, size, size);
-
-      const flares = 4;
-      for (let i = 0; i < flares; i += 1) {
-        const angle = (i / flares) * Math.PI;
-        ctx.save();
-        ctx.translate(center, center);
-        ctx.rotate(angle);
-        const width = 1.5;
-        const linear = ctx.createLinearGradient(-center, 0, center, 0);
-        linear.addColorStop(0.0, 'rgba(255,255,255,0)');
-        linear.addColorStop(0.5, 'rgba(255,255,255,0.8)');
-        linear.addColorStop(1.0, 'rgba(255,255,255,0)');
-        ctx.fillStyle = linear;
-        ctx.fillRect(-center, -width, size, width * 2);
-        ctx.restore();
-      }
-
-      const textureMap = new CanvasTexture(canvas);
-      textureMap.needsUpdate = true;
-      return textureMap;
-    }
-  }
-
-  // Fallback for non-DOM / test environments
-  const fallback = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, RGBAFormat);
-  fallback.needsUpdate = true;
-  return fallback;
-}
-
 export class CountdownFireworksSystem {
-  public readonly points: Points;
-  private readonly geometry: BufferGeometry;
-  private readonly material: PointsNodeMaterial;
-  private readonly glowTexture: THREE.Texture;
+  public readonly mesh: InstancedMesh;
+  public readonly points: InstancedMesh; // Backward compatibility alias
+  private readonly geometry: PlaneGeometry;
+  private readonly material: MeshBasicNodeMaterial;
 
   private readonly aInitPos: Float32Array;
   private readonly aInitVel: Float32Array;
@@ -145,11 +96,11 @@ export class CountdownFireworksSystem {
   private readonly live: Int32Array;
   private readonly free: number[];
 
-  private readonly ipAttr: BufferAttribute;
-  private readonly ivAttr: BufferAttribute;
-  private readonly csAttr: BufferAttribute;
-  private readonly phAttr: BufferAttribute;
-  private readonly twAttr: BufferAttribute;
+  private readonly ipAttr: InstancedBufferAttribute;
+  private readonly ivAttr: InstancedBufferAttribute;
+  private readonly csAttr: InstancedBufferAttribute;
+  private readonly phAttr: InstancedBufferAttribute;
+  private readonly twAttr: InstancedBufferAttribute;
 
   private liveCount = 0;
   private hi = 0;
@@ -179,25 +130,24 @@ export class CountdownFireworksSystem {
       this.free[i] = MAX_PARTICLES - 1 - i;
     }
 
-    this.geometry = new BufferGeometry();
-    this.ipAttr = new BufferAttribute(this.aInitPos, 3);
-    this.ivAttr = new BufferAttribute(this.aInitVel, 3);
-    this.csAttr = new BufferAttribute(this.aColSize, 4);
-    this.phAttr = new BufferAttribute(this.aPhys, 4);
-    this.twAttr = new BufferAttribute(this.aTwink, 2);
+    this.geometry = new PlaneGeometry(1, 1);
+    this.ipAttr = new InstancedBufferAttribute(this.aInitPos, 3);
+    this.ivAttr = new InstancedBufferAttribute(this.aInitVel, 3);
+    this.csAttr = new InstancedBufferAttribute(this.aColSize, 4);
+    this.phAttr = new InstancedBufferAttribute(this.aPhys, 4);
+    this.twAttr = new InstancedBufferAttribute(this.aTwink, 2);
 
     for (const attr of [this.ipAttr, this.ivAttr, this.csAttr, this.phAttr, this.twAttr]) {
       attr.setUsage(DynamicDrawUsage);
     }
 
-    this.geometry.setAttribute('position', this.ipAttr);
+    this.geometry.setAttribute('aCenter', this.ipAttr);
     this.geometry.setAttribute('aInitVel', this.ivAttr);
     this.geometry.setAttribute('aColSize', this.csAttr);
     this.geometry.setAttribute('aPhys', this.phAttr);
     this.geometry.setAttribute('aTwink', this.twAttr);
 
-    this.material = new PointsNodeMaterial();
-    this.material.sizeAttenuation = false;
+    this.material = new MeshBasicNodeMaterial();
     this.material.transparent = true;
     this.material.depthWrite = false;
     this.material.blending = THREE.AdditiveBlending;
@@ -206,12 +156,13 @@ export class CountdownFireworksSystem {
     const uSizeScale = this.uSizeScale;
     const uIntensity = this.uIntensity;
 
-    const aInitVel = attribute('aInitVel', 'vec3') as ReturnType<typeof vec3>;
-    const aColSize = attribute('aColSize', 'vec4') as ReturnType<typeof vec4>;
-    const aPhys = attribute('aPhys', 'vec4') as ReturnType<typeof vec4>;
-    const aTwink = attribute('aTwink', 'vec2') as ReturnType<typeof vec2>;
+    const aCenter = instancedBufferAttribute(this.ipAttr) as ReturnType<typeof vec3>;
+    const aInitVel = instancedBufferAttribute(this.ivAttr) as ReturnType<typeof vec3>;
+    const aColSize = instancedBufferAttribute(this.csAttr) as ReturnType<typeof vec4>;
+    const aPhys = instancedBufferAttribute(this.phAttr) as ReturnType<typeof vec4>;
+    const aTwink = instancedBufferAttribute(this.twAttr) as ReturnType<typeof vec2>;
 
-    this.material.positionNode = Fn(() => {
+    this.material.vertexNode = Fn(() => {
       const birth = aPhys.z;
       const lifespan = aPhys.w;
       const age = uTime.sub(birth);
@@ -222,31 +173,27 @@ export class CountdownFireworksSystem {
       const expTerm = exp(k.mul(age).negate());
       const f = float(1).sub(expTerm).div(k.max(float(1e-4)));
 
-      const posXDrag = positionGeometry.x.add(aInitVel.x.mul(f));
-      const posZDrag = positionGeometry.z.add(aInitVel.z.mul(f));
-      const posYDrag = positionGeometry.y.add(aInitVel.y.mul(f)).sub(g.div(k.max(float(1e-4))).mul(age.sub(f)));
+      const posXDrag = aCenter.x.add(aInitVel.x.mul(f));
+      const posZDrag = aCenter.z.add(aInitVel.z.mul(f));
+      const posYDrag = aCenter.y.add(aInitVel.y.mul(f)).sub(g.div(k.max(float(1e-4))).mul(age.sub(f)));
 
-      const posXNoDrag = positionGeometry.x.add(aInitVel.x.mul(age));
-      const posZNoDrag = positionGeometry.z.add(aInitVel.z.mul(age));
-      const posYNoDrag = positionGeometry.y.add(aInitVel.y.mul(age)).sub(float(0.5).mul(g).mul(age).mul(age));
+      const posXNoDrag = aCenter.x.add(aInitVel.x.mul(age));
+      const posZNoDrag = aCenter.z.add(aInitVel.z.mul(age));
+      const posYNoDrag = aCenter.y.add(aInitVel.y.mul(age)).sub(float(0.5).mul(g).mul(age).mul(age));
 
       const finalX = hasDrag.select(posXDrag, posXNoDrag);
       const finalY = hasDrag.select(posYDrag, posYNoDrag);
       const finalZ = hasDrag.select(posZDrag, posZNoDrag);
 
-      return isDead.select(vec3(0, -99999, 0), vec3(finalX, finalY, finalZ));
-    })();
-
-    this.material.sizeNode = Fn(() => {
-      const birth = aPhys.z;
-      const lifespan = aPhys.w;
-      const age = uTime.sub(birth);
-      const isDead = age.lessThan(float(0)).or(age.greaterThan(lifespan));
       const lifeLeft = float(1).sub(age.div(lifespan.max(float(0.001)))).clamp(0, 1);
       const sizeFade = float(0.55).add(float(0.45).mul(lifeLeft));
-      const baseSize = aColSize.w.mul(sizeFade).mul(uSizeScale);
+      const finalSize = isDead.select(float(0), aColSize.w.mul(sizeFade).mul(uSizeScale));
 
-      return isDead.select(float(0), baseSize);
+      const worldPos = isDead.select(vec3(0, -99999, 0), vec3(finalX, finalY, finalZ));
+      const viewCenter = modelViewMatrix.mul(vec4(worldPos, 1.0)).xyz;
+      const viewPos = viewCenter.add(vec3(positionGeometry.x.mul(finalSize), positionGeometry.y.mul(finalSize), 0.0));
+
+      return cameraProjectionMatrix.mul(vec4(viewPos, 1.0));
     })();
 
     this.material.outputNode = Fn(() => {
@@ -264,10 +211,11 @@ export class CountdownFireworksSystem {
       const twinkleVal = float(0.2).add(float(0.8).mul(float(0.5).add(float(0.5).mul(wave))));
       const finalTwinkle = hasTwinkle.select(twinkleVal, float(1));
 
-      const uvOffset = vec2(pointUV).sub(vec2(0.5, 0.5));
+      // Centered plane UV in [-0.5, 0.5]
+      const uvOffset = positionGeometry.xy;
       const dist = uvOffset.length().mul(2.0);
       const radialAlpha = float(1.0).sub(dist).clamp(0, 1);
-      const glowAlpha = pow(radialAlpha, float(2.2));
+      const glowAlpha = pow(radialAlpha, float(2.0));
 
       const flareX = float(1.0).sub(uvOffset.x.abs().mul(2.0)).clamp(0, 1);
       const flareY = float(1.0).sub(uvOffset.y.abs().mul(2.0)).clamp(0, 1);
@@ -283,9 +231,10 @@ export class CountdownFireworksSystem {
       return vec4(col, finalAlpha);
     })();
 
-    this.points = new Points(this.geometry, this.material);
-    this.points.frustumCulled = false;
-    this.points.renderOrder = 5;
+    this.mesh = new InstancedMesh(this.geometry, this.material, MAX_PARTICLES);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 5;
+    this.points = this.mesh;
   }
 
   public launchRandomFirework(): void {
@@ -385,7 +334,6 @@ export class CountdownFireworksSystem {
     this.updateShells(dt);
     this.reclaimExpired();
     this.uploadDirtyAttributes();
-    this.geometry.setDrawRange(0, this.hi);
   }
 
   private updateShells(dt: number): void {
@@ -751,21 +699,11 @@ export class CountdownFireworksSystem {
 
   private uploadDirtyAttributes(): void {
     if (this.dirtyHi <= this.dirtyLo) return;
-    const lo = this.dirtyLo;
-    const count = this.dirtyHi - this.dirtyLo;
-    const ranges: [BufferAttribute, number][] = [
-      [this.ipAttr, 3],
-      [this.ivAttr, 3],
-      [this.csAttr, 4],
-      [this.phAttr, 4],
-      [this.twAttr, 2],
-    ];
-
-    for (const [attr, stride] of ranges) {
-      attr.clearUpdateRanges();
-      attr.addUpdateRange(lo * stride, count * stride);
-      attr.needsUpdate = true;
-    }
+    this.ipAttr.needsUpdate = true;
+    this.ivAttr.needsUpdate = true;
+    this.csAttr.needsUpdate = true;
+    this.phAttr.needsUpdate = true;
+    this.twAttr.needsUpdate = true;
     this.dirtyLo = Infinity;
     this.dirtyHi = 0;
   }
