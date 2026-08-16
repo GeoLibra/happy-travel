@@ -58,7 +58,7 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
 
 interface HappyTravelAppProps {
   onOpenCountdown: () => void;
-  countdownTriggerRef: React.Ref<HTMLButtonElement>;
+  countdownTriggerRef: React.Ref<HTMLDivElement>;
   inactive: boolean;
 }
 
@@ -347,7 +347,14 @@ function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: Happ
         )}>
           {/* Prominent Image Highlight */}
           <div className="relative w-full shrink-0 z-20 mt-4">
-            <div className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={onOpenCountdown}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpenCountdown(); }}
+              aria-label="查看赛事海报"
+              className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E10600]"
+            >
               <img
                  src={tripImage}
                  alt="Trip Highlight"
@@ -358,7 +365,7 @@ function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: Happ
             <div className="absolute top-0 right-0 w-0 h-0 z-50 pointer-events-none">
               {!showWelcome && !inactive && <MiniFirework />}
             </div>
-      </div>
+          </div>
 
           {!showWelcome && (
             <RaceCountdown
@@ -623,7 +630,7 @@ function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: Happ
 function CountdownNavigationApp() {
   const { countdownOpen, openCountdown, closeCountdown } = useCountdownNavigation();
   const [itineraryMounted, setItineraryMounted] = useState(() => !countdownOpen);
-  const countdownTriggerRef = useRef<HTMLButtonElement>(null);
+  const countdownTriggerRef = useRef<HTMLDivElement>(null);
   const wasCountdownOpenRef = useRef(countdownOpen);
 
   useEffect(() => {

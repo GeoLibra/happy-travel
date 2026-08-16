@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { digit } from './digit';
+import { digit, getGlyph } from './digit';
 import {
   formatCountdownDigits,
   splitRemainingTime,
@@ -27,7 +27,7 @@ interface Particle {
 interface RaceCountdownProps {
   onOpen?: () => void;
   active?: boolean;
-  triggerRef?: React.Ref<HTMLButtonElement>;
+  triggerRef?: React.Ref<HTMLDivElement>;
 }
 
 const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, triggerRef }) => {
@@ -38,7 +38,6 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
-    setResolvedEvent(null);
     void resolveNextShanghaiRace({ signal: controller.signal }).then((event) => {
       if (!controller.signal.aborted) setResolvedEvent(event);
     });
@@ -51,7 +50,10 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
     const scheduleNextCheck = () => {
       const remainingMs = resolvedEvent.startsAt.getTime() - Date.now();
       if (remainingMs <= 0) {
-        setResolutionAttempt((attempt) => attempt + 1);
+        // If elapsed, throttle next check by 30 seconds rather than looping continuously
+        timeoutId = window.setTimeout(() => {
+          setResolutionAttempt((attempt) => attempt + 1);
+        }, 30_000);
         return;
       }
       timeoutId = window.setTimeout(
@@ -126,12 +128,12 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
     let DIGIT_GAP = 1 * CELL; // Space between digits in same unit
     let UNIT_GAP = 2 * CELL; // Space between unit and colon
 
-    const renderDigit = (x: number, y: number, num: number, context: CanvasRenderingContext2D) => {
+    const renderDigit = (x: number, y: number, num: number | string, context: CanvasRenderingContext2D) => {
       // digit[10] is the colon ':'
-      const matrix = digit[num];
+      const matrix = typeof num === 'number' ? digit[num] : getGlyph(num);
       if (!matrix) return;
 
-      context.fillStyle = num === 10 ? "#001A30" : "#E10600"; // Red for numbers, Dark for colon
+      context.fillStyle = (num === 10 || num === ':') ? "#001A30" : "#E10600"; // Red for numbers/letters, Dark for colon
 
       for (let i = 0; i < matrix.length; i++) {
         for (let j = 0; j < matrix[i].length; j++) {
@@ -487,12 +489,9 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
   const compactDisplay = compactParts ? formatCountdownDigits(compactParts).join('') : 'loading';
 
   return (
-    <motion.button
-      type="button"
+    <motion.div
       ref={triggerRef}
-      onClick={onOpen}
-      disabled={!onOpen}
-      aria-label="查看全屏倒计时"
+      aria-label="赛事倒计时"
       data-compact-countdown-display={compactDisplay}
       data-compact-countdown-source={resolvedEvent?.source}
       data-compact-countdown-state={resolvedEvent ? 'ready' : 'loading'}
@@ -500,15 +499,16 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       style={{ minHeight: '60px' }}
-      className="relative z-20 flex min-h-[60px] w-full items-center justify-center rounded-xl border border-[#001A30]/10 bg-white/80 px-4 text-sm font-semibold text-[#001A30] shadow-sm transition hover:bg-white disabled:cursor-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#E10600]"
+      className="relative z-20 flex min-h-[60px] w-full items-center justify-center rounded-xl border border-[#001A30]/10 bg-white/80 px-4 text-sm font-semibold text-[#001A30] shadow-sm select-none"
     >
-      <span>查看全屏倒计时</span>
+      <span className="sr-only">赛事倒计时</span>
+
       <canvas
-         ref={canvasRef}
-         className="fixed top-0 left-0 w-screen h-screen pointer-events-none drop-shadow-sm z-[15]"
-         aria-label="Race Countdown Canvas"
+        ref={canvasRef}
+        className="fixed top-0 left-0 w-screen h-screen pointer-events-none drop-shadow-sm z-[15]"
+        aria-label="Race Countdown Canvas"
       />
-    </motion.button>
+    </motion.div>
   );
 };
 

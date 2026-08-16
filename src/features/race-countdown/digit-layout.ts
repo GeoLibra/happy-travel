@@ -1,4 +1,4 @@
-import { digit as digitMatrices } from '@/src/components/digit';
+import { getGlyph } from '@/src/components/digit';
 
 export type ViewportKind = 'desktop' | 'mobile';
 export type TimeVizMode = 'reference' | 'countdown';
@@ -42,7 +42,7 @@ const MOBILE_COUNTDOWN_ROW_LENGTHS = [3, 2, 2, 2] as const;
 const LAYOUTS: Record<ViewportKind, Omit<LayoutMetrics, 'columns' | 'rows' | 'digitCapacity'>> = {
   desktop: {
     cubeSpacing: 0.17,
-    digitSpacing: 2.4,
+    digitSpacing: 2.45,
     rowSpacing: 4.1,
   },
   mobile: {
@@ -84,17 +84,9 @@ function pastelColor(
 
 function isGlyphCellVisible(glyph: number[][] | undefined, row: number, column: number): boolean {
   if (!glyph) return false;
-
-  for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
-    for (let columnOffset = -1; columnOffset <= 1; columnOffset += 1) {
-      const microRow = row + rowOffset;
-      const microColumn = column + columnOffset;
-      if (microRow < 0 || microColumn < 0) continue;
-      if (glyph[Math.floor(microRow / 2)]?.[Math.floor(microColumn / 2)] === 1) return true;
-    }
-  }
-
-  return false;
+  const glyphRow = Math.floor(row / 2);
+  const glyphCol = Math.floor(column / 2);
+  return glyph[glyphRow]?.[glyphCol] === 1;
 }
 
 export function getTimeVizLayout(mode: TimeVizMode, viewport: ViewportKind): LayoutMetrics {
@@ -128,6 +120,57 @@ function mobileCountdownPlacement(digitIndex: number): {
   };
 }
 
+function desktopShanghaiOriginX(digitIndex: number, digitSpacing = 2.85, wordGap = 1.6): number {
+  const centers: number[] = [];
+  let curr = 0;
+  for (let i = 0; i < 8; i++) {
+    if (i > 0) {
+      curr += digitSpacing;
+      // Distinct word break between SHANG (0..4) and HAI (5..7)
+      if (i === 5) {
+        curr += wordGap;
+      }
+    }
+    centers.push(curr);
+  }
+  const mid = (centers[0] + centers[7]) / 2;
+  return centers[digitIndex] - mid;
+}
+
+function desktopCountdownOriginX(digitIndex: number, digitSpacing: number, totalDigits = 9, groupGap = 1.15): number {
+  if (totalDigits <= 6) {
+    const centers: number[] = [];
+    let curr = 0;
+    for (let i = 0; i < 6; i++) {
+      if (i > 0) {
+        curr += digitSpacing;
+        // Gap between Hours (0..1), Mins (2..3), Secs (4..5)
+        if (i === 2 || i === 4) {
+          curr += groupGap;
+        }
+      }
+      centers.push(curr);
+    }
+    const mid = (centers[0] + centers[5]) / 2;
+    return centers[digitIndex] - mid;
+  }
+
+  const centers: number[] = [];
+  let curr = 0;
+  for (let i = 0; i < 9; i++) {
+    if (i > 0) {
+      curr += digitSpacing;
+      // Add gap between Days (0..2) and Hours (3..4), Hours and Mins (5..6), Mins and Secs (7..8)
+      if (i === 3 || i === 5 || i === 7) {
+        curr += groupGap;
+      }
+    }
+    centers.push(curr);
+  }
+  const mid = (centers[0] + centers[8]) / 2;
+  return centers[digitIndex] - mid;
+}
+
 export function buildDigitInstances({
   digits,
   mode,
@@ -137,19 +180,51 @@ export function buildDigitInstances({
   const layout = getTimeVizLayout(mode, viewport);
   const random = createRandom(seed);
   const instances: DigitInstance[] = [];
+  const activeDigits = digits.filter((char) => char !== '' && char !== undefined);
+  const hasLetters = activeDigits.some((char) => typeof char === 'string' && /[A-Za-z]/.test(char));
+  const is6DigitCountdown = mode === 'countdown' && !hasLetters && activeDigits.length === 6;
 
   for (let digitIndex = 0; digitIndex < layout.digitCapacity; digitIndex += 1) {
-    const semanticMobilePlacement = mode === 'countdown' && viewport === 'mobile'
-      ? mobileCountdownPlacement(digitIndex)
+    const semanticMobilePlacement = mode === 'countdown' && viewport === 'mobile' && !hasLetters
+      ? (is6DigitCountdown
+          ? { row: Math.floor(digitIndex / 2), column: digitIndex % 2, rowLength: 2 }
+          : mobileCountdownPlacement(digitIndex))
       : null;
     const groupColumn = semanticMobilePlacement?.column ?? digitIndex % layout.columns;
     const groupRow = semanticMobilePlacement?.row ?? Math.floor(digitIndex / layout.columns);
     const rowLength = semanticMobilePlacement?.rowLength ?? layout.columns;
-    const glyph = digitMatrices[Number(digits[digitIndex])];
-    const originX = viewport === 'desktop' && mode === 'reference'
-      ? (Math.floor(digitIndex / 2) - 1) * 6.1 + ((digitIndex % 2) - 0.5) * layout.digitSpacing
-      : (groupColumn - (rowLength - 1) / 2) * layout.digitSpacing;
-    const originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
+    const glyph = getGlyph(digits[digitIndex]);
+
+    let originX: number;
+    let originY: number;
+
+    if (viewport === 'desktop' && mode === 'reference') {
+      originX = (Math.floor(digitIndex / 2) - 1) * 6.1 + ((digitIndex % 2) - 0.5) * layout.digitSpacing;
+      originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
+    } else if (viewport === 'desktop' && mode === 'countdown') {
+      if (hasLetters) {
+        originX = desktopShanghaiOriginX(digitIndex);
+      } else {
+        originX = desktopCountdownOriginX(digitIndex, layout.digitSpacing, is6DigitCountdown ? 6 : 9);
+      }
+      originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
+    } else if (viewport === 'mobile' && hasLetters) {
+      // 8 letters on mobile: SHANG (row 0), HAI (row 1)
+      if (digitIndex < 5) {
+        originX = (digitIndex - 2) * 2.3;
+        originY = 2.4;
+      } else {
+        originX = (digitIndex - 5 - 1) * 2.6;
+        originY = -2.4;
+      }
+    } else if (viewport === 'mobile' && is6DigitCountdown) {
+      originX = (groupColumn - 0.5) * layout.digitSpacing;
+      originY = ((3 - 1) / 2 - groupRow) * layout.rowSpacing;
+    } else {
+      originX = (groupColumn - (rowLength - 1) / 2) * layout.digitSpacing;
+      originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
+    }
+
     const verticalCubeSpacing = viewport === 'mobile' ? 0.212 : 0.176;
 
     for (let row = 0; row < DIGIT_LATTICE_ROWS; row += 1) {

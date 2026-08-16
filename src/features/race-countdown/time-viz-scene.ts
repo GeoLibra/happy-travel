@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
@@ -105,8 +106,8 @@ const floorShader = {
 
     void main() {
       vec3 displaced = position;
-      float depthWave = sin(position.y * 0.34 + time * 0.16)
-        + sin(position.y * 0.83 - position.x * 0.035 - time * 0.11) * 0.35;
+      float depthWave = sin(position.y * 0.38 + time * 0.22)
+        + sin(position.y * 0.95 - position.x * 0.04 - time * 0.16) * 0.35;
       displaced.z += depthWave * displacementStrength;
 
       vPlaneCoord = position.xy;
@@ -131,12 +132,12 @@ const floorShader = {
 
       vec2 p = vPlaneCoord;
       vec2 uv = vUv.xy / max(vUv.w, 0.0001);
-      float band0 = sin(p.y * 0.55 + time * 0.22);
-      float band1 = sin(p.y * 1.15 + p.x * 0.10 - time * 0.17);
-      float band2 = sin(p.y * 2.10 - p.x * 0.04 + time * 0.11);
-      uv.x += 0.032 * band0 + 0.012 * band1 + 0.004 * band2;
-      uv.y += 0.006 * cos(p.y * 0.72 + time * 0.16)
-        + 0.003 * cos(p.y * 1.60 + p.x * 0.08 - time * 0.13);
+      float band0 = sin(p.y * 0.65 + time * 0.30);
+      float band1 = sin(p.y * 1.35 + p.x * 0.12 - time * 0.22);
+      float band2 = sin(p.y * 2.45 - p.x * 0.05 + time * 0.15);
+      uv.x += 0.035 * band0 + 0.014 * band1 + 0.005 * band2;
+      uv.y += 0.008 * cos(p.y * 0.85 + time * 0.22)
+        + 0.004 * cos(p.y * 1.75 + p.x * 0.10 - time * 0.16);
 
       float foreground = smoothstep(1.0, 16.0, -p.y);
       uv.y = mix(uv.y, 0.5 + (uv.y - 0.5) * 0.24, foreground);
@@ -159,15 +160,15 @@ const floorShader = {
       }
 
       float energy = max(blurred.r, max(blurred.g, blurred.b));
-      float mask = smoothstep(0.002, 0.08, energy);
-      float gain = mix(0.78, 0.48, foreground);
+      float mask = smoothstep(0.001, 0.06, energy);
+      float gain = mix(0.92, 0.55, foreground);
       float lowFrequencyNoise = 0.5 + 0.5 * sin(p.y * 0.23 + sin(p.x * 0.10));
       float depthBand = 0.5 + 0.5 * sin(
         p.y * 1.1 + sin(p.x * 0.22) * 1.5 + sin(p.y * 0.31 - p.x * 0.11) * 0.6
       );
-      float poolMask = smoothstep(0.28, 0.70, depthBand);
-      vec3 floorBase = vec3(0.004, 0.006, 0.010) + lowFrequencyNoise * 0.003;
-      vec3 liquidColor = mix(floorBase, blurred, mask * gain * mix(0.05, 1.0, poolMask));
+      float poolMask = smoothstep(0.25, 0.75, depthBand);
+      vec3 floorBase = vec3(0.003, 0.004, 0.008) + lowFrequencyNoise * 0.002;
+      vec3 liquidColor = mix(floorBase, blurred * 1.15, mask * gain * mix(0.12, 1.0, poolMask));
       gl_FragColor = vec4(liquidColor, 1.0);
 
       #include <tonemapping_fragment>
@@ -188,7 +189,7 @@ function createDefaultRenderer(
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.18;
   renderer.shadowMap.enabled = quality.shadowsEnabled;
   renderer.setClearColor(0x05060a, 1);
   return renderer;
@@ -197,9 +198,9 @@ function createDefaultRenderer(
 const defaultComposerResourceFactories: TimeVizComposerResourceFactories = {
   createBloomPass: () => new UnrealBloomPass(
     new THREE.Vector2(INITIAL_WIDTH, INITIAL_HEIGHT),
-    0.035,
-    0.12,
-    0.88,
+    0.22,
+    0.25,
+    0.78,
   ),
   createComposer: (renderer) => new EffectComposer(renderer) as unknown as TimeVizComposerCore,
   createOutputPass: () => new OutputPass(),
@@ -261,7 +262,7 @@ function reflectionSize(value: number, pixelRatio: number): number {
 }
 
 const defaultFloorResourceFactories: TimeVizFloorResourceFactories = {
-  createGeometry: () => new THREE.PlaneGeometry(42, 52, 112, 128),
+  createGeometry: () => new THREE.PlaneGeometry(60, 60, 128, 128),
   createReflector: (geometry, options) => new Reflector(geometry, options),
 };
 
@@ -368,18 +369,87 @@ function browserQualityOptions(reducedMotion: boolean): ShowroomQualityOptions {
   };
 }
 
+const defaultVoxelUniforms = {
+  uTime: { value: 0 },
+  uColor0: { value: new THREE.Vector3(0.5, 0.5, 0.5) },
+  uColor1: { value: new THREE.Vector3(0.5, 0.5, 0.5) },
+  uColor2: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
+  uColor3: { value: new THREE.Vector3(0.0, 0.33, 0.67) },
+};
+
+function createVoxelPhysicalMaterial(): THREE.MeshPhysicalMaterial {
+  const material = new THREE.MeshPhysicalMaterial({
+    clearcoat: 0.68,
+    clearcoatRoughness: 0.12,
+    color: 0xffffff,
+    metalness: 0.85,
+    roughness: 0.18,
+    emissive: 0x000000,
+    emissiveIntensity: 0.55,
+  });
+
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = defaultVoxelUniforms.uTime;
+    shader.uniforms.uColor0 = defaultVoxelUniforms.uColor0;
+    shader.uniforms.uColor1 = defaultVoxelUniforms.uColor1;
+    shader.uniforms.uColor2 = defaultVoxelUniforms.uColor2;
+    shader.uniforms.uColor3 = defaultVoxelUniforms.uColor3;
+
+    shader.vertexShader = `
+      varying vec3 vVoxelWorldPos;
+    ` + shader.vertexShader;
+
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        vVoxelWorldPos = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+      #else
+        vVoxelWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      #endif
+      `
+    );
+
+    shader.fragmentShader = `
+      uniform float uTime;
+      uniform vec3 uColor0;
+      uniform vec3 uColor1;
+      uniform vec3 uColor2;
+      uniform vec3 uColor3;
+      varying vec3 vVoxelWorldPos;
+
+      vec3 getVoxelPalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
+        return a + b * cos(6.28318530718 * (c * t + d));
+      }
+
+      vec3 adjustVoxelSat(vec3 col, float sat) {
+        float gray = dot(col, vec3(0.299, 0.587, 0.114));
+        return mix(vec3(gray), col, sat);
+      }
+    ` + shader.fragmentShader;
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+      float voxelSpatial = vVoxelWorldPos.x * 0.14 + vVoxelWorldPos.y * 0.24 - vVoxelWorldPos.z * 0.16;
+      float voxelWave = sin(vVoxelWorldPos.x * 0.09 + vVoxelWorldPos.y * 0.14) * 0.4;
+      float voxelT = fract((voxelSpatial + voxelWave) * 0.36 + uTime * 0.22);
+      vec3 voxelDynColor = adjustVoxelSat(getVoxelPalette(voxelT, uColor0, uColor1, uColor2, uColor3), 0.94);
+      diffuseColor.rgb = voxelDynColor;
+      totalEmissiveRadiance = voxelDynColor * 0.52;
+      `
+    );
+  };
+
+  return material;
+}
+
 const defaultDependencies: TimeVizDependencies = {
   cancelAnimationFrame: (frameId) => window.cancelAnimationFrame(frameId),
   createComposer: createDefaultComposer,
   createFloor: createDefaultFloor,
-  createGeometry: () => new RoundedBoxGeometry(0.16, 0.16, 0.36, 3, 0.022),
-  createMaterial: () => new THREE.MeshPhysicalMaterial({
-    clearcoat: 0.52,
-    clearcoatRoughness: 0.16,
-    color: 0xffffff,
-    metalness: 0.08,
-    roughness: 0.2,
-  }),
+  createGeometry: () => new RoundedBoxGeometry(0.155, 0.155, 0.34, 3, 0.02),
+  createMaterial: createVoxelPhysicalMaterial,
   createRenderer: createDefaultRenderer,
   loadEnvironment: loadDefaultEnvironment,
   now: () => performance.now(),
@@ -394,7 +464,7 @@ function viewportForWidth(width: number): ViewportKind {
 function normalizedDigits(digits: string[], capacity: number): string[] {
   return Array.from({ length: capacity }, (_, index) => {
     const value = digits[index];
-    return value && /^\d$/.test(value) ? value : '';
+    return value && (/^\d$/.test(value) || /^[A-Za-z:]$/.test(value)) ? value : '';
   });
 }
 
@@ -467,6 +537,18 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const instanceColor = new THREE.Color();
   quaternion.setFromEuler(new THREE.Euler(0, 0.28, 0));
 
+  let controls: OrbitControls | null = null;
+  if (typeof window !== 'undefined' && options.canvas) {
+    controls = new OrbitControls(camera, options.canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.02;
+    controls.minPolarAngle = 0.05;
+    controls.minDistance = 6;
+    controls.maxDistance = 65;
+    controls.target.set(0, -0.6, 0);
+  }
+
   const cleanupAfterFailure = (error: unknown): never => {
     const dispose = createIdempotentDisposer([...ownedResources].reverse());
     dispose();
@@ -486,6 +568,10 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     const countdown = options.mode === 'countdown';
     camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 32 : 27.5) : (countdown ? 25 : 19.2));
     camera.lookAt(0, mobile && countdown ? 0.2 : -1.2, 0);
+    if (controls) {
+      controls.target.set(0, mobile && countdown ? 0.2 : -0.6, 0);
+      controls.update();
+    }
     digitGroup.position.y = mobile ? -1.15 : -0.65;
     if (currentVehicle) applyCountdownVehiclePose(currentVehicle, viewport);
     if (floor) {
@@ -557,13 +643,18 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
     applyDigits(currentDigits, true);
 
     scene.add(new THREE.HemisphereLight(0x8da6d8, 0x08090d, 1.1));
-    const keyLight = new THREE.DirectionalLight(0xfff4e8, 3.6);
+    const keyLight = new THREE.DirectionalLight(0xfff4e8, 3.8);
     keyLight.position.set(4.5, 8, 7);
     keyLight.castShadow = quality.shadowsEnabled;
     scene.add(keyLight);
-    const rimLight = new THREE.PointLight(0x779cff, 22, 24, 1.6);
-    rimLight.position.set(-5, 2.5, 5);
+
+    const rimLight = new THREE.PointLight(0x55ccff, 26, 28, 1.5);
+    rimLight.position.set(-7, 2.5, 5);
     scene.add(rimLight);
+
+    const rimLight2 = new THREE.PointLight(0xff55aa, 18, 25, 1.6);
+    rimLight2.position.set(7, 2.5, 5);
+    scene.add(rimLight2);
 
     floor = ownResource(
       dependencies.createFloor(
@@ -608,6 +699,8 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
         const deltaTime = Math.max(0, Math.min((time - previousFrameTime) / 1000, 0.1));
         previousFrameTime = time;
         floor.update((time - animationStartedAt) / 1000);
+        defaultVoxelUniforms.uTime.value = (time - animationStartedAt) / 1000;
+        controls?.update();
         composer.render(deltaTime);
         frameCount += 1;
         if (!ready) {
@@ -641,6 +734,8 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
       animationResource,
       {
         dispose: () => {
+          controls?.dispose();
+          controls = null;
           if (currentVehicle) vehicleGroup.remove(currentVehicle);
           currentVehicle = null;
           digitGroup.clear();
@@ -667,9 +762,6 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
       resize: (width, height, pixelRatio) => {
         if (disposed || width <= 0 || height <= 0 || !renderer || !composer || !floor) return;
         const nextViewport = viewportForWidth(width);
-        // The source reference renders at one backing pixel per CSS pixel. Keep
-        // this isolated comparison route at the same density so its measured
-        // world bounds map to the same normalized viewport margins.
         const cappedPixelRatio = options.mode === 'reference'
           ? 1
           : Math.max(0.5, Math.min(pixelRatio, quality.maxPixelRatio));

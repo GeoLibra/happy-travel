@@ -21,7 +21,7 @@ import './countdown-page.css';
 
 const COUNTDOWN_SEED = 26;
 const SHANGHAI_TIME_ZONE = 'Asia/Shanghai';
-const EMPTY_DIGITS: string[] = [];
+const SHANGHAI_LETTERS = ['S', 'H', 'A', 'N', 'G', 'H', 'A', 'I'];
 
 type CountdownPageState =
   | { status: 'loading' }
@@ -57,11 +57,18 @@ function formatShanghaiTime(event: ResolvedRaceEvent, locale: 'zh' | 'en'): stri
 
 function countdownUnits(parts: CountdownParts): CountdownUnit[] {
   const digits = formatCountdownDigits(parts);
+  if (parts.days > 0) {
+    return [
+      { key: 'days', messageKey: 'countdown.units.days', value: digits.slice(0, 3).join('') },
+      { key: 'hours', messageKey: 'countdown.units.hours', value: digits.slice(3, 5).join('') },
+      { key: 'minutes', messageKey: 'countdown.units.minutes', value: digits.slice(5, 7).join('') },
+      { key: 'seconds', messageKey: 'countdown.units.seconds', value: digits.slice(7, 9).join('') },
+    ];
+  }
   return [
-    { key: 'days', messageKey: 'countdown.units.days', value: digits.slice(0, 3).join('') },
-    { key: 'hours', messageKey: 'countdown.units.hours', value: digits.slice(3, 5).join('') },
-    { key: 'minutes', messageKey: 'countdown.units.minutes', value: digits.slice(5, 7).join('') },
-    { key: 'seconds', messageKey: 'countdown.units.seconds', value: digits.slice(7, 9).join('') },
+    { key: 'hours', messageKey: 'countdown.units.hours', value: digits.slice(0, 2).join('') },
+    { key: 'minutes', messageKey: 'countdown.units.minutes', value: digits.slice(2, 4).join('') },
+    { key: 'seconds', messageKey: 'countdown.units.seconds', value: digits.slice(4, 6).join('') },
   ];
 }
 
@@ -174,7 +181,7 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
 
   const parts = state.status === 'loading' ? null : state.parts;
   const event = state.status === 'loading' ? null : state.event;
-  const digits = parts ? formatCountdownDigits(parts) : EMPTY_DIGITS;
+  const digits = parts ? formatCountdownDigits(parts) : SHANGHAI_LETTERS;
   const units = parts ? countdownUnits(parts) : [];
   const liveText = !parts
     ? t('countdown.loading')
@@ -185,7 +192,7 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
   return (
     <main
       className={`race-countdown-page race-countdown-page--${state.status}`}
-      data-countdown-display={parts?.elapsed ? 'lights-out' : digits.join('') || 'loading'}
+      data-countdown-display={parts?.elapsed ? 'lights-out' : digits.join('') || 'SHANGHAI'}
       data-countdown-layout={sceneSnapshot?.viewport === 'mobile' ? 'mobile-unit-rows' : sceneSnapshot?.viewport === 'desktop' ? 'desktop-row' : 'pending'}
       data-countdown-state={state.status}
       data-countdown-unit-rows={sceneSnapshot?.viewport === 'mobile' ? 'DDD|HH|MM|SS' : 'DDDHHMMSS'}
@@ -212,25 +219,6 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
 
         <header className="race-countdown-header">
           <p className="race-countdown-kicker">{t('countdown.eventTitle')}</p>
-          {event ? (
-            <>
-              <time
-                className="race-countdown-target"
-                data-time-zone={SHANGHAI_TIME_ZONE}
-                dateTime={event.startsAt.toISOString()}
-              >
-                {formatShanghaiTime(event, locale)} · {t('countdown.shanghaiTime')}
-              </time>
-              <p
-                className={`race-countdown-source race-countdown-source--${event.source}`}
-                data-countdown-source={event.source}
-              >
-                {event.source === 'official'
-                  ? t('countdown.official')
-                  : t('countdown.estimated')}
-              </p>
-            </>
-          ) : null}
         </header>
 
         {state.status === 'loading' ? (
@@ -240,8 +228,6 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
               <i /><i /><i /><i />
             </span>
           </section>
-        ) : parts?.elapsed ? (
-          <p className="race-countdown-lights-out">LIGHTS OUT</p>
         ) : state.status === 'webgl-fallback' ? (
           <section className="race-countdown-dom-fallback" data-countdown-fallback>
             {units.map((unit) => (
@@ -251,11 +237,7 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
               </div>
             ))}
           </section>
-        ) : (
-          <div className="race-countdown-unit-labels" aria-hidden="true">
-            {units.map((unit) => <span key={unit.key}>{t(unit.messageKey)}</span>)}
-          </div>
-        )}
+        ) : null}
 
         <p
           aria-atomic="true"

@@ -50,6 +50,31 @@ describe('buildDigitInstances', () => {
     expect(result.filter((item) => item.digitIndex === 1).every((item) => !item.visible)).toBe(true);
   });
 
+  it('places 6-digit countdown in three centered groups of 2 on desktop and 3 rows on mobile', () => {
+    const desktopResult = buildDigitInstances({
+      digits: ['0', '0', '0', '0', '0', '0'],
+      mode: 'countdown',
+      viewport: 'desktop',
+      seed: 26,
+    });
+    const desktopVisible = desktopResult.filter((item) => item.visible);
+    // 6 visible digits * active cells
+    expect(desktopVisible.length).toBeGreaterThan(0);
+    // Slots 6, 7, 8 are invisible
+    expect(desktopResult.filter((item) => item.digitIndex >= 6).every((item) => !item.visible)).toBe(true);
+
+    const mobileResult = buildDigitInstances({
+      digits: ['0', '0', '0', '0', '0', '0'],
+      mode: 'countdown',
+      viewport: 'mobile',
+      seed: 26,
+    });
+    const rowByDigit = Array.from({ length: 6 }, (_, digitIndex) => (
+      mobileResult.find((item) => item.digitIndex === digitIndex)?.groupRow
+    ));
+    expect(rowByDigit).toEqual([0, 0, 1, 1, 2, 2]);
+  });
+
   it('keeps mobile countdown units together in four semantic rows', () => {
     const result = buildDigitInstances({
       digits: ['8', '8', '8', '8', '8', '8', '8', '8', '8'],
@@ -87,7 +112,6 @@ describe('buildDigitInstances', () => {
     expect(DIGIT_LATTICE_ROWS).toBe(20);
     expect(DIGIT_LATTICE_COLUMNS).toBe(14);
     expect(result).toHaveLength(280);
-    expect(result.filter((item) => item.visible).length).toBeGreaterThan(logicalActiveCells * 4);
-    expect(result.filter((item) => item.visible).length).toBeLessThan(logicalActiveCells * 9);
+    expect(result.filter((item) => item.visible).length).toBe(logicalActiveCells * 4);
   });
 });

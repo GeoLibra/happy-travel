@@ -26,10 +26,16 @@ export function splitRemainingTime(targetMs: number, nowMs: number): CountdownPa
 }
 
 export function formatCountdownDigits(parts: CountdownParts): string[] {
-  return [
-    ...Math.max(0, Math.min(999, parts.days)).toString().padStart(3, '0'),
+  const hoursMinutesSeconds = [
     ...Math.max(0, Math.min(99, parts.hours)).toString().padStart(2, '0'),
     ...Math.max(0, Math.min(99, parts.minutes)).toString().padStart(2, '0'),
     ...Math.max(0, Math.min(99, parts.seconds)).toString().padStart(2, '0'),
   ];
+  if (parts.days > 0) {
+    return [
+      ...Math.max(0, Math.min(999, parts.days)).toString().padStart(3, '0'),
+      ...hoursMinutesSeconds,
+    ];
+  }
+  return hoursMinutesSeconds;
 }

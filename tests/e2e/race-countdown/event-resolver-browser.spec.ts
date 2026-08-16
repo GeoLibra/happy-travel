@@ -27,7 +27,7 @@ test('browser resolver aborts never-settling requests and returns the estimate',
     aborted: true,
     signalCount: 2,
     source: 'estimated',
-    startsAt: '2027-03-15T07:00:00.000Z',
+    startsAt: '2026-03-15T07:00:00.000Z',
   });
 });
 
@@ -53,6 +53,6 @@ test('browser resolver timeout wins over intercepted native fetch requests', asy
 
   expect(result).toEqual({
     source: 'estimated',
-    startsAt: '2027-03-15T07:00:00.000Z',
+    startsAt: '2026-03-15T07:00:00.000Z',
   });
 });

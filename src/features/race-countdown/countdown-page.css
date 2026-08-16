@@ -129,7 +129,7 @@
 }
 
 .race-countdown-page--loading .race-countdown-canvas {
-  opacity: 0;
+  opacity: 1;
 }
 
 .race-countdown-overlay {
@@ -245,6 +245,11 @@
   text-transform: uppercase;
 }
 
+.race-countdown-unit-labels--3-units {
+  grid-template-columns: repeat(3, 1fr);
+  width: min(600px, 60vw);
+}
+
 .race-countdown-dom-fallback {
   align-self: center;
   background: rgba(3, 8, 16, 0.72);
@@ -281,11 +286,7 @@
 }
 
 .race-countdown-loading {
-  align-self: center;
-  display: grid;
-  gap: 36px;
-  justify-self: center;
-  width: min(780px, 78vw);
+  display: none;
 }
 
 .race-countdown-loading-line,
