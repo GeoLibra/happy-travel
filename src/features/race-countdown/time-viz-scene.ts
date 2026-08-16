@@ -483,7 +483,11 @@ export function parseDigitInstanceColor(value: string): THREE.Color {
 
 export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<TimeVizScene> {
   if (!options.dependencies) {
-    return createTslTimeVizScene(options);
+    try {
+      return await createTslTimeVizScene(options);
+    } catch {
+      // Fallback to WebGL implementation when WebGPU is unsupported in environment
+    }
   }
   const dependencies = options.dependencies ?? defaultDependencies;
   const quality = dependencies.selectQuality(browserQualityOptions(Boolean(options.reducedMotion)));

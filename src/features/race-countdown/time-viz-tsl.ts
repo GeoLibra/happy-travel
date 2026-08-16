@@ -533,6 +533,19 @@ export async function createTslTimeVizScene(
     scene.add(fireworks.points);
     ownedResources.push(fireworks);
 
+    if (options.canvas) {
+      const targetCanvas = options.canvas;
+      const onPointerDown = (e: MouseEvent | PointerEvent) => {
+        if (e.button === 0) {
+          fireworks?.launchRandomFirework();
+        }
+      };
+      targetCanvas.addEventListener('pointerdown', onPointerDown);
+      ownedResources.push({
+        dispose: () => targetCanvas.removeEventListener('pointerdown', onPointerDown),
+      });
+    }
+
     const occupancy = new Uint8Array(instanceCount);
     const nextOccupancy = new Uint8Array(instanceCount);
     let occupancySeeded = false;

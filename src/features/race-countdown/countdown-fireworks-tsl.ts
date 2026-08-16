@@ -42,10 +42,10 @@ export interface FireworkShell {
 }
 
 const MAX_PARTICLES = 30000;
-const G = 5.5;
-const BURST_SPREAD = 1.4;
-const SIZE_SCALE = 18;
-const INTENSITY = 2.0;
+const G = 4.2;
+const BURST_SPREAD = 1.35;
+const SIZE_SCALE = 32.0;
+const INTENSITY = 2.5;
 const FIRST_LAUNCH_DELAY_SECONDS = 2.0;
 const RECURRING_LAUNCH_INTERVAL_SECONDS = 60.0;
 const TAU = Math.PI * 2;
@@ -290,12 +290,12 @@ export class CountdownFireworksSystem {
 
   public launchRandomFirework(): void {
     if (this.disposed) return;
-    const x = rand(-7.5, 7.5);
-    const z = rand(-6.0, -14.0);
+    const x = rand(-5.5, 5.5);
+    const z = rand(-2.0, -6.0);
     const y = 0;
-    const vx = rand(-0.4, 0.4);
-    const vz = rand(-0.4, 0.4);
-    const vy = rand(7.2, 9.2);
+    const vx = rand(-0.25, 0.25);
+    const vz = rand(-0.25, 0.25);
+    const vy = rand(5.2, 6.4);
 
     this.shells.push({
       x,
