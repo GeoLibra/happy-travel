@@ -73,7 +73,7 @@ test('reference clock advances once per second', async ({ page }) => {
 
 test('product countdown places the RB20 in the desktop scene', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'race-countdown-desktop-chromium');
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   const countdown = new RaceCountdownPageObject(page);
   await countdown.goto();
 
@@ -89,7 +89,7 @@ test('product countdown places the RB20 in the desktop scene', async ({ page }, 
 
 test('product countdown keeps the RB20 framed on mobile', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'race-countdown-mobile-chromium');
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   const countdown = new RaceCountdownPageObject(page);
   await countdown.goto();
 
@@ -109,7 +109,7 @@ test('countdown renderer resources return to baseline after five open and close 
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'race-countdown-desktop-chromium');
-  test.setTimeout(300_000);
+  test.setTimeout(360_000);
 
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);

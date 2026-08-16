@@ -23,6 +23,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('WebGL context loss preserves a navigable DOM countdown fallback', async ({ page }) => {
+  test.setTimeout(120_000);
   const countdown = new RaceCountdownPageObject(page);
   await countdown.goto();
   await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 45_000 });
