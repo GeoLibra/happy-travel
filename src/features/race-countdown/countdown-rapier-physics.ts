@@ -151,6 +151,7 @@ export class CountdownRapierPhysics {
     body.setAngvel({ x: wx, y: wy, z: wz }, true);
     body.wakeUp();
 
+    const alreadyActive = this.slotActive[p] === 1;
     this.slotActive[p] = 1;
     this.states[p] = 'falling';
     this.dwellTimes[p] = -1;
@@ -160,8 +161,10 @@ export class CountdownRapierPhysics {
     this.noiseOrigins[p * 3 + 1] = noiseOrigin[1];
     this.noiseOrigins[p * 3 + 2] = noiseOrigin[2];
 
-    this.activeIndices[this.activeCount] = p;
-    this.activeCount += 1;
+    if (!alreadyActive) {
+      this.activeIndices[this.activeCount] = p;
+      this.activeCount += 1;
+    }
 
     return p;
   }
@@ -186,6 +189,7 @@ export class CountdownRapierPhysics {
       if (this.slotActive[p] === 0) continue;
 
       const body = this.bodies[p];
+      if (!body) continue;
       const state = this.states[p];
 
       if (state === 'fading') {
@@ -197,7 +201,7 @@ export class CountdownRapierPhysics {
         if (remainingScale <= 0) {
           this.slotActive[p] = 0;
           this.states[p] = 'inactive';
-          body.setEnabled(false);
+          body.setEnabled?.(false);
           continue;
         }
 
@@ -214,7 +218,7 @@ export class CountdownRapierPhysics {
           this.states[p] = 'fading';
           this.fadeTimes[p] = 0;
           // Disable rigid body physics while shrinking to avoid CPU contact solving
-          body.setEnabled(false);
+          body.setEnabled?.(false);
         }
 
         this.activeIndices[write] = p;
@@ -223,21 +227,22 @@ export class CountdownRapierPhysics {
       }
 
       // state === 'falling'
-      const vel = body.linvel();
-      const angVel = body.angvel();
+      const vel = body.linvel?.();
+      if (!vel) continue;
+      const angVel = body.angvel?.() ?? { x: 0, y: 0, z: 0 };
       const linSpeed = Math.hypot(vel.x, vel.y, vel.z);
       const angSpeed = Math.hypot(angVel.x, angVel.y, angVel.z);
-      const pos = body.translation();
+      const pos = body.translation?.() ?? { x: 0, y: 0, z: 0 };
 
       // Check if settled (on floor or atop stack pile anywhere below spawn height)
       const isLowSpeed = linSpeed < 0.20 && angSpeed < 0.35;
-      const isSleeping = body.isSleeping();
+      const isSleeping = body.isSleeping ? body.isSleeping() : false;
       const isBelowSpawn = pos.y <= 3.5;
 
       if ((isSleeping || isLowSpeed) && isBelowSpawn) {
         this.states[p] = 'dwelling';
         this.dwellTimes[p] = 0;
-        body.sleep();
+        body.sleep?.();
       }
 
       this.activeIndices[write] = p;

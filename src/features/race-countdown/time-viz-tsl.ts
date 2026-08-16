@@ -737,11 +737,19 @@ export async function createTslTimeVizScene(
         ? 0
         : Math.min(FALL_DT_CLAMP, Math.max(0, (now - lastPhysicsNow) / 1000));
       lastPhysicsNow = now;
-      stepFallPhysics(dt);
-      fireworks?.update(now / 1000, dt);
+      try {
+        stepFallPhysics(dt);
+        fireworks?.update(now / 1000, dt);
+      } catch (err) {
+        console.error('Error during countdown physics update:', err);
+      }
     }
     controls?.update();
-    void renderer.render(scene, camera);
+    try {
+      void renderer.render(scene, camera);
+    } catch (err) {
+      console.error('Error during countdown scene render:', err);
+    }
     frameCount += 1;
     if (!ready) {
       ready = true;
