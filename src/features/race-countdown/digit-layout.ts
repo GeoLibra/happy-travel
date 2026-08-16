@@ -36,6 +36,8 @@ export const CELLS_PER_DIGIT = DIGIT_LATTICE_ROWS * DIGIT_LATTICE_COLUMNS;
 const REFERENCE_DIGIT_CAPACITY = 6;
 const COUNTDOWN_DIGIT_CAPACITY = 9;
 const DEFAULT_SEED = 26;
+const MOBILE_COUNTDOWN_ROW_STARTS = [0, 3, 5, 7] as const;
+const MOBILE_COUNTDOWN_ROW_LENGTHS = [3, 2, 2, 2] as const;
 
 const LAYOUTS: Record<ViewportKind, Omit<LayoutMetrics, 'columns' | 'rows' | 'digitCapacity'>> = {
   desktop: {
@@ -97,13 +99,32 @@ function isGlyphCellVisible(glyph: number[][] | undefined, row: number, column: 
 
 export function getTimeVizLayout(mode: TimeVizMode, viewport: ViewportKind): LayoutMetrics {
   const capacity = digitCapacity(mode);
-  const columns = viewport === 'desktop' ? capacity : 2;
+  const mobileCountdown = viewport === 'mobile' && mode === 'countdown';
+  const columns = viewport === 'desktop' ? capacity : mobileCountdown ? 3 : 2;
 
   return {
     ...LAYOUTS[viewport],
+    ...(mobileCountdown ? { rowSpacing: 4.2 } : {}),
     columns,
-    rows: Math.ceil(capacity / columns),
+    rows: mobileCountdown ? MOBILE_COUNTDOWN_ROW_LENGTHS.length : Math.ceil(capacity / columns),
     digitCapacity: capacity,
+  };
+}
+
+function mobileCountdownPlacement(digitIndex: number): {
+  column: number;
+  row: number;
+  rowLength: number;
+} {
+  const row = MOBILE_COUNTDOWN_ROW_STARTS.findIndex((start, index) => (
+    digitIndex >= start
+    && digitIndex < start + MOBILE_COUNTDOWN_ROW_LENGTHS[index]
+  ));
+  const safeRow = Math.max(0, row);
+  return {
+    column: digitIndex - MOBILE_COUNTDOWN_ROW_STARTS[safeRow],
+    row: safeRow,
+    rowLength: MOBILE_COUNTDOWN_ROW_LENGTHS[safeRow],
   };
 }
 
@@ -118,12 +139,16 @@ export function buildDigitInstances({
   const instances: DigitInstance[] = [];
 
   for (let digitIndex = 0; digitIndex < layout.digitCapacity; digitIndex += 1) {
-    const groupColumn = digitIndex % layout.columns;
-    const groupRow = Math.floor(digitIndex / layout.columns);
+    const semanticMobilePlacement = mode === 'countdown' && viewport === 'mobile'
+      ? mobileCountdownPlacement(digitIndex)
+      : null;
+    const groupColumn = semanticMobilePlacement?.column ?? digitIndex % layout.columns;
+    const groupRow = semanticMobilePlacement?.row ?? Math.floor(digitIndex / layout.columns);
+    const rowLength = semanticMobilePlacement?.rowLength ?? layout.columns;
     const glyph = digitMatrices[Number(digits[digitIndex])];
     const originX = viewport === 'desktop' && mode === 'reference'
       ? (Math.floor(digitIndex / 2) - 1) * 6.1 + ((digitIndex % 2) - 0.5) * layout.digitSpacing
-      : (groupColumn - (layout.columns - 1) / 2) * layout.digitSpacing;
+      : (groupColumn - (rowLength - 1) / 2) * layout.digitSpacing;
     const originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
     const verticalCubeSpacing = viewport === 'mobile' ? 0.212 : 0.176;
 

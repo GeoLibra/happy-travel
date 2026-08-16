@@ -6,6 +6,7 @@ import {
   CELLS_PER_DIGIT,
   DIGIT_LATTICE_COLUMNS,
   DIGIT_LATTICE_ROWS,
+  getTimeVizLayout,
 } from '@/src/features/race-countdown/digit-layout';
 
 describe('buildDigitInstances', () => {
@@ -47,6 +48,34 @@ describe('buildDigitInstances', () => {
 
     expect(result).toHaveLength(9 * CELLS_PER_DIGIT);
     expect(result.filter((item) => item.digitIndex === 1).every((item) => !item.visible)).toBe(true);
+  });
+
+  it('keeps mobile countdown units together in four semantic rows', () => {
+    const result = buildDigitInstances({
+      digits: ['8', '8', '8', '8', '8', '8', '8', '8', '8'],
+      mode: 'countdown',
+      viewport: 'mobile',
+      seed: 26,
+    });
+    const rowByDigit = Array.from({ length: 9 }, (_, digitIndex) => (
+      result.find((item) => item.digitIndex === digitIndex)?.groupRow
+    ));
+
+    expect(getTimeVizLayout('countdown', 'mobile')).toMatchObject({ columns: 3, rows: 4 });
+    expect(rowByDigit).toEqual([0, 0, 0, 1, 1, 2, 2, 3, 3]);
+  });
+
+  it('fits all mobile countdown cubes inside the accepted vertical layout bounds', () => {
+    const visible = buildDigitInstances({
+      digits: ['8', '8', '8', '8', '8', '8', '8', '8', '8'],
+      mode: 'countdown',
+      viewport: 'mobile',
+      seed: 26,
+    }).filter((item) => item.visible);
+    const yCoordinates = visible.map((item) => item.position[1]);
+
+    expect(Math.min(...yCoordinates)).toBeGreaterThanOrEqual(-8.5);
+    expect(Math.max(...yCoordinates)).toBeLessThanOrEqual(8.5);
   });
 
   it('supersamples each logical glyph cell into a dense 20 by 14 lattice', () => {

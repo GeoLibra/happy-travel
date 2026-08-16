@@ -83,6 +83,18 @@ test('product countdown keeps the RB20 framed on mobile', async ({ page }, testI
   await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready');
   await expect(countdown.product).toHaveAttribute('data-countdown-vehicle', 'ready');
   await expect(countdown.canvas).toBeVisible();
+  await expect(countdown.product).toHaveAttribute('data-countdown-layout', 'mobile-unit-rows');
+  await expect(countdown.product).toHaveAttribute('data-countdown-unit-rows', 'DDD|HH|MM|SS');
+  await expect(countdown.unitLabels).toHaveCount(4);
+  const labelCenters = await countdown.unitLabels.evaluateAll((labels) => labels.map((label) => {
+    const bounds = label.getBoundingClientRect();
+    return bounds.top + bounds.height / 2;
+  }));
+  expect(labelCenters.every((center, index) => index === 0 || center > labelCenters[index - 1]))
+    .toBe(true);
+  expect(Math.min(...labelCenters)).toBeGreaterThan(0);
+  expect(Math.max(...labelCenters)).toBeLessThan(844);
+  await expect(countdown.canvas).toHaveCSS('height', '844px');
   await page.evaluate(() => new Promise<void>((resolve) => (
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
   )));

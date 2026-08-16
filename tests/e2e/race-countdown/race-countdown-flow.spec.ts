@@ -155,7 +155,32 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('happy-travel-locale', 'zh'));
 });
 
-test('returns from the itinerary countdown with keyboard and restores state through history', async ({ page }) => {
+test('compact itinerary countdown resolves the same future event instead of freezing on 2026 zeroes', async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name === 'race-countdown-mobile-chromium',
+    'The viewport-independent compact resolver contract is covered after the desktop ignition flow.',
+  );
+  await page.route('**/ergast/f1/*/circuits/shanghai/races.json', (route) => (
+    route.fulfill({ json: officialShanghaiFixture })
+  ));
+  const itinerary = new ItineraryPage(page);
+
+  await itinerary.completeWelcomeIgnition();
+
+  await expect(itinerary.fullCountdownButton).toHaveAttribute('data-compact-countdown-state', 'ready');
+  await expect(itinerary.fullCountdownButton).toHaveAttribute('data-compact-countdown-source', 'official');
+  await expect(itinerary.fullCountdownButton).toHaveAttribute(
+    'data-compact-countdown-target',
+    '2027-03-21T07:00:00.000Z',
+  );
+  await expect(itinerary.fullCountdownButton).not.toHaveAttribute('data-compact-countdown-display', '000000000');
+});
+
+test('returns from the itinerary countdown with keyboard and restores state through history', async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name === 'race-countdown-mobile-chromium',
+    'AMap vendor lifecycle is exercised in the desktop map view; mobile starts in list view.',
+  );
   test.setTimeout(180_000);
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);
@@ -261,7 +286,11 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   });
 });
 
-test('does not attach a stale AMap loader result after countdown suspension', async ({ page }) => {
+test('does not attach a stale AMap loader result after countdown suspension', async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name === 'race-countdown-mobile-chromium',
+    'The mobile list view does not request AMap until the user explicitly switches to the map.',
+  );
   test.setTimeout(180_000);
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);
@@ -374,7 +403,13 @@ test('shows estimated status when the API is unavailable', async ({ page }) => {
   await expect(countdown.sourceStatus).toHaveAttribute('data-countdown-source', 'estimated');
 });
 
-test('shows a loading state without zero countdown digits while resolution is pending', async ({ page }) => {
+test('falls back from a stalled resolution without showing zero countdown digits', async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalSetTimeout = window.setTimeout.bind(window);
+    window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => (
+      originalSetTimeout(handler, timeout === 8_000 ? 50 : timeout, ...args)
+    )) as typeof window.setTimeout;
+  });
   let releaseRoute = () => {};
   const routeGate = new Promise<void>((resolve) => { releaseRoute = resolve; });
   await page.route('**/ergast/f1/*/circuits/shanghai/races.json', async (route) => {
@@ -385,10 +420,10 @@ test('shows a loading state without zero countdown digits while resolution is pe
 
   await countdown.goto();
 
-  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'loading');
+  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready');
+  await expect(countdown.sourceStatus).toHaveAttribute('data-countdown-source', 'estimated');
   await expect(countdown.product).not.toHaveAttribute('data-countdown-display', '000000000');
   releaseRoute();
-  await expect(countdown.sourceStatus).toBeVisible();
 });
 
 test('keeps the resolved countdown and back control usable when WebGL is unavailable', async ({ page }) => {

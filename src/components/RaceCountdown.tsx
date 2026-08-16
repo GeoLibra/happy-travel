@@ -1,9 +1,16 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { digit } from './digit';
+import {
+  formatCountdownDigits,
+  splitRemainingTime,
+} from '../features/race-countdown/countdown-time';
+import {
+  resolveNextShanghaiRace,
+  type ResolvedRaceEvent,
+} from '../features/race-countdown/event-resolver';
 
 // ── CONFIGURATION & CONSTANTS ──
-const TARGET_DATE = new Date('2026-03-15T15:00:00+08:00').getTime();
 const RADIUS = 2.0; // Particle radius (increased for better stacking visibility)
 const COLORS = ["#33B5E5", "#0099CC", "#AA66CC", "#9933CC", "#99CC00", "#669900", "#FFBB33", "#FF8800", "#FF4444", "#CC0000"];
 const MAX_PARTICLES = 12000; // Massively increased from 2000 to allow infinite floor accumulation without disappearing
@@ -25,6 +32,40 @@ interface RaceCountdownProps {
 
 const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, triggerRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [resolvedEvent, setResolvedEvent] = useState<ResolvedRaceEvent | null>(null);
+  const [resolutionAttempt, setResolutionAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const controller = new AbortController();
+    setResolvedEvent(null);
+    void resolveNextShanghaiRace({ signal: controller.signal }).then((event) => {
+      if (!controller.signal.aborted) setResolvedEvent(event);
+    });
+    return () => controller.abort();
+  }, [active, resolutionAttempt]);
+
+  useEffect(() => {
+    if (!active || !resolvedEvent) return;
+    let timeoutId: number | undefined;
+    const scheduleNextCheck = () => {
+      const remainingMs = resolvedEvent.startsAt.getTime() - Date.now();
+      if (remainingMs <= 0) {
+        setResolutionAttempt((attempt) => attempt + 1);
+        return;
+      }
+      timeoutId = window.setTimeout(
+        scheduleNextCheck,
+        Math.min(remainingMs + 50, 2_147_000_000),
+      );
+    };
+    scheduleNextCheck();
+    return () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [active, resolvedEvent]);
+
+  const targetMs = resolvedEvent?.startsAt.getTime() ?? null;
 
   // Track previous time to detect changes for spawning particles
   const currentSecondsRef = useRef(-1);
@@ -37,7 +78,8 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
 
   // Function to calculate remaining time arrays
   const getRemainingTime = () => {
-    const diff = TARGET_DATE - new Date().getTime();
+    if (targetMs === null) return null;
+    const diff = targetMs - new Date().getTime();
     if (diff <= 0) return { d: 0, h: 0, m: 0, s: 0 };
     return {
       d: Math.floor(diff / (1000 * 60 * 60 * 24)),
@@ -48,7 +90,7 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
   };
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || targetMs === null) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -214,7 +256,7 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
       }
     };
 
-    const checkTimeChanges = (newTime: ReturnType<typeof getRemainingTime>, startX: number, startY: number) => {
+    const checkTimeChanges = (newTime: NonNullable<ReturnType<typeof getRemainingTime>>, startX: number, startY: number) => {
       let curX = startX;
 
       // Days (render conditionally)
@@ -294,6 +336,10 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
       const CANVAS_W = rect.width;
 
       const time = getRemainingTime();
+      if (!time) {
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
       const hasDays = time.d > 0;
       const dDigits = time.d >= 100 ? 3 : 2;
 
@@ -435,7 +481,10 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
       observer.disconnect();
       window.removeEventListener('resize', setCanvasSize);
     };
-  }, [active]);
+  }, [active, targetMs]);
+
+  const compactParts = targetMs === null ? null : splitRemainingTime(targetMs, Date.now());
+  const compactDisplay = compactParts ? formatCountdownDigits(compactParts).join('') : 'loading';
 
   return (
     <motion.button
@@ -444,6 +493,10 @@ const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, tr
       onClick={onOpen}
       disabled={!onOpen}
       aria-label="查看全屏倒计时"
+      data-compact-countdown-display={compactDisplay}
+      data-compact-countdown-source={resolvedEvent?.source}
+      data-compact-countdown-state={resolvedEvent ? 'ready' : 'loading'}
+      data-compact-countdown-target={resolvedEvent?.startsAt.toISOString()}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       style={{ minHeight: '60px' }}

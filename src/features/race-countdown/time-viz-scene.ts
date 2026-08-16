@@ -484,7 +484,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const updateCameraFraming = () => {
     const mobile = viewport === 'mobile';
     const countdown = options.mode === 'countdown';
-    camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 28 : 27.5) : (countdown ? 25 : 19.2));
+    camera.position.set(0.5, mobile && countdown ? 0.25 : 0.4, mobile ? (countdown ? 32 : 27.5) : (countdown ? 25 : 19.2));
     camera.lookAt(0, mobile && countdown ? 0.2 : -1.2, 0);
     digitGroup.position.y = mobile ? -1.15 : -0.65;
     if (currentVehicle) applyCountdownVehiclePose(currentVehicle, viewport);

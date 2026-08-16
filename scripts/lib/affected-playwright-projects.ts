@@ -41,6 +41,7 @@ const APP_MATRIX_PATHS = [
 
 const APP_BROWSER_PATHS = [
   /^src\/components\/digit\.ts$/,
+  /^src\/components\/MiniFirework\.tsx$/,
 ];
 
 const F1_BROWSER_PATHS = [
@@ -61,6 +62,7 @@ const F1_BROWSER_PATHS = [
 const COUNTDOWN_BROWSER_PATHS = [
   /^src\/features\/race-countdown\//,
   /^src\/components\/RaceCountdown\.tsx$/,
+  /^src\/components\/(?:MapComponent|MiniFirework)\.tsx$/,
   /^src\/components\/digit\.ts$/,
   /^src\/components\/showroom\/(?:asset-manager|showroom-assets|showroom-resource-lifecycle)\.ts$/,
   /^src\/lib\/model-loader\.ts$/,

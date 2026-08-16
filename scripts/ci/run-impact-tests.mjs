@@ -25,7 +25,16 @@ const e2eSuiteToPlaywright = {
   smoke: ['--project', 'app-desktop-chromium', '--project', 'showroom-desktop-chromium'],
   'itinerary-particles': ['--project', 'particles-e2e-chromium'],
   rose: ['--project', 'rose-e2e-chromium'],
+  'race-countdown': [
+    '--project', 'race-countdown-desktop-chromium',
+    '--project', 'race-countdown-mobile-chromium',
+  ],
+  'countdown-lifecycle': ['--project', 'webgl-renderer-lifecycle-chromium'],
 };
+
+export function getE2EPlaywrightArgs(suite) {
+  return e2eSuiteToPlaywright[suite];
+}
 
 // Map memory suite names to memlab scenarios
 const memorySuiteToScenario = {
@@ -93,7 +102,7 @@ export function runImpactTests() {
   if (selection.e2e.length > 0) {
     console.log(`\n>>> Executing E2E Tests: ${selection.e2e.join(' ')} <<<`);
     for (const suite of selection.e2e) {
-      const playwrightArgs = e2eSuiteToPlaywright[suite];
+      const playwrightArgs = getE2EPlaywrightArgs(suite);
       if (!playwrightArgs) {
         console.warn(`  No Playwright mapping for e2e suite '${suite}', skipping.`);
         continue;

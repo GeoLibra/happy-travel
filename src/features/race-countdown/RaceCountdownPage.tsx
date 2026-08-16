@@ -16,6 +16,7 @@ import {
   resolveNextShanghaiRace,
   type ResolvedRaceEvent,
 } from './event-resolver';
+import type { TimeVizSceneSnapshot } from './time-viz-types';
 import './countdown-page.css';
 
 const COUNTDOWN_SEED = 26;
@@ -69,6 +70,7 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
   const [state, setState] = useState<CountdownPageState>({ status: 'loading' });
   const [vehicle, setVehicle] = useState<CountdownVehicle | null>(null);
   const [vehicleState, setVehicleState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [sceneSnapshot, setSceneSnapshot] = useState<TimeVizSceneSnapshot | null>(null);
   const mountedRef = useRef(false);
   const initialResolutionStartedRef = useRef(false);
   const webglUnavailableRef = useRef(false);
@@ -116,7 +118,15 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
     mountedRef.current = true;
     if (!initialResolutionStartedRef.current) {
       initialResolutionStartedRef.current = true;
-      void resolveNextShanghaiRace().then(applyResolvedEvent);
+      void resolveNextShanghaiRace().then((event) => {
+        setState((current) => ({
+          event,
+          parts: remainingParts(event),
+          status: webglUnavailableRef.current || current.status === 'webgl-fallback'
+            ? 'webgl-fallback'
+            : 'ready',
+        }));
+      });
     }
 
     return () => {
@@ -145,12 +155,14 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
   useEffect(() => {
     if (!elapsed || resolvingElapsedEventRef.current) return;
 
+    const controller = new AbortController();
     resolvingElapsedEventRef.current = true;
-    void resolveNextShanghaiRace()
+    void resolveNextShanghaiRace({ signal: controller.signal })
       .then(applyResolvedEvent)
       .finally(() => {
         resolvingElapsedEventRef.current = false;
       });
+    return () => controller.abort();
   }, [elapsed]);
 
   const handleWebGLFailure = () => {
@@ -174,7 +186,9 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
     <main
       className={`race-countdown-page race-countdown-page--${state.status}`}
       data-countdown-display={parts?.elapsed ? 'lights-out' : digits.join('') || 'loading'}
+      data-countdown-layout={sceneSnapshot?.viewport === 'mobile' ? 'mobile-unit-rows' : sceneSnapshot?.viewport === 'desktop' ? 'desktop-row' : 'pending'}
       data-countdown-state={state.status}
+      data-countdown-unit-rows={sceneSnapshot?.viewport === 'mobile' ? 'DDD|HH|MM|SS' : 'DDDHHMMSS'}
       data-countdown-vehicle={vehicleState}
     >
       {state.status !== 'webgl-fallback' ? (
@@ -184,6 +198,7 @@ export function RaceCountdownPage({ onBack }: RaceCountdownPageProps) {
             mode="countdown"
             seed={COUNTDOWN_SEED}
             vehicle={vehicle?.object}
+            onSnapshot={setSceneSnapshot}
             onWebGLFailure={handleWebGLFailure}
           />
         </div>

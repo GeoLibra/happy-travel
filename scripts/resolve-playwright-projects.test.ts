@@ -168,6 +168,31 @@ test('particle itinerary changes select app and particles E2E only', () => {
   );
 });
 
+test('map lifecycle changes preserve particles coverage and add countdown lifecycle coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/components/MapComponent.tsx']),
+    [
+      'app-desktop-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+      'particles-e2e-chromium',
+    ],
+  );
+});
+
+test('mini firework timer changes select app and countdown lifecycle coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/components/MiniFirework.tsx']),
+    [
+      'app-desktop-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+    ],
+  );
+});
+
 test('rose changes select app and rose E2E only', () => {
   assert.deepEqual(
     resolveAffectedPlaywrightProjects(['tests/e2e/rose/rose-interaction-bloom.spec.ts']),

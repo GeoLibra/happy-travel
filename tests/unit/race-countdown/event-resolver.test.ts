@@ -56,4 +56,31 @@ describe('resolveNextShanghaiRace', () => {
     expect(result).toMatchObject({ source: 'estimated', season: 2026 });
     expect(result.startsAt.toISOString()).toBe('2026-03-15T07:00:00.000Z');
   });
+
+  it('aborts stalled Jolpica requests and resolves the estimated fallback within the timeout', async () => {
+    vi.useFakeTimers();
+    const observedSignals: AbortSignal[] = [];
+    const fetchImpl = vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+      if (init?.signal) observedSignals.push(init.signal);
+      return new Promise<Response>(() => {});
+    });
+
+    try {
+      const pending = resolveNextShanghaiRace({
+        now: new Date('2026-08-15T00:00:00+08:00'),
+        fetchImpl,
+        timeoutMs: 250,
+      });
+
+      await vi.advanceTimersByTimeAsync(250);
+      const result = await pending;
+
+      expect(result).toMatchObject({ source: 'estimated', season: 2027 });
+      expect(result.startsAt.toISOString()).toBe('2027-03-15T07:00:00.000Z');
+      expect(observedSignals).toHaveLength(2);
+      expect(observedSignals.every((signal) => signal.aborted)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

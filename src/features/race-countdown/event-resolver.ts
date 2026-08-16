@@ -1,5 +1,6 @@
 const JOLPICA_BASE_URL = 'https://api.jolpi.ca/ergast/f1';
 const SHANGHAI_TIME_ZONE = 'Asia/Shanghai';
+const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
 
 export interface ResolvedRaceEvent {
   startsAt: Date;
@@ -10,6 +11,8 @@ export interface ResolvedRaceEvent {
 export interface ResolveRaceOptions {
   now?: Date;
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 interface RaceResponse {
@@ -82,17 +85,43 @@ function parseRace(race: unknown, nowMs: number): ResolvedRaceEvent | undefined 
 }
 
 export async function resolveNextShanghaiRace(
-  { now = new Date(), fetchImpl = fetch }: ResolveRaceOptions = {},
+  {
+    now = new Date(),
+    fetchImpl = fetch,
+    signal,
+    timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  }: ResolveRaceOptions = {},
 ): Promise<ResolvedRaceEvent> {
+  const requestController = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let rejectTermination: ((error: Error) => void) | undefined;
+  const termination = new Promise<never>((_resolve, reject) => {
+    rejectTermination = reject;
+    timeoutId = setTimeout(() => {
+      requestController.abort(new DOMException('Jolpica request timed out', 'TimeoutError'));
+      reject(new Error('Jolpica request timed out'));
+    }, Math.max(0, timeoutMs));
+  });
+  const handleExternalAbort = () => {
+    requestController.abort(signal?.reason);
+    rejectTermination?.(new Error('Jolpica request aborted'));
+  };
+  if (signal?.aborted) handleExternalAbort();
+  else signal?.addEventListener('abort', handleExternalAbort, { once: true });
+
   try {
     const currentYear = shanghaiYear(now);
-    const responses = await Promise.all([currentYear, currentYear + 1].map(async (year) => {
-      const response = await fetchImpl(
-        `${JOLPICA_BASE_URL}/${year}/circuits/shanghai/races.json`,
-      );
-      if (!response.ok) throw new Error(`Jolpica request failed: ${response.status}`);
-      return asRaceResponse(await response.json());
-    }));
+    const responses = await Promise.race([
+      Promise.all([currentYear, currentYear + 1].map(async (year) => {
+        const response = await fetchImpl(
+          `${JOLPICA_BASE_URL}/${year}/circuits/shanghai/races.json`,
+          { signal: requestController.signal },
+        );
+        if (!response.ok) throw new Error(`Jolpica request failed: ${response.status}`);
+        return asRaceResponse(await response.json());
+      })),
+      termination,
+    ]);
 
     const candidates = responses
       .flatMap((response) => response.MRData.RaceTable.Races)
@@ -103,5 +132,8 @@ export async function resolveNextShanghaiRace(
     return candidates[0] ?? fallbackEvent(now);
   } catch {
     return fallbackEvent(now);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', handleExternalAbort);
   }
 }

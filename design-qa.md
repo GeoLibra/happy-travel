@@ -101,4 +101,13 @@
 - Fix round 1 changes only lifecycle instrumentation and affected-test routing. The exact five-cycle desktop browser path passed with real renderer/composer/vehicle/rAF/listener ownership returning to the zero baseline after each close; no camera, vehicle pose, digit, reflection, overlay, or CSS value changed.
 - Fix round 2 changes only affected-project routing and its resolver tests. Direct glyph, HDR environment, lifecycle-helper, and model-loader changes now select the dedicated countdown projects; no visual implementation or accepted evidence changed.
 
+### Iteration 9 — whole-branch mobile countdown correction, passed
+
+- Re-captured the integrated product at the exact `390 x 844` mobile project viewport in `output/reference/countdown-rb20-mobile.png` after the whole-branch review fix.
+- The nine product digits now use four semantic rows: `DDD / HH / MM / SS`. No unit is split across rows, and the four DOM captions occupy the matching vertical centers on the right edge.
+- Mobile countdown row spacing is `4.2` world units with the camera at Z `32`. A renderer-level projection regression uses the real instanced-mesh bounds and camera and requires every cube corner to remain inside the accepted vertical NDC envelope; the exact browser capture shows the top day row and bottom seconds row fully visible.
+- Individual cube size and the 20 x 14 lattice remain unchanged. The extra fit comes from semantic packing and camera framing, not cube compression.
+- The RB20 remains in the lower foreground and overlaps only the seconds unit. The title, Shanghai-local target, official/estimated badge, back control, and all four unit captions stay inside the viewport.
+- Exact mobile browser regression asserts `mobile-unit-rows`, `DDD|HH|MM|SS`, four strictly increasing label centers, the full 844px canvas height, and a successful screenshot capture. No P1/P2 visual issue remains.
+
 final result: passed
