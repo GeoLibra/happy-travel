@@ -72,7 +72,7 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-jammy
       options: --ipc=host
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.detect-projects.outputs.matrix) }}

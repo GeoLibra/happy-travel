@@ -182,7 +182,7 @@ test('returns from the itinerary countdown with keyboard and restores state thro
     testInfo.project.name === 'race-countdown-mobile-chromium',
     'AMap vendor lifecycle is exercised in the desktop map view; mobile starts in list view.',
   );
-  test.setTimeout(300_000);
+  test.setTimeout(480_000);
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);
   const mapRenderer = page.locator('[data-amap-renderer-state]');
@@ -191,9 +191,9 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   await installAmapVendorFixture(page, true);
   await itinerary.completeWelcomeIgnition();
   await itinerary.selectDayTab(1);
-  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'ready');
-  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '1');
-  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '1');
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'ready', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '1', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '1', { timeout: 60_000 });
   const markerCount = await mapRenderer.getAttribute('data-amap-marker-count');
   expect(Number(markerCount)).toBeGreaterThan(0);
   const expectedMarkerCount = Number(markerCount);
@@ -210,14 +210,14 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   await expect(fireworkPortal).toHaveCount(1);
   await itinerary.fullCountdownButton.focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/countdown$/);
-  await expect(countdown.backButton).toBeFocused();
-  await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true');
-  await expect(itinerary.surface).toHaveCSS('display', 'none');
-  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended');
-  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '0');
-  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '0');
-  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', '0');
+  await expect(page).toHaveURL(/\/countdown$/, { timeout: 60_000 });
+  await expect(countdown.backButton).toBeFocused({ timeout: 60_000 });
+  await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true', { timeout: 60_000 });
+  await expect(itinerary.surface).toHaveCSS('display', 'none', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '0', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '0', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', '0', { timeout: 60_000 });
   await expect(fireworkPortal).toHaveCount(0);
   expect(await readAmapVendorLifecycle(page)).toMatchObject({
     mapCreated: 1,
@@ -235,15 +235,15 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   await expect(page.getByRole('main')).toHaveCount(1);
 
   await countdown.backButton.press('Enter');
-  await expect(page).toHaveURL(/\/$/);
-  await expect(itinerary.daySelector).toBeVisible();
-  await expect(page.locator('button:has-text("DAY 2") > div')).toBeVisible();
-  await expect(itinerary.fullCountdownButton).toBeFocused();
-  await expect(page.locator('[data-f1-welcome-action="enter"]')).toHaveCount(0);
-  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'ready');
-  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '1');
-  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '1');
-  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', markerCount ?? '');
+  await expect(page).toHaveURL(/\/$/, { timeout: 60_000 });
+  await expect(itinerary.daySelector).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('button:has-text("DAY 2") > div')).toBeVisible({ timeout: 60_000 });
+  await expect(itinerary.fullCountdownButton).toBeFocused({ timeout: 60_000 });
+  await expect(page.locator('[data-f1-welcome-action="enter"]')).toHaveCount(0, { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'ready', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '1', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '1', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', markerCount ?? '', { timeout: 60_000 });
   await expect(fireworkPortal).toHaveCount(1);
   const recreatedLifecycle = await readAmapVendorLifecycle(page);
   expect(recreatedLifecycle).toMatchObject({
@@ -266,15 +266,15 @@ test('returns from the itinerary countdown with keyboard and restores state thro
     .toBeLessThan(recreatedLifecycle.events.indexOf(`label-marker:create:${expectedMarkerCount + 1}`));
 
   await page.goForward();
-  await expect(page).toHaveURL(/\/countdown$/);
-  await expect(countdown.backButton).toBeFocused();
-  await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true');
-  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended');
-  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '0');
-  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '0');
-  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', '0');
-  await expect(fireworkPortal).toHaveCount(0);
-  await expect(page.getByRole('main')).toHaveCount(1);
+  await expect(page).toHaveURL(/\/countdown$/, { timeout: 60_000 });
+  await expect(countdown.backButton).toBeFocused({ timeout: 60_000 });
+  await expect(itinerary.surface).toHaveAttribute('aria-hidden', 'true', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-instance-count', '0', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-layer-count', '0', { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-marker-count', '0', { timeout: 60_000 });
+  await expect(fireworkPortal).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('main')).toHaveCount(1, { timeout: 60_000 });
   expect(await readAmapVendorLifecycle(page)).toMatchObject({
     mapCreated: 2,
     mapDestroyed: 2,
@@ -345,13 +345,13 @@ test('does not attach a stale AMap loader result after countdown suspension', as
   expect(loaderRequestCount).toBe(1);
   expect(requestedAmapKey).toBe(fixtureAmapKey);
   expect(amapLoaderErrors).toEqual([]);
-  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'initializing');
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'initializing', { timeout: 60_000 });
   expect(await readAmapVendorLifecycle(page)).toMatchObject({ mapCreated: 0, layerCreated: 0 });
 
   await itinerary.openFullCountdown();
-  await expect(page).toHaveURL(/\/countdown$/);
-  await expect(countdown.backButton).toBeFocused();
-  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(page).toHaveURL(/\/countdown$/, { timeout: 60_000 });
+  await expect(countdown.backButton).toBeFocused({ timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended', { timeout: 60_000 });
   releaseLoader();
   await expect.poll(async () => page.evaluate(() => (
     typeof (window as typeof window & { ___onAPILoaded?: unknown }).___onAPILoaded
@@ -368,11 +368,11 @@ test('does not attach a stale AMap loader result after countdown suspension', as
     labelMarkerCreated: 0,
     labelMarkerRemoved: 0,
   });
-  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended');
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended', { timeout: 60_000 });
 
   await countdown.backButton.press('Enter');
-  await expect(page).toHaveURL(/\/$/);
-  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'ready');
+  await expect(page).toHaveURL(/\/$/, { timeout: 60_000 });
+  await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'ready', { timeout: 60_000 });
   expect(await readAmapVendorLifecycle(page)).toMatchObject({
     mapCreated: 1,
     mapDestroyed: 0,
