@@ -50,6 +50,7 @@ import {
 } from '@/src/lib/test-observability';
 
 import { applyCountdownVehiclePose } from './countdown-vehicle';
+import { CountdownStackHeightfield } from './countdown-stack-heightfield';
 import { getTimeVizLayout } from './digit-layout';
 import { TinySDF } from './tiny-sdf';
 import type {
@@ -485,6 +486,8 @@ export async function createTslTimeVizScene(
     const activeIndices = new Int32Array(MAX_FALL_PARTICLES);
     let activeCount = 0;
     let poolIndex = 0;
+    const heightfield = new CountdownStackHeightfield();
+    let lastHeightfieldResetTime = 0;
 
     const fallPosArray = new Float32Array(MAX_FALL_PARTICLES * 3);
     const fallScaleArray = new Float32Array(MAX_FALL_PARTICLES);
@@ -652,7 +655,6 @@ export async function createTslTimeVizScene(
           } else {
             fallGroundDwell[p] = nextDwell;
           }
-          fallPosArray[p * 3 + 2] = fallBaseZ[p] + maxZ;
           fallScaleArray[p] = 1;
           activeIndices[write] = p;
           write += 1;
@@ -664,16 +666,35 @@ export async function createTslTimeVizScene(
         fallOffsetY[p] += fallVelY[p] * dt;
         fallOffsetZ[p] += fallVelZ[p] * dt;
 
-        if (fallOffsetZ[p] >= maxZ) {
-          fallOffsetZ[p] = maxZ;
-          fallVelZ[p] *= -FALL_RESTITUTION;
-          fallVelX[p] *= 0.55;
-          fallVelY[p] *= 0.55;
-          if (Math.abs(fallVelZ[p]) < FALL_SETTLE_SPEED) {
-            fallVelX[p] = 0;
-            fallVelY[p] = 0;
-            fallVelZ[p] = 0;
-            fallGroundDwell[p] = 0;
+        const currentX = fallBaseX[p] + fallOffsetX[p];
+        const currentY = fallBaseY[p] + fallOffsetY[p];
+        const stackH = heightfield.queryHeight(currentX, currentY);
+        const curMaxZ = maxZ - stackH;
+
+        if (fallOffsetZ[p] >= curMaxZ) {
+          fallOffsetZ[p] = curMaxZ;
+          const grad = heightfield.queryGradient(currentX, currentY);
+          const slopeStrength = Math.hypot(grad.gx, grad.gy);
+
+          if (slopeStrength > 0.08 || stackH >= heightfield.maxHeight * 0.9) {
+            // Slope sliding downhill + forward/lateral scatter
+            fallVelX[p] = fallVelX[p] * (1 - 1.8 * dt) - grad.gx * 3.5 * dt + (Math.random() - 0.5) * 0.2 * dt;
+            fallVelY[p] = fallVelY[p] * (1 - 1.8 * dt) - grad.gy * 3.5 * dt + 0.3 * dt;
+            fallVelZ[p] *= -0.15;
+          } else {
+            // Ground friction deceleration
+            fallVelX[p] *= Math.max(0, 1 - 4.5 * dt);
+            fallVelY[p] *= Math.max(0, 1 - 4.5 * dt);
+            fallVelZ[p] *= -FALL_RESTITUTION;
+            if (Math.hypot(fallVelX[p], fallVelY[p]) < 0.1 && Math.abs(fallVelZ[p]) < FALL_SETTLE_SPEED) {
+              fallVelX[p] = 0;
+              fallVelY[p] = 0;
+              fallVelZ[p] = 0;
+              if (fallGroundDwell[p] < 0) {
+                fallGroundDwell[p] = 0;
+                heightfield.deposit(currentX, currentY, cubeSize * 0.7);
+              }
+            }
           }
         }
 
