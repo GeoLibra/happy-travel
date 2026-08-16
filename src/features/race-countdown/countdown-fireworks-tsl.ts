@@ -245,34 +245,7 @@ export class CountdownFireworksSystem {
   }
 
   public launchFestivalDisplay(): void {
-    if (this.disposed) return;
-    // Shell 1: Grand Golden Willow in the center-right high altitude
-    this.shells.push({
-      x: rand(0.5, 3.5),
-      y: 0,
-      z: rand(-2.5, -4.5),
-      vx: rand(-0.1, 0.15),
-      vy: rand(5.6, 6.4),
-      vz: rand(-0.15, 0.15),
-      color: new THREE.Color().setHSL(45 / 360, 1.0, 0.6),
-      type: 'willow',
-      trailTimer: 0,
-      burstScale: 1.15,
-    });
-
-    // Shell 2: Electric Cyan + Neon Pink Double Chrysanthemum slightly lower and left
-    this.shells.push({
-      x: rand(-3.5, -1.0),
-      y: 0,
-      z: rand(-2.0, -4.0),
-      vx: rand(-0.15, 0.1),
-      vy: rand(4.8, 5.4),
-      vz: rand(-0.15, 0.15),
-      color: new THREE.Color().setHSL(175 / 360, 1.0, 0.6),
-      type: 'double',
-      trailTimer: 0,
-      burstScale: 1.0,
-    });
+    this.launchRandomFirework();
   }
 
   public launchRandomFirework(): void {
