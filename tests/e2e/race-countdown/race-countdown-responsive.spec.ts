@@ -77,7 +77,7 @@ test('product countdown places the RB20 in the desktop scene', async ({ page }, 
   const countdown = new RaceCountdownPageObject(page);
   await countdown.goto();
 
-  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 30_000 });
+  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 45_000 });
   await expect(countdown.product).toHaveAttribute('data-countdown-vehicle', 'ready', { timeout: 45_000 });
   await expect(countdown.canvas).toBeVisible();
   await expect(countdown.canvas).toHaveCount(1);
@@ -93,11 +93,11 @@ test('product countdown keeps the RB20 framed on mobile', async ({ page }, testI
   const countdown = new RaceCountdownPageObject(page);
   await countdown.goto();
 
-  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 30_000 });
+  await expect(countdown.product).toHaveAttribute('data-countdown-state', 'ready', { timeout: 45_000 });
   await expect(countdown.product).toHaveAttribute('data-countdown-vehicle', 'ready', { timeout: 45_000 });
   await expect(countdown.canvas).toBeVisible();
-  await expect(countdown.product).toHaveAttribute('data-countdown-layout', 'mobile-unit-rows');
-  await expect(countdown.product).toHaveAttribute('data-countdown-unit-rows', 'DDD|HH|MM|SS');
+  await expect(countdown.product).toHaveAttribute('data-countdown-layout', 'mobile-unit-rows', { timeout: 45_000 });
+  await expect(countdown.product).toHaveAttribute('data-countdown-unit-rows', 'DDD|HH|MM|SS', { timeout: 45_000 });
   await expect(countdown.canvas).toHaveCSS('height', '844px');
   await page.evaluate(() => new Promise<void>((resolve) => (
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()))

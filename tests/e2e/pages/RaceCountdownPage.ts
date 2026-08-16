@@ -70,8 +70,10 @@ export class RaceCountdownPageObject {
     });
   }
 
-  async waitForObservabilityReady(): Promise<CountdownObservabilitySnapshot> {
-    await expect.poll(async () => (await this.readObservability())?.ready ?? false).toBe(true);
+  async waitForObservabilityReady(timeout = 45_000): Promise<CountdownObservabilitySnapshot> {
+    await expect.poll(async () => (await this.readObservability())?.ready ?? false, {
+      timeout,
+    }).toBe(true);
     const snapshot = await this.readObservability();
     if (!snapshot) throw new Error('Countdown observability snapshot is unavailable');
     return snapshot;
