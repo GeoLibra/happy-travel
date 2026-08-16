@@ -278,6 +278,12 @@ const MapComponent: React.FC<MapProps> = ({
     return () => {
       disposed = true;
       observer.disconnect();
+
+      // Clean up the AMap loader callback if it exists
+      if (typeof window !== 'undefined' && (window as any).___onAPILoaded) {
+        delete (window as any).___onAPILoaded;
+      }
+
       if (labelsLayer.current) {
         try {
           labelsLayer.current.clear();
