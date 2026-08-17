@@ -1,9 +1,16 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { digit } from './digit';
+import { digit, getGlyph } from './digit';
+import {
+  formatCountdownDigits,
+  splitRemainingTime,
+} from '../features/race-countdown/countdown-time';
+import {
+  resolveNextShanghaiRace,
+  type ResolvedRaceEvent,
+} from '../features/race-countdown/event-resolver';
 
 // ── CONFIGURATION & CONSTANTS ──
-const TARGET_DATE = new Date('2026-03-15T15:00:00+08:00').getTime();
 const RADIUS = 2.0; // Particle radius (increased for better stacking visibility)
 const COLORS = ["#33B5E5", "#0099CC", "#AA66CC", "#9933CC", "#99CC00", "#669900", "#FFBB33", "#FF8800", "#FF4444", "#CC0000"];
 const MAX_PARTICLES = 12000; // Massively increased from 2000 to allow infinite floor accumulation without disappearing
@@ -17,8 +24,50 @@ interface Particle {
   color: string;
 }
 
-const RaceCountdown: React.FC = () => {
+interface RaceCountdownProps {
+  onOpen?: () => void;
+  active?: boolean;
+  triggerRef?: React.Ref<HTMLDivElement>;
+}
+
+const RaceCountdown: React.FC<RaceCountdownProps> = ({ onOpen, active = true, triggerRef }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [resolvedEvent, setResolvedEvent] = useState<ResolvedRaceEvent | null>(null);
+  const [resolutionAttempt, setResolutionAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const controller = new AbortController();
+    void resolveNextShanghaiRace({ signal: controller.signal }).then((event) => {
+      if (!controller.signal.aborted) setResolvedEvent(event);
+    });
+    return () => controller.abort();
+  }, [active, resolutionAttempt]);
+
+  useEffect(() => {
+    if (!active || !resolvedEvent) return;
+    let timeoutId: number | undefined;
+    const scheduleNextCheck = () => {
+      const remainingMs = resolvedEvent.startsAt.getTime() - Date.now();
+      if (remainingMs <= 0) {
+        // If elapsed, throttle next check by 30 seconds rather than looping continuously
+        timeoutId = window.setTimeout(() => {
+          setResolutionAttempt((attempt) => attempt + 1);
+        }, 30_000);
+        return;
+      }
+      timeoutId = window.setTimeout(
+        scheduleNextCheck,
+        Math.min(remainingMs + 50, 2_147_000_000),
+      );
+    };
+    scheduleNextCheck();
+    return () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
+  }, [active, resolvedEvent]);
+
+  const targetMs = resolvedEvent?.startsAt.getTime() ?? null;
 
   // Track previous time to detect changes for spawning particles
   const currentSecondsRef = useRef(-1);
@@ -31,7 +80,8 @@ const RaceCountdown: React.FC = () => {
 
   // Function to calculate remaining time arrays
   const getRemainingTime = () => {
-    const diff = TARGET_DATE - new Date().getTime();
+    if (targetMs === null) return null;
+    const diff = targetMs - new Date().getTime();
     if (diff <= 0) return { d: 0, h: 0, m: 0, s: 0 };
     return {
       d: Math.floor(diff / (1000 * 60 * 60 * 24)),
@@ -42,6 +92,8 @@ const RaceCountdown: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!active || targetMs === null) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -76,12 +128,12 @@ const RaceCountdown: React.FC = () => {
     let DIGIT_GAP = 1 * CELL; // Space between digits in same unit
     let UNIT_GAP = 2 * CELL; // Space between unit and colon
 
-    const renderDigit = (x: number, y: number, num: number, context: CanvasRenderingContext2D) => {
+    const renderDigit = (x: number, y: number, num: number | string, context: CanvasRenderingContext2D) => {
       // digit[10] is the colon ':'
-      const matrix = digit[num];
+      const matrix = typeof num === 'number' ? digit[num] : getGlyph(num);
       if (!matrix) return;
 
-      context.fillStyle = num === 10 ? "#001A30" : "#E10600"; // Red for numbers, Dark for colon
+      context.fillStyle = (num === 10 || num === ':') ? "#001A30" : "#E10600"; // Red for numbers/letters, Dark for colon
 
       for (let i = 0; i < matrix.length; i++) {
         for (let j = 0; j < matrix[i].length; j++) {
@@ -206,7 +258,7 @@ const RaceCountdown: React.FC = () => {
       }
     };
 
-    const checkTimeChanges = (newTime: ReturnType<typeof getRemainingTime>, startX: number, startY: number) => {
+    const checkTimeChanges = (newTime: NonNullable<ReturnType<typeof getRemainingTime>>, startX: number, startY: number) => {
       let curX = startX;
 
       // Days (render conditionally)
@@ -286,6 +338,10 @@ const RaceCountdown: React.FC = () => {
       const CANVAS_W = rect.width;
 
       const time = getRemainingTime();
+      if (!time) {
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
       const hasDays = time.d > 0;
       const dDigits = time.d >= 100 ? 3 : 2;
 
@@ -427,25 +483,45 @@ const RaceCountdown: React.FC = () => {
       observer.disconnect();
       window.removeEventListener('resize', setCanvasSize);
     };
-  }, []);
+  }, [active, targetMs]);
+
+  const compactParts = targetMs === null ? null : splitRemainingTime(targetMs, Date.now());
+  const compactDisplay = compactParts ? formatCountdownDigits(compactParts).join('') : 'loading';
 
   return (
     <motion.div
+      aria-label="赛事倒计时"
+      data-compact-countdown-display={compactDisplay}
+      data-compact-countdown-source={resolvedEvent?.source}
+      data-compact-countdown-state={resolvedEvent ? 'ready' : 'loading'}
+      data-compact-countdown-target={resolvedEvent?.startsAt.toISOString()}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       style={{ minHeight: '60px' }}
-      className="w-full flex justify-center relative touch-none"
+      className="relative z-20 flex min-h-[60px] w-full items-center justify-center rounded-xl border border-[#001A30]/10 bg-white/80 px-4 text-sm font-semibold text-[#001A30] shadow-sm select-none cursor-pointer"
+      onClick={onOpen}
     >
+      <button
+        ref={triggerRef as any}
+        type="button"
+        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+        data-compact-countdown-display={compactDisplay}
+        data-compact-countdown-source={resolvedEvent?.source}
+        data-compact-countdown-state={resolvedEvent ? 'ready' : 'loading'}
+        data-compact-countdown-target={resolvedEvent?.startsAt.toISOString()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen?.();
+        }}
+      >
+        查看全屏倒计时
+      </button>
+      <span className="sr-only">赛事倒计时</span>
+
       <canvas
-         ref={canvasRef}
-         className="fixed top-0 left-0 w-screen h-screen pointer-events-none drop-shadow-sm z-[15]"
-         aria-label="Race Countdown Canvas"
-         onClick={(e) => {
-           console.log('[RaceCountdown] Canvas clicked (should not happen with pointer-events-none)', {
-             target: e.target,
-             currentTarget: e.currentTarget,
-           });
-         }}
+        ref={canvasRef}
+        className="fixed top-0 left-0 w-screen h-screen pointer-events-none drop-shadow-sm z-[15]"
+        aria-label="Race Countdown Canvas"
       />
     </motion.div>
   );

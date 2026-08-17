@@ -39,6 +39,8 @@ test('showroom implementation and F1 model changes select the complete safety ma
       'showroom-mobile-chromium',
       'showroom-arrival-timeline-chromium',
       'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
       'showroom-webkit-smoke',
       'f1-e2e-chromium',
     ],
@@ -59,10 +61,135 @@ test('F1 interaction changes select F1 browser and lifecycle coverage', () => {
   );
 });
 
+test('race countdown changes select desktop, mobile, and WebGL lifecycle coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects([
+      'src/features/race-countdown/time-viz-scene.ts',
+    ]),
+    [
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+    ],
+  );
+});
+
+test('shared observability changes select the complete scene safety matrix', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/lib/test-observability.ts']),
+    ALL_PLAYWRIGHT_PROJECTS,
+  );
+});
+
+test('shared showroom dependencies include countdown browser coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects([
+      'src/lib/showroom-quality.ts',
+      'src/components/showroom/asset-manager.ts',
+    ]),
+    [
+      'showroom-desktop-chromium',
+      'showroom-mobile-chromium',
+      'showroom-arrival-timeline-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+      'showroom-webkit-smoke',
+      'f1-e2e-chromium',
+    ],
+  );
+});
+
+test('countdown lifecycle helper preserves showroom coverage and adds countdown coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects([
+      'src/components/showroom/showroom-resource-lifecycle.ts',
+    ]),
+    [
+      'showroom-desktop-chromium',
+      'showroom-mobile-chromium',
+      'showroom-arrival-timeline-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+      'showroom-webkit-smoke',
+      'f1-e2e-chromium',
+    ],
+  );
+});
+
+test('countdown glyph changes preserve app coverage and add countdown coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/components/digit.ts']),
+    [
+      'app-desktop-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+    ],
+  );
+});
+
+test('countdown environment changes select dedicated countdown and lifecycle coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects([
+      'public/environments/lythwood_room_1k.hdr',
+    ]),
+    [
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+    ],
+  );
+});
+
+test('shared model loader changes select all direct browser consumers', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/lib/model-loader.ts']),
+    [
+      'app-desktop-chromium',
+      'showroom-desktop-chromium',
+      'showroom-mobile-chromium',
+      'showroom-arrival-timeline-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+      'showroom-webkit-smoke',
+      'f1-e2e-chromium',
+      'rose-e2e-chromium',
+    ],
+  );
+});
+
 test('particle itinerary changes select app and particles E2E only', () => {
   assert.deepEqual(
     resolveAffectedPlaywrightProjects(['tests/e2e/itinerary-particles/particles.spec.ts']),
     ['app-desktop-chromium', 'particles-e2e-chromium'],
+  );
+});
+
+test('map lifecycle changes preserve particles coverage and add countdown lifecycle coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/components/MapComponent.tsx']),
+    [
+      'app-desktop-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+      'particles-e2e-chromium',
+    ],
+  );
+});
+
+test('mini firework timer changes select app and countdown lifecycle coverage', () => {
+  assert.deepEqual(
+    resolveAffectedPlaywrightProjects(['src/components/MiniFirework.tsx']),
+    [
+      'app-desktop-chromium',
+      'webgl-renderer-lifecycle-chromium',
+      'race-countdown-desktop-chromium',
+      'race-countdown-mobile-chromium',
+    ],
   );
 });
 

@@ -73,6 +73,22 @@ export default defineConfig({
       },
     },
     {
+      name: 'race-countdown-desktop-chromium',
+      testMatch: 'race-countdown/**/*.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
+      },
+    },
+    {
+      name: 'race-countdown-mobile-chromium',
+      testMatch: 'race-countdown/**/*.spec.ts',
+      use: {
+        ...devices['Pixel 7'],
+        viewport: { width: 390, height: 844 },
+      },
+    },
+    {
       name: 'showroom-webkit-smoke',
       testMatch: /showroom-webkit-smoke\.spec\.ts/,
       use: {
@@ -106,4 +122,3 @@ export default defineConfig({
     },
   ],
 });
-

@@ -28,6 +28,15 @@
       }
     },
     {
+      "pattern": "^src/features/race-countdown/.*|src/components/(?:RaceCountdown|MapComponent|MiniFirework)\\.tsx$|tests/(?:unit|e2e)/race-countdown/.*",
+      "suites": {
+        "unit": ["tests/unit/race-countdown"],
+        "assets": [],
+        "e2e": ["race-countdown", "countdown-lifecycle"],
+        "memory": []
+      }
+    },
+    {
       "pattern": "^src/i18n/.*|src/data/itinerary\\.json$",
       "suites": {
         "unit": ["tests/unit/i18n"],
@@ -47,9 +56,9 @@
     }
   ],
   "fullFallback": {
-    "unit": ["tests/unit/ci", "tests/unit/f1", "tests/unit/particles", "tests/unit/rose", "tests/unit/i18n"],
+    "unit": ["tests/unit/ci", "tests/unit/f1", "tests/unit/particles", "tests/unit/rose", "tests/unit/i18n", "tests/unit/race-countdown"],
     "assets": ["all"],
-    "e2e": ["f1", "itinerary-particles", "rose", "smoke"],
+    "e2e": ["f1", "itinerary-particles", "rose", "smoke", "race-countdown", "countdown-lifecycle"],
     "memory": ["f1", "particles", "rose"]
   }
 }

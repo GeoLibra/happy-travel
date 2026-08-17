@@ -96,6 +96,7 @@ export default function MiniFirework() {
   const fireworkContent = (
     <div
       className="pointer-events-none"
+      data-mini-firework-portal
       style={{
         position: 'fixed',
         top: pos.top,

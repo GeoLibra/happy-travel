@@ -17,6 +17,7 @@
     "check:f1": "node --import tsx scripts/check-f1-motion.ts && node --import tsx scripts/check-f1-glitch-sequence.ts && node --import tsx scripts/check-f1-wheel-hold.ts && node --import tsx scripts/check-f1-airflow.ts && node --import tsx scripts/check-f1-welcome.ts && node --import tsx scripts/check-f1-studio.ts && node --import tsx scripts/check-f1-showroom-interaction.ts && node --import tsx scripts/check-f1-arrival-motion.ts && node --import tsx scripts/check-f1-reflection.ts && node --import tsx scripts/check-f1-model.ts && node scripts/verify-rb20-showroom-v5.mjs public/models/2024_redbull_rb20_showroom_v5.glb",
     "check:f1-model": "node --import tsx scripts/check-f1-model.ts",
     "check:webgl-lifecycle": "playwright test --project=webgl-renderer-lifecycle-chromium",
+    "check:countdown": "vitest run tests/unit/race-countdown && playwright test --project=race-countdown-desktop-chromium --project=race-countdown-mobile-chromium",
     "check:rose": "node scripts/verify-rose-glb.mjs public/models/rose.glb && node --import tsx scripts/check-rose-animation.ts && node --import tsx scripts/check-shake-detection.ts",
     "check:i18n": "node --import tsx scripts/check-i18n.ts",
     "test:memory": "node scripts/ci/run-memlab.mjs",
@@ -29,6 +30,7 @@
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
+    "@dimforge/rapier3d-compat": "^0.20.0",
     "@google/genai": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/three": "^0.183.1",

@@ -37,6 +37,9 @@ import f1EngineShiftSound from './audio/f1-engine-2.mp3';
 import successSound from './audio/success.mp3';
 import { localizeItinerary, useI18n } from './i18n';
 import { EMPTY_SHAKE_STATE, stepShakeDetection } from './lib/shake-detection';
+import { ReferenceTimeVizPage } from './features/race-countdown/ReferenceTimeVizPage';
+import { RaceCountdownPage } from './features/race-countdown/RaceCountdownPage';
+import { useCountdownNavigation } from './features/race-countdown/useCountdownNavigation';
 
 const TypeIcon = ({ type, className }: { type: Location['type'], className?: string }) => {
   switch (type) {
@@ -53,7 +56,13 @@ const TypeIcon = ({ type, className }: { type: Location['type'], className?: str
   }
 };
 
-export default function App() {
+interface HappyTravelAppProps {
+  onOpenCountdown: () => void;
+  countdownTriggerRef: React.Ref<HTMLDivElement>;
+  inactive: boolean;
+}
+
+function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: HappyTravelAppProps) {
   const { locale, t, toggleLocale } = useI18n();
   const [showWelcome, setShowWelcome] = useState(true);
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
@@ -226,7 +235,13 @@ export default function App() {
   };
 
   return (
-    <>
+    <div
+      data-itinerary-surface
+      aria-hidden={inactive || undefined}
+      inert={inactive}
+      style={{ display: inactive ? 'none' : undefined }}
+    >
+      <>
       <AnimatePresence>
         {showWelcome && (
           <WelcomePage
@@ -332,7 +347,14 @@ export default function App() {
         )}>
           {/* Prominent Image Highlight */}
           <div className="relative w-full shrink-0 z-20 mt-4">
-            <div className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={onOpenCountdown}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpenCountdown(); }}
+              aria-label="查看赛事海报"
+              className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E10600]"
+            >
               <img
                  src={tripImage}
                  alt="Trip Highlight"
@@ -341,11 +363,17 @@ export default function App() {
             </div>
             {/* Firework anchor placed exactly at the top right bounding corner */}
             <div className="absolute top-0 right-0 w-0 h-0 z-50 pointer-events-none">
-              {!showWelcome && <MiniFirework />}
+              {!showWelcome && !inactive && <MiniFirework />}
             </div>
-      </div>
+          </div>
 
-          {!showWelcome && <RaceCountdown />}
+          {!showWelcome && (
+            <RaceCountdown
+              onOpen={onOpenCountdown}
+              active={!inactive}
+              triggerRef={countdownTriggerRef}
+            />
+          )}
 
           {/* Day Selector with Swipe Support */}
           {/* Day Selector with Swipe Support */}
@@ -560,6 +588,7 @@ export default function App() {
           viewMode === 'list' && "hidden md:block"
         )}>
           <MapComponent
+            active={!inactive}
             locations={allLocations}
             selectedLocationId={selectedLocationId}
             onMarkerClick={(loc) => setSelectedLocationId(loc.id)}
@@ -593,6 +622,49 @@ export default function App() {
 
       <RoseModal isOpen={showRoseModal} onClose={() => setShowRoseModal(false)} />
     </motion.div>
+      </>
+    </div>
+  );
+}
+
+function CountdownNavigationApp() {
+  const { countdownOpen, openCountdown, closeCountdown } = useCountdownNavigation();
+  const [itineraryMounted, setItineraryMounted] = useState(() => !countdownOpen);
+  const countdownTriggerRef = useRef<HTMLDivElement>(null);
+  const wasCountdownOpenRef = useRef(countdownOpen);
+
+  useEffect(() => {
+    if (!countdownOpen) setItineraryMounted(true);
+  }, [countdownOpen]);
+
+  useEffect(() => {
+    const shouldRestoreFocus = wasCountdownOpenRef.current && !countdownOpen;
+    wasCountdownOpenRef.current = countdownOpen;
+    if (!shouldRestoreFocus) return;
+
+    const frameId = window.requestAnimationFrame(() => countdownTriggerRef.current?.focus());
+    return () => window.cancelAnimationFrame(frameId);
+  }, [countdownOpen]);
+
+  return (
+    <>
+      {itineraryMounted && (
+        <HappyTravelApp
+          onOpenCountdown={openCountdown}
+          countdownTriggerRef={countdownTriggerRef}
+          inactive={countdownOpen}
+        />
+      )}
+      {countdownOpen && (
+        <div className="relative z-[100]">
+          <RaceCountdownPage onBack={closeCountdown} />
+        </div>
+      )}
     </>
   );
+}
+
+export default function App() {
+  if (window.location.pathname === '/time-viz-reference') return <ReferenceTimeVizPage />;
+  return <CountdownNavigationApp />;
 }

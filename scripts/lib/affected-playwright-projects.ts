@@ -4,6 +4,8 @@ export const ALL_PLAYWRIGHT_PROJECTS = [
   'showroom-mobile-chromium',
   'showroom-arrival-timeline-chromium',
   'webgl-renderer-lifecycle-chromium',
+  'race-countdown-desktop-chromium',
+  'race-countdown-mobile-chromium',
   'showroom-webkit-smoke',
   'f1-e2e-chromium',
   'particles-e2e-chromium',
@@ -27,6 +29,7 @@ const FULL_MATRIX_PATHS = [
   /^index\.html$/,
   /^src\/App\.tsx$/,
   /^src\/i18n\.tsx$/,
+  /^src\/lib\/test-observability\.ts$/,
   /^src\/components\/(?:WelcomePage|ParticleBackground)\.tsx$/,
 ];
 
@@ -36,18 +39,38 @@ const APP_MATRIX_PATHS = [
   /^(?:tailwind|postcss)\.config\.[cm]?[jt]s$/,
 ];
 
+const APP_BROWSER_PATHS = [
+  /^src\/components\/digit\.ts$/,
+  /^src\/components\/MiniFirework\.tsx$/,
+];
+
 const F1_BROWSER_PATHS = [
   /^src\/App\.tsx$/,
   /^src\/components\/(?:WelcomePage|ParticleBackground)\.tsx$/,
   /^src\/components\/effects\/(?:f1|studio|gpu|showroom|.*Reflection)/,
   /^src\/components\/showroom\//,
   /^src\/lib\/(?:f1-|showroom-)/,
+  /^src\/lib\/model-loader\.ts$/,
   /^public\/models\/.*(?:f1|rb20|redbull|showroom).*\.glb$/i,
   /^tests\/e2e\/f1\//,
   /^tests\/e2e\/renderer-lifecycle\.spec\.ts$/,
   /^tests\/e2e\/pages\/(?:WelcomePage|ShowroomPage)\.ts$/,
   /^tests\/memory\/memlab\/f1-welcome\.cjs$/,
   /^scripts\/(?:check-f1|verify-f1|verify-rb20|f1-|run-f1)/,
+];
+
+const COUNTDOWN_BROWSER_PATHS = [
+  /^src\/features\/race-countdown\//,
+  /^src\/components\/RaceCountdown\.tsx$/,
+  /^src\/components\/(?:MapComponent|MiniFirework)\.tsx$/,
+  /^src\/components\/digit\.ts$/,
+  /^src\/components\/showroom\/(?:asset-manager|showroom-assets|showroom-resource-lifecycle)\.ts$/,
+  /^src\/lib\/model-loader\.ts$/,
+  /^src\/lib\/showroom-quality\.ts$/,
+  /^public\/environments\/lythwood_room_1k\.hdr$/,
+  /^public\/models\/.*(?:rb20|redbull|showroom).*\.glb$/i,
+  /^tests\/(?:e2e|unit)\/race-countdown\//,
+  /^tests\/e2e\/pages\/RaceCountdownPage\.ts$/,
 ];
 
 const PARTICLES_BROWSER_PATHS = [
@@ -59,6 +82,7 @@ const PARTICLES_BROWSER_PATHS = [
 
 const ROSE_BROWSER_PATHS = [
   /^src\/components\/(?:Rose|.*Rose)/,
+  /^src\/lib\/model-loader\.ts$/,
   /^src\/lib\/rose-/,
   /^public\/models\/rose\.glb$/i,
   /^tests\/e2e\/rose\//,
@@ -93,6 +117,10 @@ export function resolveAffectedPlaywrightProjects(
 
   const selected = new Set<PlaywrightProject>();
 
+  if (relevantPaths.some((path) => matchesAny(path, APP_BROWSER_PATHS))) {
+    selected.add('app-desktop-chromium');
+  }
+
   if (relevantPaths.some((path) => matchesAny(path, F1_BROWSER_PATHS))) {
     selected.add('showroom-desktop-chromium');
     selected.add('showroom-mobile-chromium');
@@ -100,6 +128,12 @@ export function resolveAffectedPlaywrightProjects(
     selected.add('showroom-webkit-smoke');
     selected.add('f1-e2e-chromium');
     selected.add('webgl-renderer-lifecycle-chromium');
+  }
+
+  if (relevantPaths.some((path) => matchesAny(path, COUNTDOWN_BROWSER_PATHS))) {
+    selected.add('webgl-renderer-lifecycle-chromium');
+    selected.add('race-countdown-desktop-chromium');
+    selected.add('race-countdown-mobile-chromium');
   }
 
   if (relevantPaths.some((path) => matchesAny(path, PARTICLES_BROWSER_PATHS))) {
