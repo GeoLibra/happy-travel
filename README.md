@@ -40,7 +40,9 @@ Happy Travel is a React + Three.js trip planner for the 2026 Shanghai race weeke
 <p>
   <img width="3024" height="1494" alt="Happy Travel rose interaction screenshot" src="https://github.com/user-attachments/assets/ed4a1094-31f4-44f5-85c1-bf986795fdc3" />
 </p>
-
+<p>
+<img width="3024" height="1492" alt="image" src="https://github.com/user-attachments/assets/c6751e16-a623-4405-8232-1e9fa18ebbdd" />
+</p>
 ## Tech Stack
 
 | Area | Tools |
