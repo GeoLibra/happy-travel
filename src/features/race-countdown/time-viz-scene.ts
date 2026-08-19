@@ -575,13 +575,14 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
   const updateCameraFraming = () => {
     const mobile = viewport === 'mobile';
     const countdown = options.mode === 'countdown';
-    camera.position.set(0.5, mobile && countdown ? 1.8 : 1.2, mobile ? (countdown ? 32 : 27.5) : (countdown ? 22 : 19.2));
-    camera.lookAt(0, mobile && countdown ? 1.5 : 1.0, 0);
+    camera.fov = mobile ? (countdown ? 34 : 36) : 36;
+    camera.position.set(0, mobile && countdown ? 1.25 : 1.2, mobile ? (countdown ? 23.5 : 27.5) : (countdown ? 22 : 19.2));
+    camera.lookAt(0, mobile && countdown ? 0.95 : 1.0, 0);
     if (controls) {
-      controls.target.set(0, mobile && countdown ? 1.5 : 1.0, 0);
+      controls.target.set(0, mobile && countdown ? 0.95 : 1.0, 0);
       controls.update();
     }
-    digitGroup.position.y = mobile ? 1.5 : 1.4;
+    digitGroup.position.y = mobile ? (countdown ? 0.9 : 1.5) : 1.4;
     if (currentVehicle) applyCountdownVehiclePose(currentVehicle, viewport);
     if (floor) {
       floor.object.position.y = 0;
@@ -610,7 +611,7 @@ export async function createTimeVizScene(options: TimeVizSceneOptions): Promise<
         const instanceIndex = firstCell + cellOffset;
         const instance = instances[instanceIndex];
         position.set(instance.position[0], instance.position[1], instance.position[2]);
-        scale.setScalar(instance.visible ? 0.95 : 0.0001);
+        scale.setScalar(instance.visible ? (instance.scale ?? 1.0) * 0.95 : 0.0001);
         matrix.compose(position, quaternion, scale);
         cellMesh.setMatrixAt(instanceIndex, matrix);
       }

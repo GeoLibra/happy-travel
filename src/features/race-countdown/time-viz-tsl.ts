@@ -72,7 +72,7 @@ const DESKTOP_CAMERA_REFERENCE = { x: 0, y: 0.5, z: 20, targetY: 0.5 } as const;
 const MOBILE_CAMERA_REFERENCE = { x: -30, y: 2, z: 50, targetY: 2.5 } as const;
 
 const DESKTOP_CAMERA_COUNTDOWN = { x: 0, y: 1.15, z: 23.5, targetY: 1.05 } as const;
-const MOBILE_CAMERA_COUNTDOWN = { x: -18, y: 3.8, z: 26, targetY: 1.2 } as const;
+const MOBILE_CAMERA_COUNTDOWN = { x: 0, y: 1.25, z: 23.5, targetY: 0.95 } as const;
 
 const MASK_DURATION_MS = 800;
 const FALL_GRAVITY = 14;
@@ -116,18 +116,31 @@ function remapRangeClamp(
 
 /** Matches countdown `mobileOffset()` local X. */
 function countdownMobileLocalX(digitIndex: number): number {
-  if (digitIndex < 3) return 2.6;
-  if (digitIndex < 5) return 0.9;
-  if (digitIndex < 7) return -0.9;
-  return -2.6;
+  const targetX = [-1.21, -0.83, -0.46, -0.14, 0.17, 0.44, 0.70, 0.97, 1.19];
+  const desktopX = [-4.56, -3.56, -2.56, -1.31, -0.31, 0.94, 1.94, 3.19, 4.19];
+  const scale = [0.39, 0.39, 0.39, 0.34, 0.34, 0.30, 0.30, 0.26, 0.26];
+  const idx = Math.max(0, Math.min(8, digitIndex));
+  return targetX[idx] - desktopX[idx] * scale[idx];
 }
 
-/** Matches countdown `mobileOffset()` local Z after the shared (0,0,-1.8) add. */
+/** Matches countdown `mobileOffset()` local Y (World Z - depth from back to front). */
+function countdownMobileLocalY(digitIndex: number): number {
+  const depths = [-0.80, -0.80, -0.80, -0.25, -0.25, 0.25, 0.25, 0.80, 0.80];
+  const idx = Math.max(0, Math.min(8, digitIndex));
+  return depths[idx];
+}
+
+/** Matches countdown `mobileOffset()` local Z (World Y - height). Set to 0 so all digits sit on water baseline! */
 function countdownMobileLocalZ(digitIndex: number): number {
-  if (digitIndex < 3) return -5.4;
-  if (digitIndex < 5) return -3.6;
-  if (digitIndex < 7) return -1.8;
-  return 0;
+  void digitIndex;
+  return 0.0;
+}
+
+/** Matches countdown `mobileScale()` per digit (从大到小: 天最大 -> 秒最小). */
+function countdownMobileScale(digitIndex: number): number {
+  const scales = [0.39, 0.39, 0.39, 0.34, 0.34, 0.30, 0.30, 0.26, 0.26];
+  const idx = Math.max(0, Math.min(8, digitIndex));
+  return scales[idx];
 }
 
 function sampleGlyphInside(
@@ -347,7 +360,7 @@ export async function createTslTimeVizScene(
     const ungappedX = (x / xCount) * fieldWidth - ungappedXHalf;
     for (let y = 0; y < yCount; y += 1) {
       for (let z = 0; z < zCount; z += 1) {
-        const depth = (z / zCount) * FIELD_DEPTH;
+        const depth = (z - (zCount - 1) / 2) * (cell * 0.55);
         const height = (y / yCount) * FIELD_HEIGHT - yHalf;
         dummy.position.set(gappedX, depth, height);
         dummy.updateMatrix();
@@ -424,19 +437,38 @@ export async function createTslTimeVizScene(
   let syncOccupancyOnTween: (nextDigits: string[]) => void = () => undefined;
   let lastPhysicsNow = 0;
 
+  const DESKTOP_DIGIT_CENTERS = [-4.56, -3.56, -2.56, -1.31, -0.31, 0.94, 1.94, 3.19, 4.19];
+  const MOBILE_TARGET_X = [-1.21, -0.83, -0.46, -0.14, 0.17, 0.44, 0.70, 0.97, 1.19];
+  const MOBILE_SCALES = [0.39, 0.39, 0.39, 0.34, 0.34, 0.30, 0.30, 0.26, 0.26];
+  const MOBILE_DEPTHS = [-0.80, -0.80, -0.80, -0.25, -0.25, 0.25, 0.25, 0.80, 0.80];
+
+  const mobileScaleNode = isCountdown ? Fn(() => {
+    const index = floor(digitUvNode().x.mul(digitCount));
+    const s = float(1.0).toVar();
+    for (let i = 0; i < 9; i += 1) {
+      If(index.equal(float(i)), () => {
+        s.assign(float(MOBILE_SCALES[i]));
+      });
+    }
+    return s;
+  }) : Fn(() => float(1.0));
+
   const mobileOffset = isCountdown ? Fn(() => {
     const index = floor(digitUvNode().x.mul(digitCount));
     const offset = vec3(0, 0, 0).toVar();
-    If(index.lessThan(float(3)), () => {
-      offset.assign(vec3(2.6, 0, -3.6));
-    }).ElseIf(index.lessThan(float(5)), () => {
-      offset.assign(vec3(0.9, 0, -1.8));
-    }).ElseIf(index.lessThan(float(7)), () => {
-      offset.assign(vec3(-0.9, 0, 0.0));
-    }).Else(() => {
-      offset.assign(vec3(-2.6, 0, 1.8));
-    });
-    offset.assign(offset.add(vec3(0, 0, -1.8)));
+    for (let i = 0; i < 9; i += 1) {
+      If(index.equal(float(i)), () => {
+        const s = float(MOBILE_SCALES[i]);
+        const x0 = float(DESKTOP_DIGIT_CENTERS[i]);
+        const xm = float(MOBILE_TARGET_X[i]);
+        const zm = float(MOBILE_DEPTHS[i]);
+        const targetX = xm.add(gappedNode.x.sub(x0).mul(s));
+        const dx = targetX.sub(gappedNode.x);
+        const dy = zm.add(gappedNode.y.mul(s.sub(float(1.0))));
+        const dz = gappedNode.z.mul(s.sub(float(1.0)));
+        offset.assign(vec3(dx, dy, dz));
+      });
+    }
     return offset;
   }) : Fn(() => {
     const index = floor(digitUvNode().x.mul(digitCount));
@@ -457,6 +489,7 @@ export async function createTslTimeVizScene(
 
   material.positionNode = positionGeometry
     .mul(cubeScale())
+    .mul(mix(float(1.0), mobileScaleNode(), mobileUniform))
     .add(mix(vec3(0), mobileOffset(), mobileUniform));
   material.colorNode = Fn(() => {
     const t = noiseNode().mod(1).mul(remapClamp(cubeScale(), 0, 1, 0, 1));
@@ -593,10 +626,12 @@ export async function createTslTimeVizScene(
           const gy = gappedPositions[i * 3 + 1];
           const gz = gappedPositions[i * 3 + 2];
           const mobX = isMobile ? countdownMobileLocalX(slot) : 0;
+          const mobY = isMobile ? countdownMobileLocalY(slot) : 0;
           const mobZ = isMobile ? countdownMobileLocalZ(slot) : 0;
-          const worldX = gx + mobX + (mesh.position.x || 0);
-          const worldY = mesh.position.y - gz - mobZ;
-          const worldZ = gy;
+          const scale = isMobile ? countdownMobileScale(slot) : 1.0;
+          const worldX = (gx * scale) + mobX + (mesh.position.x || 0);
+          const worldY = mesh.position.y - (gz * scale) - mobZ;
+          const worldZ = (gy * scale) + mobY;
           rapierPhysics.spawnCube(worldX, worldY, worldZ, [gx, gy, gz]);
         }
       }

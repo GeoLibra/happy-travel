@@ -17,6 +17,7 @@ export interface DigitInstance {
   position: readonly [number, number, number];
   color: string;
   visible: boolean;
+  scale?: number;
 }
 
 export interface LayoutMetrics {
@@ -198,6 +199,11 @@ export function buildDigitInstances({
     let originX: number;
     let originY: number;
 
+    const isMobileCountdown9 = viewport === 'mobile' && mode === 'countdown' && !hasLetters && !is6DigitCountdown;
+    const isMobileCountdown6 = viewport === 'mobile' && mode === 'countdown' && !hasLetters && is6DigitCountdown;
+    let rowScale = 1.0;
+    let originZ = 0;
+
     if (viewport === 'desktop' && mode === 'reference') {
       originX = (Math.floor(digitIndex / 2) - 1) * 6.1 + ((digitIndex % 2) - 0.5) * layout.digitSpacing;
       originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
@@ -217,15 +223,40 @@ export function buildDigitInstances({
         originX = (digitIndex - 5 - 1) * 2.6;
         originY = -2.4;
       }
-    } else if (viewport === 'mobile' && is6DigitCountdown) {
-      originX = (groupColumn - 0.5) * layout.digitSpacing;
-      originY = ((3 - 1) / 2 - groupRow) * layout.rowSpacing;
+    } else if (isMobileCountdown6) {
+      // 6-digit countdown: HH (left), MM (mid), SS (right) - 从大到小，绝不重叠
+      const mobileGroupOffsets6 = [
+        { x: -0.64, z: -0.50, scale: 0.36 }, // Hours (2 位, scale 0.36)
+        { x: 0.00, z: 0.00, scale: 0.31 },  // Minutes (2 位, scale 0.31)
+        { x: 0.60, z: 0.50, scale: 0.26 },  // Seconds (2 位, scale 0.26)
+      ];
+      const grp = Math.floor(digitIndex / 2);
+      const colInGrp = digitIndex % 2;
+      const cfg = mobileGroupOffsets6[grp] ?? mobileGroupOffsets6[0];
+      rowScale = cfg.scale;
+      originX = cfg.x + (colInGrp - 0.5) * (0.31 * (rowScale / 0.36));
+      originY = 0;
+      originZ = cfg.z;
+    } else if (isMobileCountdown9) {
+      // 9-digit countdown: DDD (left), HH (mid-left), MM (mid-right), SS (right) - 从大到小，绝不重叠
+      const mobileGroupOffsets9 = [
+        { x: -0.83, z: -0.80, scale: 0.39 }, // Days (3 位, scale 0.39)
+        { x: 0.02, z: -0.25, scale: 0.34 },  // Hours (2 位, scale 0.34)
+        { x: 0.57, z: 0.25, scale: 0.30 },   // Minutes (2 位, scale 0.30)
+        { x: 1.08, z: 0.80, scale: 0.26 },   // Seconds (2 位, scale 0.26)
+      ];
+      const cfg = mobileGroupOffsets9[groupRow] ?? mobileGroupOffsets9[0];
+      rowScale = cfg.scale;
+      originX = cfg.x + (groupColumn - (rowLength - 1) / 2) * (0.37 * (rowScale / 0.39));
+      originY = 0;
+      originZ = cfg.z;
     } else {
       originX = (groupColumn - (rowLength - 1) / 2) * layout.digitSpacing;
       originY = ((layout.rows - 1) / 2 - groupRow) * layout.rowSpacing;
     }
 
-    const verticalCubeSpacing = viewport === 'mobile' ? 0.212 : 0.176;
+    const verticalCubeSpacing = (viewport === 'mobile' ? 0.212 : 0.176) * rowScale;
+    const horizontalCubeSpacing = layout.cubeSpacing * rowScale;
 
     for (let row = 0; row < DIGIT_LATTICE_ROWS; row += 1) {
       for (let column = 0; column < DIGIT_LATTICE_COLUMNS; column += 1) {
@@ -234,10 +265,11 @@ export function buildDigitInstances({
           digitIndex,
           groupRow,
           position: [
-            originX + (column - (DIGIT_LATTICE_COLUMNS - 1) / 2) * layout.cubeSpacing,
+            originX + (column - (DIGIT_LATTICE_COLUMNS - 1) / 2) * horizontalCubeSpacing,
             originY + ((DIGIT_LATTICE_ROWS - 1) / 2 - row) * verticalCubeSpacing,
-            0,
+            originZ,
           ],
+          scale: rowScale,
           color: pastelColor(random, digitIndex, row, column),
           visible: isGlyphCellVisible(glyph, row, column),
         });
