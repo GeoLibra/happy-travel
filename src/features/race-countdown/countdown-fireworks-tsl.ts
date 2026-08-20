@@ -249,7 +249,7 @@ export class CountdownFireworksSystem {
   }
 
   public launchRandomFirework(): void {
-    if (this.disposed) return;
+    if (this.disposed || this.shells.length > 0 || this.liveCount > 0) return;
     const x = rand(-5.0, 5.0);
     const z = rand(-2.0, -5.5);
     const y = 0;

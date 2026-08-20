@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 const COUNTDOWN_PATH = '/countdown';
+const ITINERARY_PATH = '/itinerary';
 const COUNTDOWN_HISTORY_STATE_KEY = 'happyTravelCountdown';
 
 function isCountdownOpen() {
@@ -44,7 +45,7 @@ export function useCountdownNavigation() {
       return;
     }
 
-    window.history.replaceState(window.history.state, '', '/');
+    window.history.replaceState(window.history.state, '', ITINERARY_PATH);
     setCountdownOpen(false);
   }, []);
 

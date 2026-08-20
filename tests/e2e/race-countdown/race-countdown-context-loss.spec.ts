@@ -37,5 +37,5 @@ test('WebGL context loss preserves a navigable DOM countdown fallback', async ({
   await expect(countdown.canvas).toHaveCount(0);
   await expect(countdown.backButton).toBeVisible();
   await countdown.backButton.click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/itinerary$/);
 });

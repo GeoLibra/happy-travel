@@ -235,7 +235,7 @@ test('returns from the itinerary countdown with keyboard and restores state thro
   await expect(page.getByRole('main')).toHaveCount(1);
 
   await countdown.backButton.press('Enter');
-  await expect(page).toHaveURL(/\/$/, { timeout: 60_000 });
+  await expect(page).toHaveURL(/\/itinerary$/, { timeout: 60_000 });
   await expect(itinerary.daySelector).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('button:has-text("DAY 2") > div')).toBeVisible({ timeout: 60_000 });
   await expect(itinerary.fullCountdownButton).toBeFocused({ timeout: 60_000 });
@@ -371,7 +371,7 @@ test('does not attach a stale AMap loader result after countdown suspension', as
   await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'suspended', { timeout: 60_000 });
 
   await countdown.backButton.press('Enter');
-  await expect(page).toHaveURL(/\/$/, { timeout: 60_000 });
+  await expect(page).toHaveURL(/\/itinerary$/, { timeout: 60_000 });
   await expect(mapRenderer).toHaveAttribute('data-amap-renderer-state', 'ready', { timeout: 60_000 });
   expect(await readAmapVendorLifecycle(page)).toMatchObject({
     mapCreated: 1,
@@ -428,7 +428,7 @@ test('keeps the resolved countdown and back control usable when WebGL is unavail
   await expect(countdown.domFallback.locator('[data-countdown-unit]')).toHaveCount(4);
   await expect(countdown.backButton).toBeVisible();
   await countdown.backButton.click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/itinerary$/);
 });
 
 test('updates the polite announcement at minute boundaries instead of every second', async ({ page }) => {

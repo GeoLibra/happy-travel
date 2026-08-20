@@ -35,3 +35,13 @@ test('default route renders the welcome experience without showroom overlay', as
   });
 });
 
+test('itinerary has its own path and only the countdown card opens countdown', async ({ page }) => {
+  await page.goto('/itinerary', { waitUntil: 'domcontentloaded' });
+
+  await expect(page.locator('[data-app-action="return-welcome"]')).toBeVisible();
+  await expect(page.locator('[data-f1-welcome-action="enter"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '查看赛事海报' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: '查看全屏倒计时' }).click();
+  await expect(page).toHaveURL(/\/countdown$/);
+});

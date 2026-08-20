@@ -76,7 +76,7 @@ test('countdown renderer resources return to baseline after five open and close 
     expect(active.resourceCount, `cycle ${cycle} must report owned resources`).toBeGreaterThan(0);
 
     await countdown.backButton.click();
-    await expect(page).toHaveURL(/\/$/, { timeout: 60_000 });
+    await expect(page).toHaveURL(/\/itinerary$/, { timeout: 60_000 });
     await expect.poll(async () => await countdown.readObservability(), { timeout: 120_000 }).toEqual(baseline);
   }
 });

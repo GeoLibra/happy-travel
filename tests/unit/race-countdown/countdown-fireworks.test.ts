@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   CountdownFireworksSystem,
+  type FireworkShell,
   type FireworkBurstType,
 } from '@/src/features/race-countdown/countdown-fireworks-tsl';
 
@@ -72,6 +73,27 @@ describe('CountdownFireworksSystem (WebGPU / TSL)', () => {
     // After bursting, live particles should have been emitted
     const liveCount = (system as unknown as { liveCount: number }).liveCount;
     expect(liveCount).toBeGreaterThan(100);
+
+    system.dispose();
+  });
+
+  it('ignores another launch until the current firework has fully finished', () => {
+    const system = new CountdownFireworksSystem();
+
+    system.launchFestivalDisplay();
+    system.launchFestivalDisplay();
+
+    expect((system as unknown as { shells: FireworkShell[] }).shells).toHaveLength(1);
+
+    for (let step = 0; step < 600; step += 1) {
+      system.update(step * 0.02, 0.02);
+    }
+
+    expect((system as unknown as { shells: FireworkShell[] }).shells).toHaveLength(0);
+    expect((system as unknown as { liveCount: number }).liveCount).toBe(0);
+
+    system.launchFestivalDisplay();
+    expect((system as unknown as { shells: FireworkShell[] }).shells).toHaveLength(1);
 
     system.dispose();
   });

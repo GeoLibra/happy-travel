@@ -64,7 +64,7 @@ interface HappyTravelAppProps {
 
 function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: HappyTravelAppProps) {
   const { locale, t, toggleLocale } = useI18n();
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(() => window.location.pathname !== '/itinerary');
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
   const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>();
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list'); // For mobile toggle
@@ -84,6 +84,28 @@ function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: Happ
   useEffect(() => {
     isModalOpenRef.current = showRoseModal;
   }, [showRoseModal]);
+
+  useEffect(() => {
+    const syncPageFromLocation = () => {
+      setShowWelcome(window.location.pathname !== '/itinerary');
+    };
+    window.addEventListener('popstate', syncPageFromLocation);
+    return () => window.removeEventListener('popstate', syncPageFromLocation);
+  }, []);
+
+  const openItinerary = () => {
+    if (window.location.pathname !== '/itinerary') {
+      window.history.pushState(window.history.state, '', '/itinerary');
+    }
+    setShowWelcome(false);
+  };
+
+  const openWelcome = () => {
+    if (window.location.pathname !== '/') {
+      window.history.pushState(window.history.state, '', '/');
+    }
+    setShowWelcome(true);
+  };
 
   const localizedItinerary = useMemo(() => localizeItinerary(ITINERARY_DATA, locale), [locale]);
   const allLocations = useMemo(() => localizedItinerary.flatMap(d => d.locations), [localizedItinerary]);
@@ -249,7 +271,7 @@ function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: Happ
             onPrepareEnter={() => { void requestMotionPermission(); }}
             onEnter={() => {
               console.log('[App] Entering application...');
-              setShowWelcome(false);
+              openItinerary();
             }}
           />
         )}
@@ -280,7 +302,7 @@ function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: Happ
             <button
               type="button"
               data-app-action="return-welcome"
-              onClick={() => setShowWelcome(true)}
+              onClick={openWelcome}
               aria-label="Return to Welcome"
               className="w-10 h-10 bg-[#001A30] rounded-xl flex items-center justify-center text-[#FFB800] shadow-lg shadow-[#001A30]/20 border border-white/10 relative overflow-hidden group cursor-pointer"
             >
@@ -348,12 +370,7 @@ function HappyTravelApp({ onOpenCountdown, countdownTriggerRef, inactive }: Happ
           {/* Prominent Image Highlight */}
           <div className="relative w-full shrink-0 z-20 mt-4">
             <div
-              role="button"
-              tabIndex={0}
-              onClick={onOpenCountdown}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpenCountdown(); }}
-              aria-label="查看赛事海报"
-              className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E10600]"
+              className="w-full h-48 md:h-56 rounded-2xl overflow-hidden relative shadow-xl shadow-slate-200/50 group border border-white/60 select-none"
             >
               <img
                  src={tripImage}
