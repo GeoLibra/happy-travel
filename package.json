@@ -19,6 +19,7 @@
     "check:f1-model": "node --import tsx scripts/check-f1-model.ts",
     "check:webgl-lifecycle": "playwright test --project=webgl-renderer-lifecycle-chromium",
     "check:countdown": "vitest run tests/unit/race-countdown && playwright test --project=race-countdown-desktop-chromium --project=race-countdown-mobile-chromium",
+    "check:countdown-lifecycle": "playwright test --project=race-countdown-lifecycle-chromium",
     "check:rose": "node scripts/verify-rose-glb.mjs public/models/rose.glb && node --import tsx scripts/check-rose-animation.ts && node --import tsx scripts/check-shake-detection.ts",
     "check:i18n": "node --import tsx scripts/check-i18n.ts",
     "test:memory": "node scripts/ci/run-memlab.mjs",

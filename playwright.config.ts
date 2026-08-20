@@ -75,6 +75,7 @@ export default defineConfig({
     {
       name: 'race-countdown-desktop-chromium',
       testMatch: 'race-countdown/**/*.spec.ts',
+      testIgnore: /race-countdown-lifecycle\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
@@ -83,9 +84,18 @@ export default defineConfig({
     {
       name: 'race-countdown-mobile-chromium',
       testMatch: 'race-countdown/**/*.spec.ts',
+      testIgnore: /race-countdown-lifecycle\.spec\.ts/,
       use: {
         ...devices['Pixel 7'],
         viewport: { width: 390, height: 844 },
+      },
+    },
+    {
+      name: 'race-countdown-lifecycle-chromium',
+      testMatch: /race-countdown-lifecycle\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 720 },
       },
     },
     {

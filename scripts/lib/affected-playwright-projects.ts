@@ -6,6 +6,7 @@ export const ALL_PLAYWRIGHT_PROJECTS = [
   'webgl-renderer-lifecycle-chromium',
   'race-countdown-desktop-chromium',
   'race-countdown-mobile-chromium',
+  'race-countdown-lifecycle-chromium',
   'showroom-webkit-smoke',
   'f1-e2e-chromium',
   'particles-e2e-chromium',
@@ -134,6 +135,7 @@ export function resolveAffectedPlaywrightProjects(
     selected.add('webgl-renderer-lifecycle-chromium');
     selected.add('race-countdown-desktop-chromium');
     selected.add('race-countdown-mobile-chromium');
+    selected.add('race-countdown-lifecycle-chromium');
   }
 
   if (relevantPaths.some((path) => matchesAny(path, PARTICLES_BROWSER_PATHS))) {

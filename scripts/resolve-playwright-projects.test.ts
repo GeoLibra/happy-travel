@@ -41,6 +41,7 @@ test('showroom implementation and F1 model changes select the complete safety ma
       'webgl-renderer-lifecycle-chromium',
       'race-countdown-desktop-chromium',
       'race-countdown-mobile-chromium',
+      'race-countdown-lifecycle-chromium',
       'showroom-webkit-smoke',
       'f1-e2e-chromium',
     ],
@@ -70,6 +71,7 @@ test('race countdown changes select desktop, mobile, and WebGL lifecycle coverag
       'webgl-renderer-lifecycle-chromium',
       'race-countdown-desktop-chromium',
       'race-countdown-mobile-chromium',
+      'race-countdown-lifecycle-chromium',
     ],
   );
 });
@@ -94,6 +96,7 @@ test('shared showroom dependencies include countdown browser coverage', () => {
       'webgl-renderer-lifecycle-chromium',
       'race-countdown-desktop-chromium',
       'race-countdown-mobile-chromium',
+      'race-countdown-lifecycle-chromium',
       'showroom-webkit-smoke',
       'f1-e2e-chromium',
     ],
@@ -112,6 +115,7 @@ test('countdown lifecycle helper preserves showroom coverage and adds countdown 
       'webgl-renderer-lifecycle-chromium',
       'race-countdown-desktop-chromium',
       'race-countdown-mobile-chromium',
+      'race-countdown-lifecycle-chromium',
       'showroom-webkit-smoke',
       'f1-e2e-chromium',
     ],
@@ -126,6 +130,7 @@ test('countdown glyph changes preserve app coverage and add countdown coverage',
       'webgl-renderer-lifecycle-chromium',
       'race-countdown-desktop-chromium',
       'race-countdown-mobile-chromium',
+      'race-countdown-lifecycle-chromium',
     ],
   );
 });
@@ -139,6 +144,7 @@ test('countdown environment changes select dedicated countdown and lifecycle cov
       'webgl-renderer-lifecycle-chromium',
       'race-countdown-desktop-chromium',
       'race-countdown-mobile-chromium',
+      'race-countdown-lifecycle-chromium',
     ],
   );
 });
@@ -154,6 +160,7 @@ test('shared model loader changes select all direct browser consumers', () => {
       'webgl-renderer-lifecycle-chromium',
       'race-countdown-desktop-chromium',
       'race-countdown-mobile-chromium',
+      'race-countdown-lifecycle-chromium',
       'showroom-webkit-smoke',
       'f1-e2e-chromium',
       'rose-e2e-chromium',
@@ -176,6 +183,7 @@ test('map lifecycle changes preserve particles coverage and add countdown lifecy
       'webgl-renderer-lifecycle-chromium',
       'race-countdown-desktop-chromium',
       'race-countdown-mobile-chromium',
+      'race-countdown-lifecycle-chromium',
       'particles-e2e-chromium',
     ],
   );
@@ -189,6 +197,7 @@ test('mini firework timer changes select app and countdown lifecycle coverage', 
       'webgl-renderer-lifecycle-chromium',
       'race-countdown-desktop-chromium',
       'race-countdown-mobile-chromium',
+      'race-countdown-lifecycle-chromium',
     ],
   );
 });

@@ -70,6 +70,7 @@ describe('Impact Resolver', () => {
     ]);
     expect(getE2EPlaywrightArgs('countdown-lifecycle')).toEqual([
       '--project', 'webgl-renderer-lifecycle-chromium',
+      '--project', 'race-countdown-lifecycle-chromium',
     ]);
   });
 

@@ -29,7 +29,10 @@ const e2eSuiteToPlaywright = {
     '--project', 'race-countdown-desktop-chromium',
     '--project', 'race-countdown-mobile-chromium',
   ],
-  'countdown-lifecycle': ['--project', 'webgl-renderer-lifecycle-chromium'],
+  'countdown-lifecycle': [
+    '--project', 'webgl-renderer-lifecycle-chromium',
+    '--project', 'race-countdown-lifecycle-chromium',
+  ],
 };
 
 export function getE2EPlaywrightArgs(suite) {
