@@ -1,11 +1,12 @@
 .time-viz-page {
   background: #0e0e0e;
   color: #f8fafc;
-  height: 100svh;
+  height: 100%;
+  min-height: 100dvh;
   inset: 0;
   overflow: hidden;
   position: fixed;
-  width: 100vw;
+  width: 100%;
 }
 
 .time-viz-page canvas {
@@ -112,12 +113,13 @@
     radial-gradient(circle at 50% 20%, rgba(20, 55, 89, 0.34), transparent 40%),
     #05060a;
   color: #f8fafc;
-  height: 100svh;
+  height: 100%;
+  min-height: 100dvh;
   inset: 0;
   isolation: isolate;
   overflow: hidden;
   position: fixed;
-  width: 100vw;
+  width: 100%;
 }
 
 .race-countdown-canvas {

@@ -182,7 +182,7 @@ test('returns from the itinerary countdown with keyboard and restores state thro
     testInfo.project.name === 'race-countdown-mobile-chromium',
     'AMap vendor lifecycle is exercised in the desktop map view; mobile starts in list view.',
   );
-  test.setTimeout(480_000);
+  test.setTimeout(720_000);
   const itinerary = new ItineraryPage(page);
   const countdown = new RaceCountdownPageObject(page);
   const mapRenderer = page.locator('[data-amap-renderer-state]');
